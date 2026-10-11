@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hire Car System
 
-## Getting Started
+Next.js dashboard for shared hire-car operations. Business records are stored in Supabase PostgreSQL. Supabase Auth handles email/password sign-in, and database row-level security allows authenticated users to share operational data while limiting account management to administrators.
 
-First, run the development server:
+## Supabase setup
+
+1. Create a Supabase project and add the project URL, publishable key, and service-role key to `.env.local`, using [.env.example](./.env.example) as the template. Set the same variables in the Vercel project. The service-role key is server-only and must never use a `NEXT_PUBLIC_` prefix.
+2. Apply [`supabase/migrations/20261011000000_initial_schema.sql`](./supabase/migrations/20261011000000_initial_schema.sql) once to the project using the Supabase SQL Editor. It creates the tables, RLS policies, auth profile trigger, and starter records carried over from the prototype.
+3. In Supabase Auth URL Configuration, set the Site URL to the app's origin and add redirect URLs for local development and the deployed app, including `/auth/confirm`. Disable public sign-ups; administrators create accounts by invitation.
+4. Create the first administrator from Supabase Dashboard → Authentication → Users. Use **Add user** with an email and password (and confirm the email). The database trigger creates the corresponding profile.
+5. Promote that profile in the SQL Editor, replacing the address with the first administrator's email:
+
+   ```sql
+   update public.profiles
+   set role = 'admin'
+   where email = lower('admin@example.com');
+   ```
+
+6. Run `npm run dev` and sign in at `/login`. Administrators can invite accounts and assign either role from **登录管理**. Invited users set their own passwords from the email link.
+
+The migration seeds the prototype's sample vehicles, drivers, companies, sources, and two sample orders. Remove those rows before using the project with real operational data if they are not wanted.
+
+All signed-in users share and can edit the same operational records. Only administrators can list, invite, edit, promote, or delete accounts. The application currently has one shared workspace; it does not isolate records by company.
+
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run `npm run lint` and `npm run build` before deployment.

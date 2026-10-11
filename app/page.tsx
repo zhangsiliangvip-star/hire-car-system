@@ -1,99 +1,33 @@
 
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import type {
+  ActiveView,
+  AccountProfile,
+  BatchAddType,
+  CalendarVehicleFilter,
+  Company,
+  CompanyDraft,
+  Driver,
+  DriverDraft,
+  LoginAccount,
+  Order,
+  OrderDraft,
+  OrderSource,
+  OrderSourceDraft,
+  OrderStatus,
+  Vehicle,
+  VehicleDisplayStatus,
+  VehicleDraft,
+  VehicleStatus,
+} from "@/lib/domain";
+import { usePersistedCollection } from "@/lib/use-persisted-collection";
+import { createClient as createSupabaseClient } from "@/lib/supabase/browser";
 
-type OrderStatus = "仮予約" | "予約確定" | "運行中" | "完了" | "キャンセル";
-type ActiveView =
-  | "calendar"
-  | "orders"
-  | "login"
-  | "drivers"
-  | "vehicles"
-  | "sources"
-  | "companies";
-type CalendarVehicleFilter = "all" | "alphard" | "hiace" | "tesla" | "external";
-
-type Order = {
-  id: number;
-  vehicle: string;
-  date: string;
-  endDate: string;
-  offDates: string[];
-  customer: string;
-  phone: string;
-  pickup: string;
-  destination: string;
-  time: string;
-  status: OrderStatus;
-  notes: string;
-  driver: string;
-  orderSource: string;
-  company: string;
-  salesRep: string;
-};
-
-type OrderDraft = Omit<Order, "id">;
-type Driver = {
-  id: number;
-  name: string;
-  phone: string;
-  wechat: string;
-  whatsapp: string;
-  licenseExpiry: string;
-};
-type DriverDraft = Omit<Driver, "id">;
-type VehicleStatus = "运营中" | "停运中";
-type VehicleDisplayStatus = VehicleStatus | "休運";
-type Vehicle = {
-  id: number;
-  name: string;
-  plate: string;
-  ownerCompany: string;
-  seats: string;
-  fuelType: string;
-  inspectionExpiry: string;
-  liabilityExpiry: string;
-  notes: string;
-  status: VehicleStatus;
-};
-type VehicleDraft = Omit<Vehicle, "id">;
-type OrderSource = {
-  id: number;
-  companyName: string;
-  contactName: string;
-  contactInfo: string;
-  color: string;
-};
-type OrderSourceDraft = Omit<OrderSource, "id">;
-type Company = {
-  id: number;
-  name: string;
-  operationsManager: string;
-  maintenanceManager: string;
-  phone: string;
-  rollCallAddress: string;
-  garageAddress: string;
-};
-type CompanyDraft = Omit<Company, "id">;
-type BatchAddType = "drivers" | "vehicles" | "sources" | "companies";
-type LoginAccount = {
-  id: number;
-  fullName: string;
-  loginId: string;
-  company: string;
-  position: string;
-  hasPassword: boolean;
-};
-
-const initialVehicles: Vehicle[] = [
-  { id: 1, name: "Alphard 01", plate: "", ownerCompany: "", seats: "", fuelType: "", inspectionExpiry: "", liabilityExpiry: "", notes: "", status: "运营中" },
-  { id: 2, name: "Alphard 02", plate: "", ownerCompany: "", seats: "", fuelType: "", inspectionExpiry: "", liabilityExpiry: "", notes: "", status: "运营中" },
-  { id: 3, name: "Alphard 03", plate: "", ownerCompany: "", seats: "", fuelType: "", inspectionExpiry: "", liabilityExpiry: "", notes: "", status: "运营中" },
-  { id: 4, name: "Hiace 01", plate: "", ownerCompany: "", seats: "", fuelType: "", inspectionExpiry: "", liabilityExpiry: "", notes: "", status: "运营中" },
-  { id: 5, name: "Crown 01", plate: "", ownerCompany: "", seats: "", fuelType: "", inspectionExpiry: "", liabilityExpiry: "", notes: "", status: "运营中" },
-];
+const DEFAULT_VEHICLE_NAME = "Alphard 01";
 
 const fuelTypes = ["レギュラー", "ディーゼル"];
 const vehicleNameOptions = [
@@ -254,30 +188,6 @@ function SourceColorPicker({
   );
 }
 
-const initialDrivers: Driver[] = [
-  { id: 1, name: "藤原 拓也", phone: "", wechat: "", whatsapp: "", licenseExpiry: "" },
-  { id: 2, name: "CHO / FUSHIN", phone: "", wechat: "", whatsapp: "", licenseExpiry: "" },
-  { id: 3, name: "FUJIWARA / TAKUYA", phone: "", wechat: "", whatsapp: "", licenseExpiry: "" },
-];
-
-const initialOrderSources: OrderSource[] = [
-  { id: 1, companyName: "直接客户", contactName: "", contactInfo: "", color: "#0f766e" },
-  { id: 2, companyName: "合作公司", contactName: "", contactInfo: "", color: "#2563eb" },
-  { id: 3, companyName: "旅行社", contactName: "", contactInfo: "", color: "#7c3aed" },
-  { id: 4, companyName: "网络平台", contactName: "", contactInfo: "", color: "#ea580c" },
-  { id: 5, companyName: "其他", contactName: "", contactInfo: "", color: "#475569" },
-];
-
-const initialCompanies: Company[] = [
-  { id: 1, name: "本公司", operationsManager: "", maintenanceManager: "", phone: "", rollCallAddress: "", garageAddress: "" },
-  { id: 2, name: "合作公司 A", operationsManager: "", maintenanceManager: "", phone: "", rollCallAddress: "", garageAddress: "" },
-  { id: 3, name: "合作公司 B", operationsManager: "", maintenanceManager: "", phone: "", rollCallAddress: "", garageAddress: "" },
-];
-
-const salesReps = [
-  "藤原 拓也",
-];
-
 const CUSTOM_DRIVER = "__custom_driver__";
 const CUSTOM_SOURCE = "__custom_source__";
 const UNSOURCED_ORDER = "__unsourced_order__";
@@ -415,6 +325,31 @@ function getCurrentMonthKey() {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function createId() {
+  return crypto.randomUUID();
+}
+
+type ImportedOrderDetails = {
+  time: string;
+  pickup: string;
+  destination: string;
+};
+
+function parseImportedOrderDetails(input: string): ImportedOrderDetails[] {
+  const timeAndLocations = /\b([01]?\d|2[0-3]):([0-5]\d)\b\s+(\S+)\s+(\S+)/g;
+  const orders: ImportedOrderDetails[] = [];
+
+  for (const match of input.matchAll(timeAndLocations)) {
+    orders.push({
+      time: `${match[1].padStart(2, "0")}:${match[2]}`,
+      pickup: match[3],
+      destination: match[4],
+    });
+  }
+
+  return orders;
+}
+
 const statusStyles: Record<OrderStatus, string> = {
   仮予約: "border-amber-200 bg-amber-50 text-amber-800",
   予約確定: "border-blue-200 bg-blue-50 text-blue-800",
@@ -424,7 +359,7 @@ const statusStyles: Record<OrderStatus, string> = {
 };
 
 function createEmptyDraft(
-  vehicle: string = initialVehicles[0].name,
+  vehicle: string = DEFAULT_VEHICLE_NAME,
   date: string = "2026-09-29",
 ): OrderDraft {
   return {
@@ -447,6 +382,7 @@ function createEmptyDraft(
 }
 
 export default function Home() {
+  const router = useRouter();
   const [calendarCenterDate, setCalendarCenterDate] = useState(() => getCenteredTodayDate());
   const [calendarVehicleFilter, setCalendarVehicleFilter] =
     useState<CalendarVehicleFilter>("all");
@@ -466,58 +402,62 @@ export default function Home() {
     calendarCenterDate.getMonth() + 1,
     0,
   );
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 1,
-      vehicle: "Alphard 01",
-      date: "2026-09-30",
-      endDate: "2026-09-30",
-      offDates: [],
-      customer: "王先生",
-      phone: "",
-      pickup: "东京",
-      destination: "成田机场",
-      time: "08:30",
-      status: "予約確定",
-      notes: "",
-      driver: "",
-      orderSource: "",
-      company: "",
-      salesRep: "",
-    },
-    {
-      id: 2,
-      vehicle: "Alphard 02",
-      date: "2026-10-02",
-      endDate: "2026-10-02",
-      offDates: [],
-      customer: "田中様",
-      phone: "",
-      pickup: "羽田机场",
-      destination: "银座",
-      time: "14:00",
-      status: "予約確定",
-      notes: "",
-      driver: "",
-      orderSource: "",
-      company: "",
-      salesRep: "",
-    },
-  ]);
+  const [isDataReady, setIsDataReady] = useState(false);
+  const [dataLoadError, setDataLoadError] = useState("");
+  const [persistenceError, setPersistenceError] = useState("");
+  const [pendingSaveCount, setPendingSaveCount] = useState(0);
+  const [accountError, setAccountError] = useState("");
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState<AccountProfile | null>(null);
+  const reportPersistenceError = useCallback((message: string) => {
+    setPersistenceError(message);
+  }, []);
+  const reportPendingSave = useCallback((change: number) => {
+    setPendingSaveCount((count) => Math.max(0, count + change));
+  }, []);
+  const {
+    items: orders,
+    updateItems: setOrders,
+    replaceItems: replaceOrders,
+  } = usePersistedCollection<Order>("orders", reportPersistenceError, reportPendingSave);
+  const {
+    items: orderSourceRecords,
+    updateItems: setOrderSourceRecords,
+    replaceItems: replaceOrderSourceRecords,
+  } = usePersistedCollection<OrderSource>("orderSources", reportPersistenceError, reportPendingSave);
+  const {
+    items: companyRecords,
+    updateItems: setCompanyRecords,
+    replaceItems: replaceCompanyRecords,
+  } = usePersistedCollection<Company>("companies", reportPersistenceError, reportPendingSave);
+  const {
+    items: driverRecords,
+    updateItems: setDriverRecords,
+    replaceItems: replaceDriverRecords,
+  } = usePersistedCollection<Driver>("drivers", reportPersistenceError, reportPendingSave);
+  const {
+    items: vehicleRecords,
+    updateItems: setVehicleRecords,
+    replaceItems: replaceVehicleRecords,
+  } = usePersistedCollection<Vehicle>("vehicles", reportPersistenceError, reportPendingSave);
 
   const [showForm, setShowForm] = useState(false);
+  const [showBatchOrderForm, setShowBatchOrderForm] = useState(false);
+  const [batchOrderInput, setBatchOrderInput] = useState("");
+  const [batchOrderDate, setBatchOrderDate] = useState("");
+  const [batchOrderVehicle, setBatchOrderVehicle] = useState("");
   const [pendingDelete, setPendingDelete] = useState<{
     message: string;
-    action: () => void;
+    action: () => void | Promise<void>;
   } | null>(null);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deletePasswordError, setDeletePasswordError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [batchAddType, setBatchAddType] = useState<BatchAddType | null>(null);
   const [batchInput, setBatchInput] = useState("");
-  const [draggingOrderId, setDraggingOrderId] = useState<number | null>(null);
+  const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
   const [dragTargetKey, setDragTargetKey] = useState<string | null>(null);
   const [splitSelection, setSplitSelection] = useState<{
-    orderId: number;
+    orderId: string;
     startDate: string | null;
     endDate: string | null;
   } | null>(null);
@@ -527,9 +467,8 @@ export default function Home() {
   const [orderMonth, setOrderMonth] = useState(getCurrentMonthKey);
   const [orderSourceFilter, setOrderSourceFilter] = useState("");
   const [orderCompanyFilter, setOrderCompanyFilter] = useState("");
-  const [orderSourceRecords, setOrderSourceRecords] = useState<OrderSource[]>(initialOrderSources);
   const [showSourceForm, setShowSourceForm] = useState(false);
-  const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [editingSourceName, setEditingSourceName] = useState<string | null>(null);
   const [sourceForm, setSourceForm] = useState<OrderSourceDraft>({
     companyName: "",
@@ -537,19 +476,18 @@ export default function Home() {
     contactInfo: "",
     color: "#2563eb",
   });
-  const [companyRecords, setCompanyRecords] = useState<Company[]>(initialCompanies);
   const [loginAccounts, setLoginAccounts] = useState<LoginAccount[]>([]);
   const [showLoginAccountForm, setShowLoginAccountForm] = useState(false);
-  const [editingLoginAccountId, setEditingLoginAccountId] = useState<number | null>(null);
+  const [editingLoginAccountId, setEditingLoginAccountId] = useState<string | null>(null);
   const [loginAccountForm, setLoginAccountForm] = useState({
     fullName: "",
-    loginId: "",
+    email: "",
     company: "",
     position: "",
-    newPassword: "",
+    role: "user" as LoginAccount["role"],
   });
   const [showCompanyForm, setShowCompanyForm] = useState(false);
-  const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [editingCompanyName, setEditingCompanyName] = useState<string | null>(null);
   const [companyForm, setCompanyForm] = useState<CompanyDraft>({
     name: "",
@@ -559,10 +497,9 @@ export default function Home() {
     rollCallAddress: "",
     garageAddress: "",
   });
-  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
-  const [driverRecords, setDriverRecords] = useState<Driver[]>(initialDrivers);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [showDriverForm, setShowDriverForm] = useState(false);
-  const [editingDriverId, setEditingDriverId] = useState<number | null>(null);
+  const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
   const [editingDriverName, setEditingDriverName] = useState<string | null>(null);
   const [driverForm, setDriverForm] = useState<DriverDraft>({
     name: "",
@@ -571,9 +508,8 @@ export default function Home() {
     whatsapp: "",
     licenseExpiry: "",
   });
-  const [vehicleRecords, setVehicleRecords] = useState<Vehicle[]>(initialVehicles);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
-  const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [editingVehicleName, setEditingVehicleName] = useState<string | null>(null);
   const [vehicleForm, setVehicleForm] = useState<VehicleDraft>({
     name: "",
@@ -592,7 +528,69 @@ export default function Home() {
   const [customDriverMode, setCustomDriverMode] = useState(false);
   const [customSourceMode, setCustomSourceMode] = useState(false);
   const [customCompanyMode, setCustomCompanyMode] = useState(false);
-  const [customSalesRepMode, setCustomSalesRepMode] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        const response = await fetch("/api/data", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "无法载入业务数据。");
+        }
+        if (cancelled) return;
+
+        replaceOrders(payload.orders);
+        replaceDriverRecords(payload.drivers);
+        replaceVehicleRecords(payload.vehicles);
+        replaceOrderSourceRecords(payload.orderSources);
+        replaceCompanyRecords(payload.companies);
+        setCurrentProfile(payload.profile);
+        setIsDataReady(true);
+
+        if (payload.profile.role === "admin") {
+          setIsLoadingAccounts(true);
+          try {
+            const accountsResponse = await fetch("/api/admin/accounts", {
+              cache: "no-store",
+            });
+            const accountsPayload = await accountsResponse.json();
+            if (!accountsResponse.ok) {
+              throw new Error(accountsPayload.error || "无法读取账号列表。");
+            }
+            if (!cancelled) setLoginAccounts(accountsPayload);
+          } catch (error) {
+            console.error("Failed to load user accounts.", error);
+            if (!cancelled) {
+              setAccountError(
+                error instanceof Error ? error.message : "无法读取账号列表。",
+              );
+            }
+          } finally {
+            if (!cancelled) setIsLoadingAccounts(false);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to initialize dashboard.", error);
+        if (!cancelled) {
+          setDataLoadError(
+            error instanceof Error ? error.message : "无法载入业务数据。",
+          );
+        }
+      }
+    }
+
+    void loadDashboard();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    replaceCompanyRecords,
+    replaceDriverRecords,
+    replaceOrderSourceRecords,
+    replaceOrders,
+    replaceVehicleRecords,
+  ]);
   const orderSources = orderSourceRecords.map((source) => source.companyName);
   const orderSourceColorByName = new Map(
     orderSourceRecords.map((source) => [source.companyName, source.color]),
@@ -603,7 +601,7 @@ export default function Home() {
   const sourceRows = [
     ...orderSourceRecords,
     ...unregisteredSourceNames.map((name, index) => ({
-      id: -(index + 1),
+      id: `unregistered-source-${index}`,
       companyName: name,
       contactName: "",
       contactInfo: "",
@@ -617,7 +615,7 @@ export default function Home() {
   const companyRows = [
     ...companyRecords,
     ...unregisteredCompanyNames.map((name, index) => ({
-      id: -(index + 1),
+      id: `unregistered-company-${index}`,
       name,
       operationsManager: "",
       maintenanceManager: "",
@@ -632,7 +630,7 @@ export default function Home() {
   const driverRows = [
     ...driverRecords,
     ...unregisteredDriverNames.map((name, index) => ({
-      id: -(index + 1),
+      id: `unregistered-driver-${index}`,
       name,
       phone: "",
       wechat: "",
@@ -646,7 +644,7 @@ export default function Home() {
   const vehicleRows = [
     ...vehicleRecords,
     ...unregisteredVehicleNames.map((name, index) => ({
-      id: -(index + 1),
+      id: `unregistered-vehicle-${index}`,
       name,
       plate: "",
       ownerCompany: "",
@@ -665,7 +663,7 @@ export default function Home() {
         getVehicleTypeOrder(first.name) - getVehicleTypeOrder(second.name);
       if (typeOrderDifference !== 0) return typeOrderDifference;
       if (first.name !== second.name) return 0;
-      return first.id - second.id;
+      return first.id.localeCompare(second.id);
     })
     .map((vehicle) => vehicle.name);
   const filteredCalendarVehicles = vehicles.filter((vehicle) => {
@@ -713,76 +711,92 @@ export default function Home() {
   const todayDateKey = toDateKey(new Date());
   const isUpcomingOrder = (order: Order) => order.date > todayDateKey;
 
-  function requestDelete(message: string, action: () => void) {
-    setDeletePassword("");
-    setDeletePasswordError("");
+  function requestDelete(message: string, action: () => void | Promise<void>) {
+    setDeleteError("");
     setPendingDelete({ message, action });
   }
 
-  function confirmPendingDelete() {
-    if (!pendingDelete) return;
-    if (deletePassword !== "0610") {
-      setDeletePasswordError("密码错误，请重新输入。");
-      return;
+  async function confirmPendingDelete() {
+    if (!pendingDelete || isDeleting) return;
+    setDeleteError("");
+    setIsDeleting(true);
+    try {
+      await pendingDelete.action();
+      setPendingDelete(null);
+    } catch (error) {
+      console.error("Failed to complete a confirmed deletion.", error);
+      setDeleteError(
+        error instanceof Error ? error.message : "删除失败，请稍后重试。",
+      );
+    } finally {
+      setIsDeleting(false);
     }
-
-    pendingDelete.action();
-    setPendingDelete(null);
-    setDeletePassword("");
-    setDeletePasswordError("");
   }
 
-  function saveLoginAccount(event: FormEvent<HTMLFormElement>) {
+  async function loadLoginAccounts() {
+    setIsLoadingAccounts(true);
+    try {
+      const response = await fetch("/api/admin/accounts", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "无法读取账号列表。");
+      }
+      setLoginAccounts(payload);
+      setAccountError("");
+    } finally {
+      setIsLoadingAccounts(false);
+    }
+  }
+
+  async function saveLoginAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const fullName = loginAccountForm.fullName.trim();
-    const loginId = loginAccountForm.loginId.trim();
+    const email = loginAccountForm.email.trim().toLowerCase();
     const position = loginAccountForm.position.trim();
-    if (!fullName || !loginId || !loginAccountForm.company || !position) {
-      alert("请填写用户姓名、登录ID、所属会社和职位。");
-      return;
-    }
-    if (loginAccounts.some((account) =>
-      account.loginId === loginId && account.id !== editingLoginAccountId
-    )) {
-      alert("该登录ID已存在。");
+    if (!fullName || !email || !loginAccountForm.company || !position) {
+      alert("请填写用户姓名、邮箱、所属会社和职位。");
       return;
     }
 
-    if (editingLoginAccountId === null) {
-      setLoginAccounts((accounts) => [
-        ...accounts,
-        {
-          id: Date.now(),
-          fullName,
-          loginId,
-          company: loginAccountForm.company,
-          position,
-          hasPassword: false,
-        },
-      ]);
-    } else {
-      setLoginAccounts((accounts) =>
-        accounts.map((account) => {
-          if (account.id !== editingLoginAccountId) return account;
-          const changedPassword = Boolean(loginAccountForm.newPassword);
-          return {
-            ...account,
-            fullName,
-            loginId,
-            company: loginAccountForm.company,
-            position,
-            hasPassword: changedPassword || account.hasPassword,
-          };
-        }),
-      );
+    setAccountError("");
+    try {
+      const response = await fetch("/api/admin/accounts", {
+        method: editingLoginAccountId === null ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          editingLoginAccountId === null
+            ? {
+                email,
+                fullName,
+                company: loginAccountForm.company,
+                position,
+                role: loginAccountForm.role,
+              }
+            : {
+                userId: editingLoginAccountId,
+                fullName,
+                company: loginAccountForm.company,
+                position,
+                role: loginAccountForm.role,
+              },
+        ),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "保存账号失败。");
+      await loadLoginAccounts();
+    } catch (error) {
+      console.error("Failed to save a user account.", error);
+      setAccountError(error instanceof Error ? error.message : "保存账号失败。");
+      return;
     }
+
     setEditingLoginAccountId(null);
     setLoginAccountForm({
       fullName: "",
-      loginId: "",
+      email: "",
       company: "",
       position: "",
-      newPassword: "",
+      role: "user",
     });
     setShowLoginAccountForm(false);
   }
@@ -791,17 +805,24 @@ export default function Home() {
     setEditingLoginAccountId(account?.id ?? null);
     setLoginAccountForm({
       fullName: account?.fullName ?? "",
-      loginId: account?.loginId ?? "",
+      email: account?.email ?? "",
       company: account?.company ?? "",
       position: account?.position ?? "",
-      newPassword: "",
+      role: account?.role ?? "user",
     });
     setShowLoginAccountForm(true);
   }
 
   function deleteLoginAccount(account: LoginAccount) {
-    requestDelete(`确定要删除登录账号「${account.loginId}」吗？`, () => {
-      setLoginAccounts((accounts) => accounts.filter((item) => item.id !== account.id));
+    requestDelete(`确定要删除登录账号「${account.email}」吗？`, async () => {
+      const response = await fetch("/api/admin/accounts", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: account.id }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "删除账号失败。");
+      await loadLoginAccounts();
     });
   }
 
@@ -825,7 +846,7 @@ export default function Home() {
     }
   }
 
-  function moveOrderToCell(orderId: number, vehicle: string, targetDate: string) {
+  function moveOrderToCell(orderId: string, vehicle: string, targetDate: string) {
     setOrders((currentOrders) =>
       currentOrders.map((order) => {
         if (order.id !== orderId) return order;
@@ -858,14 +879,12 @@ export default function Home() {
   }
 
   function moveSplitRangeToVehicle(
-    orderId: number,
+    orderId: string,
     vehicle: string,
     startDate: string,
     endDate: string,
   ) {
     setOrders((currentOrders) => {
-      let nextId = Math.max(Date.now(), ...currentOrders.map((order) => order.id + 1));
-
       return currentOrders.flatMap((order) => {
         if (order.id !== orderId || order.vehicle === vehicle) return [order];
 
@@ -893,7 +912,7 @@ export default function Home() {
         if (hasAfter) {
           remainingOrders.push({
             ...order,
-            id: hasBefore ? nextId++ : order.id,
+            id: hasBefore ? createId() : order.id,
             date: shiftDateKey(endDate, 1),
             endDate: orderEndDate,
             offDates: order.offDates.filter((offDate) => offDate > endDate),
@@ -902,7 +921,7 @@ export default function Home() {
 
         remainingOrders.push({
           ...order,
-          id: nextId++,
+          id: createId(),
           vehicle,
           date: startDate,
           endDate,
@@ -917,7 +936,7 @@ export default function Home() {
     setDragTargetKey(null);
   }
 
-  function selectSplitDate(orderId: number, date: string) {
+  function selectSplitDate(orderId: string, date: string) {
     setSplitSelection((current) => {
       if (
         !current ||
@@ -952,8 +971,50 @@ export default function Home() {
     setCustomDriverMode(false);
     setCustomSourceMode(false);
     setCustomCompanyMode(false);
-    setCustomSalesRepMode(false);
     setShowForm(true);
+  }
+
+  function openBatchOrderImport() {
+    const vehicle = availableVehicles[0];
+    if (!vehicle) {
+      alert("没有可用车辆，不能批量新增预约。");
+      return;
+    }
+
+    setBatchOrderInput("");
+    setBatchOrderDate(toDateKey(calendarCenterDate));
+    setBatchOrderVehicle(vehicle);
+    setShowBatchOrderForm(true);
+  }
+
+  function importBatchOrders() {
+    const details = parseImportedOrderDetails(batchOrderInput);
+    if (details.length === 0) {
+      alert("未识别到预约信息。请按“06:30 上车地点 下车地点”的格式粘贴。");
+      return;
+    }
+    if (details.length > 500) {
+      alert("一次最多导入 500 条预约，请分批导入。");
+      return;
+    }
+    if (!batchOrderDate || vehicleStatusByName.get(batchOrderVehicle) !== "运营中") {
+      alert("请选择有效的日期和运营中的车辆。");
+      return;
+    }
+
+    setOrders((currentOrders) => [
+      ...currentOrders,
+      ...details.map((detail) => ({
+        ...createEmptyDraft(batchOrderVehicle, batchOrderDate),
+        id: createId(),
+        customer: `${detail.pickup} → ${detail.destination}`,
+        time: detail.time,
+        pickup: detail.pickup,
+        destination: detail.destination,
+      })),
+    ]);
+    setShowBatchOrderForm(false);
+    setBatchOrderInput("");
   }
 
   function openNewDriver() {
@@ -970,7 +1031,7 @@ export default function Home() {
   }
 
   function openEditDriver(driver: Driver) {
-    setEditingDriverId(driver.id > 0 ? driver.id : null);
+    setEditingDriverId(driver.id.startsWith("unregistered-") ? null : driver.id);
     setEditingDriverName(driver.name);
     setDriverForm({
       name: driver.name,
@@ -1007,7 +1068,7 @@ export default function Home() {
     }
 
     if (editingDriverId === null) {
-      setDriverRecords((current) => [...current, { id: Date.now(), ...savedDriver }]);
+      setDriverRecords((current) => [...current, { id: createId(), ...savedDriver }]);
     } else {
       setDriverRecords((current) =>
         current.map((driver) =>
@@ -1060,7 +1121,7 @@ export default function Home() {
   }
 
   function openEditSource(source: OrderSource) {
-    setEditingSourceId(source.id > 0 ? source.id : null);
+    setEditingSourceId(source.id.startsWith("unregistered-") ? null : source.id);
     setEditingSourceName(source.companyName);
     setSourceForm({
       companyName: source.companyName,
@@ -1098,7 +1159,7 @@ export default function Home() {
     if (editingSourceId === null) {
       setOrderSourceRecords((current) => [
         ...current,
-        { id: Date.now(), ...savedSource },
+        { id: createId(), ...savedSource },
       ]);
     } else {
       setOrderSourceRecords((current) =>
@@ -1136,7 +1197,7 @@ export default function Home() {
       return [
         ...current,
         {
-          id: Date.now(),
+          id: createId(),
           companyName: source.companyName,
           contactName: source.contactName,
           contactInfo: source.contactInfo,
@@ -1171,7 +1232,7 @@ export default function Home() {
   }
 
   function openEditCompany(company: Company) {
-    setEditingCompanyId(company.id > 0 ? company.id : null);
+    setEditingCompanyId(company.id.startsWith("unregistered-") ? null : company.id);
     setEditingCompanyName(company.name);
     setCompanyForm({
       name: company.name,
@@ -1227,7 +1288,7 @@ export default function Home() {
     if (editingCompanyId === null) {
       setCompanyRecords((current) => [
         ...current,
-        { id: Date.now(), ...savedCompany },
+        { id: createId(), ...savedCompany },
       ]);
     } else {
       setCompanyRecords((current) =>
@@ -1302,7 +1363,7 @@ export default function Home() {
   }
 
   function openEditVehicle(vehicle: Vehicle) {
-    setEditingVehicleId(vehicle.id > 0 ? vehicle.id : null);
+    setEditingVehicleId(vehicle.id.startsWith("unregistered-") ? null : vehicle.id);
     setEditingVehicleName(vehicle.name);
     setVehicleNameMode(vehicle.name);
     setVehicleForm({
@@ -1372,7 +1433,7 @@ export default function Home() {
     if (editingVehicleId === null) {
       setVehicleRecords((current) => [
         ...current,
-        { id: Date.now(), ...savedVehicle },
+        { id: createId(), ...savedVehicle },
       ]);
     } else {
       setVehicleRecords((current) =>
@@ -1450,10 +1511,9 @@ export default function Home() {
         alert("運転士不能重复，请检查批量内容。");
         return;
       }
-      const baseId = Date.now();
       setDriverRecords((current) => [
         ...current,
-        ...records.map((record, index) => ({ id: baseId + index, ...record })),
+        ...records.map((record) => ({ id: createId(), ...record })),
       ]);
     }
 
@@ -1505,11 +1565,10 @@ export default function Home() {
         alert("車両番号不能重复，请检查批量内容。");
         return;
       }
-      const baseId = Date.now();
       setVehicleRecords((current) => [
         ...current,
-        ...records.map((record, index) => ({
-          id: baseId + index,
+        ...records.map((record) => ({
+          id: createId(),
           ...record,
           status: "运营中" as const,
         })),
@@ -1533,10 +1592,9 @@ export default function Home() {
         alert("来源不能重复，请检查批量内容。");
         return;
       }
-      const baseId = Date.now();
       setOrderSourceRecords((current) => [
         ...current,
-        ...records.map((record, index) => ({ id: baseId + index, ...record })),
+        ...records.map((record) => ({ id: createId(), ...record })),
       ]);
     }
 
@@ -1571,10 +1629,9 @@ export default function Home() {
         alert("所属会社名称不能重复，请检查批量内容。");
         return;
       }
-      const baseId = Date.now();
       setCompanyRecords((current) => [
         ...current,
-        ...records.map((record, index) => ({ id: baseId + index, ...record })),
+        ...records.map((record) => ({ id: createId(), ...record })),
       ]);
     }
 
@@ -1619,11 +1676,6 @@ export default function Home() {
         !companies.includes(order.company),
     );
 
-    setCustomSalesRepMode(
-      Boolean(order.salesRep) &&
-        !salesReps.includes(order.salesRep),
-    );
-
     setShowForm(true);
   }
 
@@ -1634,7 +1686,6 @@ export default function Home() {
     setCustomDriverMode(false);
     setCustomSourceMode(false);
     setCustomCompanyMode(false);
-    setCustomSalesRepMode(false);
   }
 
   function addOrder() {
@@ -1662,7 +1713,7 @@ export default function Home() {
     if (editingOrderId === null) {
       setOrders((currentOrders) => [
         ...currentOrders,
-        { id: Date.now(), ...savedForm },
+        { id: createId(), ...savedForm },
       ]);
     } else {
       setOrders((currentOrders) =>
@@ -1693,6 +1744,57 @@ export default function Home() {
     if (order) requestOrderDeletion(order);
   }
 
+  async function signOut() {
+    try {
+      const supabase = createSupabaseClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.replace("/login");
+    } catch (error) {
+      console.error("Failed to sign out.", error);
+      setPersistenceError(
+        error instanceof Error ? error.message : "退出登录失败，请重试。",
+      );
+    }
+  }
+
+  if (!isDataReady) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
+        <div className="w-full max-w-lg rounded-xl border bg-white p-6 text-center shadow-sm">
+          {dataLoadError ? (
+            <>
+              <h1 className="text-lg font-bold text-rose-800">无法载入业务数据</h1>
+              <p role="alert" className="mt-2 text-sm text-gray-700">{dataLoadError}</p>
+              <p className="mt-2 text-sm text-gray-600">
+                请检查 Supabase 环境变量、数据库迁移和当前账号的激活状态。
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="mt-4 rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+              >
+                重新尝试
+              </button>
+            </>
+          ) : (
+            <p role="status" className="text-sm text-gray-700">正在安全载入数据…</p>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  if (!currentProfile) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
+        <p role="alert" className="rounded border bg-white p-6 text-sm text-rose-800">
+          当前账号没有用户资料。请联系系统管理员。
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-100 text-gray-900">
       {/* 顶部 */}
@@ -1701,14 +1803,55 @@ export default function Home() {
           <h1 className="text-xl font-bold">ハイヤー配車管理</h1>
         </div>
 
-        <button
-          onClick={() => openNewOrder(availableVehicles[0] ?? "", toDateKey(calendarCenterDate))}
-          disabled={availableVehicles.length === 0}
-          className="rounded-lg bg-blue-600 px-5 py-2 font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          ＋ 新建予約
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="hidden text-right text-xs sm:block">
+            <p className="font-semibold">{currentProfile.fullName || currentProfile.email}</p>
+            <p className="text-slate-300">
+              {currentProfile.role === "admin" ? "管理员" : "普通用户"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={signOut}
+            className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold hover:bg-slate-800"
+          >
+            退出
+          </button>
+          <button
+            type="button"
+            onClick={openBatchOrderImport}
+            disabled={availableVehicles.length === 0}
+            className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-bold text-blue-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            批量导入
+          </button>
+          <button
+            onClick={() => openNewOrder(availableVehicles[0] ?? "", toDateKey(calendarCenterDate))}
+            disabled={availableVehicles.length === 0}
+            className="rounded-lg bg-blue-600 px-5 py-2 font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ＋ 新建予約
+          </button>
+        </div>
       </header>
+
+      {persistenceError && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+          <span>保存错误：{persistenceError} 本地显示可能尚未同步到服务器，请重新载入后核对数据。</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="shrink-0 rounded border border-rose-400 px-3 py-1 font-semibold hover:bg-rose-100"
+          >
+            重新载入
+          </button>
+        </div>
+      )}
+      {pendingSaveCount > 0 && !persistenceError && (
+        <p role="status" className="border-b bg-blue-50 px-4 py-2 text-sm text-blue-900">
+          正在保存到服务器…
+        </p>
+      )}
 
       <div className="flex min-h-[calc(100vh-76px)] flex-col md:flex-row">
         <aside className="w-full shrink-0 border-b bg-white p-3 md:w-[180px] md:border-b-0 md:border-r">
@@ -1721,7 +1864,9 @@ export default function Home() {
               { id: "vehicles", label: "車両", icon: "▰" },
               { id: "sources", label: "来源", icon: "↗" },
               { id: "companies", label: "所属会社", icon: "▣" },
-              { id: "login", label: "ログイン管理", icon: "♙" },
+              ...(currentProfile.role === "admin"
+                ? [{ id: "login" as const, label: "ログイン管理", icon: "♙" }]
+                : []),
             ].map((item) => (
               <button
                 key={item.id}
@@ -1756,6 +1901,7 @@ export default function Home() {
                       setShowLoginAccountForm(false);
                       setEditingLoginAccountId(null);
                     } else {
+                      setAccountError("");
                       openLoginAccountForm();
                     }
                   }}
@@ -1764,9 +1910,14 @@ export default function Home() {
                   {showLoginAccountForm ? "取消" : "+ 新增账号"}
                 </button>
               </div>
-              <p className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                临时版本：账号资料仅暂存于当前页面，刷新后会消失；密码不会安全保存，也不会用于登录验证。
+              <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                新账号会收到邮箱邀请并自行设置密码。只有管理员可以管理账号；登录用户共享本工作区的业务数据。
               </p>
+              {accountError && (
+                <p role="alert" className="mb-4 rounded border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">
+                  {accountError}
+                </p>
+              )}
               {showLoginAccountForm && (
                 <form onSubmit={saveLoginAccount} className="mb-5 grid gap-4 rounded border bg-white p-4 sm:grid-cols-2 xl:grid-cols-3">
                   <label className="text-sm font-medium">
@@ -1774,8 +1925,8 @@ export default function Home() {
                     <input required value={loginAccountForm.fullName} onChange={(event) => setLoginAccountForm((current) => ({ ...current, fullName: event.target.value }))} className="mt-1 w-full rounded border p-2" />
                   </label>
                   <label className="text-sm font-medium">
-                    登录ID
-                    <input required value={loginAccountForm.loginId} onChange={(event) => setLoginAccountForm((current) => ({ ...current, loginId: event.target.value }))} className="mt-1 w-full rounded border p-2" />
+                    登录邮箱
+                    <input required type="email" autoComplete="email" disabled={editingLoginAccountId !== null} value={loginAccountForm.email} onChange={(event) => setLoginAccountForm((current) => ({ ...current, email: event.target.value }))} className="mt-1 w-full rounded border p-2 disabled:bg-gray-100" />
                   </label>
                   <label className="text-sm font-medium">
                     所属会社
@@ -1788,15 +1939,24 @@ export default function Home() {
                     职位
                     <input required value={loginAccountForm.position} onChange={(event) => setLoginAccountForm((current) => ({ ...current, position: event.target.value }))} className="mt-1 w-full rounded border p-2" />
                   </label>
-                  {editingLoginAccountId !== null && (
-                    <label className="text-sm font-medium">
-                      登录密码（留空则不变）
-                      <input type="password" autoComplete="new-password" value={loginAccountForm.newPassword} onChange={(event) => setLoginAccountForm((current) => ({ ...current, newPassword: event.target.value }))} className="mt-1 w-full rounded border p-2" />
-                    </label>
-                  )}
+                  <label className="text-sm font-medium">
+                    角色
+                    <select
+                      value={loginAccountForm.role}
+                      disabled={editingLoginAccountId === currentProfile.id}
+                      onChange={(event) => setLoginAccountForm((current) => ({
+                        ...current,
+                        role: event.target.value === "admin" ? "admin" : "user",
+                      }))}
+                      className="mt-1 w-full rounded border bg-white p-2 disabled:bg-gray-100"
+                    >
+                      <option value="user">普通用户</option>
+                      <option value="admin">管理员</option>
+                    </select>
+                  </label>
                   <div className="flex items-end">
                     <button type="submit" className="w-full rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
-                      {editingLoginAccountId === null ? "新增账号" : "保存修改"}
+                      {editingLoginAccountId === null ? "发送邀请" : "保存修改"}
                     </button>
                   </div>
                 </form>
@@ -1806,27 +1966,31 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">用户姓名</th>
-                      <th className="px-4 py-3 font-semibold">登录ID</th>
+                      <th className="px-4 py-3 font-semibold">登录邮箱</th>
                       <th className="px-4 py-3 font-semibold">所属会社</th>
                       <th className="px-4 py-3 font-semibold">职位</th>
-                      <th className="px-4 py-3 font-semibold">登录密码</th>
+                      <th className="px-4 py-3 font-semibold">账号状态</th>
+                      <th className="px-4 py-3 font-semibold">角色</th>
                       <th className="px-4 py-3 font-semibold">操作</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {loginAccounts.length === 0 ? (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">暂无登录账号</td></tr>
+                    {isLoadingAccounts && loginAccounts.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">正在读取账号…</td></tr>
+                    ) : loginAccounts.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">暂无登录账号</td></tr>
                     ) : loginAccounts.map((account) => (
                       <tr key={account.id} className="border-t">
                         <td className="px-4 py-3 font-medium">{account.fullName}</td>
-                        <td className="px-4 py-3">{account.loginId}</td>
+                        <td className="px-4 py-3">{account.email}</td>
                         <td className="px-4 py-3">{account.company}</td>
                         <td className="px-4 py-3">{account.position}</td>
-                        <td className="px-4 py-3">{account.hasPassword ? "••••••" : "未设置"}</td>
+                        <td className="px-4 py-3">{account.emailConfirmed ? "已激活" : "待激活"}</td>
+                        <td className="px-4 py-3">{account.role === "admin" ? "管理员" : "普通用户"}</td>
                         <td className="px-4 py-3">
                           <div className="flex gap-3">
                             <button type="button" onClick={() => openLoginAccountForm(account)} className="font-medium text-blue-700 hover:underline">编辑</button>
-                            <button type="button" onClick={() => deleteLoginAccount(account)} className="font-medium text-rose-700 hover:underline">删除</button>
+                            <button type="button" disabled={account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="font-medium text-rose-700 hover:underline disabled:cursor-not-allowed disabled:opacity-40" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
                           </div>
                         </td>
                       </tr>
@@ -2027,7 +2191,7 @@ export default function Home() {
                 ).length,
               ]),
             );
-            const orderLanes = new Map<number, number>();
+            const orderLanes = new Map<string, number>();
             const laneEndDates: string[] = [];
 
             for (const order of visibleOrders) {
@@ -2095,7 +2259,7 @@ export default function Home() {
                     try {
                       const splitData = JSON.parse(dragData) as {
                         type?: string;
-                        orderId?: number;
+                        orderId?: string;
                         startDate?: string;
                         endDate?: string;
                       };
@@ -2118,9 +2282,8 @@ export default function Home() {
                     }
                   }
 
-                  const orderId = Number(dragData);
-                  if (Number.isFinite(orderId)) {
-                    moveOrderToCell(orderId, vehicle, dates[dateIndex].date);
+                  if (dragData) {
+                    moveOrderToCell(dragData, vehicle, dates[dateIndex].date);
                   }
                 }}
                 style={{
@@ -2222,7 +2385,6 @@ export default function Home() {
                     : firstDayAfterOrder - 1;
                   const barDates = dates.slice(startIndex, endIndex + 1);
                   const isSplittable = (order.endDate || order.date) > order.date;
-                  const infoCenterIndex = Math.floor(barDates.length / 2);
                   let infoSegmentStart = -1;
                   let infoSegmentEnd = -1;
                   let currentSegmentStart = -1;
@@ -2401,6 +2563,9 @@ export default function Home() {
                           className={`absolute inset-y-0 z-10 flex flex-col items-center justify-center gap-0 px-1 ${isSelectingSplit ? "pointer-events-none pb-5" : ""}`}
                         >
                           <div className="flex w-full items-center justify-center gap-2">
+                            {order.time && (
+                              <span className="shrink-0 font-medium">{order.time}</span>
+                            )}
                             <span className="min-w-0 truncate font-bold" title={order.customer}>
                               {order.customer}
                             </span>
@@ -2408,20 +2573,22 @@ export default function Home() {
                               <span className="shrink-0 font-medium">{order.status}</span>
                             )}
                           </div>
-                          <div className="grid w-full grid-cols-2 gap-1">
-                            <div
-                              className="min-w-0 truncate"
-                              title={order.orderSource || "未填写"}
-                            >
-                              {order.orderSource || "未填写"}
+                          {(order.orderSource || order.driver) && (
+                            <div className="grid w-full grid-cols-2 gap-1">
+                              <div
+                                className="min-w-0 truncate"
+                                title={order.orderSource || "未填写"}
+                              >
+                                {order.orderSource || "未填写"}
+                              </div>
+                              <div
+                                className={`min-w-0 truncate ${orderDriverExpired ? "font-semibold text-red-600" : ""}`}
+                                title={order.driver || "未安排"}
+                              >
+                                {order.driver || "未安排"}
+                              </div>
                             </div>
-                            <div
-                              className={`min-w-0 truncate ${orderDriverExpired ? "font-semibold text-red-600" : ""}`}
-                              title={order.driver || "未安排"}
-                            >
-                              {order.driver || "未安排"}
-                            </div>
-                          </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2494,7 +2661,7 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">用车日期</th>
-                      <th className="px-4 py-3 font-semibold">时间</th>
+                      <th className="px-4 py-3 font-semibold">配車時間</th>
                       <th className="px-4 py-3 font-semibold">手配状態</th>
                       <th className="px-4 py-3 font-semibold">予約情報</th>
                       <th className="px-4 py-3 font-semibold">車両</th>
@@ -2886,6 +3053,80 @@ export default function Home() {
         </section>
       </div>
 
+      {showBatchOrderForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-xl font-bold">批量导入预约</h2>
+              <button
+                type="button"
+                onClick={() => setShowBatchOrderForm(false)}
+                className="text-2xl text-gray-500"
+                aria-label="关闭批量导入窗口"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              系统会从每条信息中识别“配車時間、上车地点、下车地点”。其余内容不会导入。
+            </p>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium">
+                用车日期
+                <input
+                  type="date"
+                  required
+                  value={batchOrderDate}
+                  onChange={(event) => setBatchOrderDate(event.target.value)}
+                  className="mt-1 w-full rounded border px-3 py-2"
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                車両
+                <select
+                  value={batchOrderVehicle}
+                  onChange={(event) => setBatchOrderVehicle(event.target.value)}
+                  className="mt-1 w-full rounded border px-3 py-2"
+                >
+                  {availableVehicles.map((vehicle) => (
+                    <option key={vehicle} value={vehicle}>
+                      {vehicle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-medium">
+                预约信息
+                <textarea
+                  rows={8}
+                  autoFocus
+                  value={batchOrderInput}
+                  onChange={(event) => setBatchOrderInput(event.target.value)}
+                  placeholder={"06:30 品川 墨田 5 L\n06:45 羽田 台东 5 绿 MF JL42"}
+                  className="mt-1 w-full resize-y rounded border p-2 font-mono text-sm"
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowBatchOrderForm(false)}
+                className="rounded border px-5 py-2"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={importBatchOrders}
+                className="rounded bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700"
+              >
+                生成订单
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 新建 / 编辑予約窗口 */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -2916,6 +3157,16 @@ export default function Home() {
                   onChange={(e) =>
                     setForm({ ...form, customer: e.target.value })
                   }
+                />
+              </label>
+
+              <label className="block text-sm font-medium">
+                配車時間
+                <input
+                  type="time"
+                  className="mt-1 w-full rounded border p-2"
+                  value={form.time}
+                  onChange={(event) => setForm({ ...form, time: event.target.value })}
                 />
               </label>
 
@@ -3900,6 +4151,10 @@ export default function Home() {
                     <dd className="break-words font-medium">{selectedOrderDetails.customer || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
+                    <dt className="text-gray-500">配車時間</dt>
+                    <dd className="break-words font-medium">{selectedOrderDetails.time || "-"}</dd>
+                  </div>
+                  <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">开始日期</dt>
                     <dd className="break-words font-medium">{formatOrderDate(selectedOrderDetails.date)}</dd>
                   </div>
@@ -3999,24 +4254,9 @@ export default function Home() {
           >
             <h2 className="text-lg font-bold">确认删除</h2>
             <p className="mt-3 text-sm text-gray-700">{pendingDelete.message}</p>
-            <label className="mt-4 block text-sm font-medium">
-              删除密码
-              <input
-                type="password"
-                autoComplete="current-password"
-                autoFocus
-                value={deletePassword}
-                onChange={(event) => {
-                  setDeletePassword(event.target.value);
-                  setDeletePasswordError("");
-                }}
-                className="mt-1 w-full rounded border p-2"
-                aria-invalid={Boolean(deletePasswordError)}
-              />
-            </label>
-            {deletePasswordError && (
+            {deleteError && (
               <p role="alert" className="mt-2 text-sm text-rose-700">
-                {deletePasswordError}
+                {deleteError}
               </p>
             )}
             <div className="mt-5 flex justify-end gap-2">
@@ -4024,18 +4264,18 @@ export default function Home() {
                 type="button"
                 onClick={() => {
                   setPendingDelete(null);
-                  setDeletePassword("");
-                  setDeletePasswordError("");
                 }}
+                disabled={isDeleting}
                 className="rounded border px-4 py-2 text-sm font-semibold hover:bg-gray-50"
               >
                 取消
               </button>
               <button
                 type="submit"
-                className="rounded bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800"
+                disabled={isDeleting}
+                className="rounded bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
               >
-                确认删除
+                {isDeleting ? "正在删除…" : "确认删除"}
               </button>
             </div>
           </form>
