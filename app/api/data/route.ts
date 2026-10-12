@@ -10,6 +10,7 @@ import type {
 } from "@/lib/domain";
 import { jsonResponse } from "@/lib/api-response";
 import { readAllPages } from "@/lib/supabase/pagination";
+import { verifyDeletePassword } from "@/lib/delete-password";
 
 const idSchema = z.string().uuid();
 const dateSchema = z.iso.date();
@@ -73,26 +74,31 @@ const mutationSchema = z.discriminatedUnion("collection", [
     collection: z.literal("orders"),
     upsert: z.array(orderSchema).max(500),
     deleteIds: z.array(idSchema).max(500),
+    deletePassword: z.string().max(1024),
   }).strict(),
   z.object({
     collection: z.literal("drivers"),
     upsert: z.array(driverSchema).max(500),
     deleteIds: z.array(idSchema).max(500),
+    deletePassword: z.string().max(1024),
   }).strict(),
   z.object({
     collection: z.literal("vehicles"),
     upsert: z.array(vehicleSchema).max(500),
     deleteIds: z.array(idSchema).max(500),
+    deletePassword: z.string().max(1024),
   }).strict(),
   z.object({
     collection: z.literal("orderSources"),
     upsert: z.array(orderSourceSchema).max(500),
     deleteIds: z.array(idSchema).max(500),
+    deletePassword: z.string().max(1024),
   }).strict(),
   z.object({
     collection: z.literal("companies"),
     upsert: z.array(companySchema).max(500),
     deleteIds: z.array(idSchema).max(500),
+    deletePassword: z.string().max(1024),
   }).strict(),
 ]);
 
@@ -367,6 +373,15 @@ export async function POST(request: Request) {
     const parsed = mutationSchema.safeParse(body);
     if (!parsed.success) {
       return jsonResponse({ error: "提交的数据格式不正确。" }, { status: 400 });
+    }
+    if (parsed.data.deleteIds.length > 0) {
+      const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);
+      if (!passwordCheck.configured) {
+        return jsonResponse({ error: "服务器尚未配置删除专用密码。" }, { status: 503 });
+      }
+      if (!passwordCheck.valid) {
+        return jsonResponse({ error: "删除专用密码错误，请检查后重试。" }, { status: 403 });
+      }
     }
 
     await applyMutation(supabase, parsed.data);

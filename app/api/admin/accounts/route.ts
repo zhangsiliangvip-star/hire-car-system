@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { AccountProfile } from "@/lib/domain";
 import { jsonResponse } from "@/lib/api-response";
 import { readAllPages } from "@/lib/supabase/pagination";
+import { verifyDeletePassword } from "@/lib/delete-password";
 
 const inviteSchema = z.object({
   email: z.email().max(320),
@@ -23,6 +24,7 @@ const updateSchema = z.object({
 
 const deleteSchema = z.object({
   userId: z.string().uuid(),
+  deletePassword: z.string().max(1024),
 }).strict();
 
 function toAccountProfile(row: {
@@ -190,6 +192,13 @@ export async function DELETE(request: Request) {
     const parsed = deleteSchema.safeParse(body);
     if (!parsed.success) {
       return jsonResponse({ error: "提交的账号编号无效。" }, { status: 400 });
+    }
+    const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);
+    if (!passwordCheck.configured) {
+      return jsonResponse({ error: "服务器尚未配置删除专用密码。" }, { status: 503 });
+    }
+    if (!passwordCheck.valid) {
+      return jsonResponse({ error: "删除专用密码错误，请检查后重试。" }, { status: 403 });
     }
     if (parsed.data.userId === identity.profile.id) {
       return jsonResponse({ error: "不能删除当前登录的管理员账号。" }, { status: 400 });

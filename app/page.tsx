@@ -1,7 +1,14 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type {
@@ -24,6 +31,7 @@ import type {
   VehicleDraft,
   VehicleStatus,
 } from "@/lib/domain";
+import { buildApiErrorMessage, readJsonSafely } from "@/lib/api-client";
 import { usePersistedCollection } from "@/lib/use-persisted-collection";
 import { createClient as createSupabaseClient } from "@/lib/supabase/browser";
 
@@ -409,6 +417,12 @@ export default function Home() {
   const [accountError, setAccountError] = useState("");
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<AccountProfile | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const deletePasswordRef = useRef(deletePassword);
+  useLayoutEffect(() => {
+    deletePasswordRef.current = deletePassword;
+  }, [deletePassword]);
+  const getDeletePassword = useCallback(() => deletePasswordRef.current, []);
   const reportPersistenceError = useCallback((message: string) => {
     setPersistenceError(message);
   }, []);
@@ -419,27 +433,52 @@ export default function Home() {
     items: orders,
     updateItems: setOrders,
     replaceItems: replaceOrders,
-  } = usePersistedCollection<Order>("orders", reportPersistenceError, reportPendingSave);
+  } = usePersistedCollection<Order>(
+    "orders",
+    reportPersistenceError,
+    reportPendingSave,
+    getDeletePassword,
+  );
   const {
     items: orderSourceRecords,
     updateItems: setOrderSourceRecords,
     replaceItems: replaceOrderSourceRecords,
-  } = usePersistedCollection<OrderSource>("orderSources", reportPersistenceError, reportPendingSave);
+  } = usePersistedCollection<OrderSource>(
+    "orderSources",
+    reportPersistenceError,
+    reportPendingSave,
+    getDeletePassword,
+  );
   const {
     items: companyRecords,
     updateItems: setCompanyRecords,
     replaceItems: replaceCompanyRecords,
-  } = usePersistedCollection<Company>("companies", reportPersistenceError, reportPendingSave);
+  } = usePersistedCollection<Company>(
+    "companies",
+    reportPersistenceError,
+    reportPendingSave,
+    getDeletePassword,
+  );
   const {
     items: driverRecords,
     updateItems: setDriverRecords,
     replaceItems: replaceDriverRecords,
-  } = usePersistedCollection<Driver>("drivers", reportPersistenceError, reportPendingSave);
+  } = usePersistedCollection<Driver>(
+    "drivers",
+    reportPersistenceError,
+    reportPendingSave,
+    getDeletePassword,
+  );
   const {
     items: vehicleRecords,
     updateItems: setVehicleRecords,
     replaceItems: replaceVehicleRecords,
-  } = usePersistedCollection<Vehicle>("vehicles", reportPersistenceError, reportPendingSave);
+  } = usePersistedCollection<Vehicle>(
+    "vehicles",
+    reportPersistenceError,
+    reportPendingSave,
+    getDeletePassword,
+  );
 
   const [showForm, setShowForm] = useState(false);
   const [showBatchOrderForm, setShowBatchOrderForm] = useState(false);
@@ -450,7 +489,7 @@ export default function Home() {
   const [batchOrderCompany, setBatchOrderCompany] = useState("");
   const [pendingDelete, setPendingDelete] = useState<{
     message: string;
-    action: () => void | Promise<void>;
+    action: (password: string) => void | Promise<void>;
   } | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -536,29 +575,45 @@ export default function Home() {
     async function loadDashboard() {
       try {
         const response = await fetch("/api/data", { cache: "no-store" });
-        const payload = await response.json();
+        const payload = await readJsonSafely(response);
         if (!response.ok) {
-          throw new Error(payload.error || "无法载入业务数据。");
+          throw new Error(buildApiErrorMessage(response, payload, "无法载入业务数据。"));
         }
+        if (!payload || typeof payload !== "object") {
+          throw new Error("服务器返回的业务数据格式无效。");
+        }
+        const dashboard = payload as {
+          profile: AccountProfile;
+          orders: Order[];
+          drivers: Driver[];
+          vehicles: Vehicle[];
+          orderSources: OrderSource[];
+          companies: Company[];
+        };
         if (cancelled) return;
 
-        replaceOrders(payload.orders);
-        replaceDriverRecords(payload.drivers);
-        replaceVehicleRecords(payload.vehicles);
-        replaceOrderSourceRecords(payload.orderSources);
-        replaceCompanyRecords(payload.companies);
-        setCurrentProfile(payload.profile);
+        replaceOrders(dashboard.orders);
+        replaceDriverRecords(dashboard.drivers);
+        replaceVehicleRecords(dashboard.vehicles);
+        replaceOrderSourceRecords(dashboard.orderSources);
+        replaceCompanyRecords(dashboard.companies);
+        setCurrentProfile(dashboard.profile);
         setIsDataReady(true);
 
-        if (payload.profile.role === "admin") {
+        if (dashboard.profile.role === "admin") {
           setIsLoadingAccounts(true);
           try {
             const accountsResponse = await fetch("/api/admin/accounts", {
               cache: "no-store",
             });
-            const accountsPayload = await accountsResponse.json();
+            const accountsPayload = await readJsonSafely(accountsResponse);
             if (!accountsResponse.ok) {
-              throw new Error(accountsPayload.error || "无法读取账号列表。");
+              throw new Error(
+                buildApiErrorMessage(accountsResponse, accountsPayload, "无法读取账号列表。"),
+              );
+            }
+            if (!Array.isArray(accountsPayload)) {
+              throw new Error("服务器返回的账号列表格式无效。");
             }
             if (!cancelled) setLoginAccounts(accountsPayload);
           } catch (error) {
@@ -713,18 +768,23 @@ export default function Home() {
   const todayDateKey = toDateKey(new Date());
   const isUpcomingOrder = (order: Order) => order.date > todayDateKey;
 
-  function requestDelete(message: string, action: () => void | Promise<void>) {
+  function requestDelete(
+    message: string,
+    action: (password: string) => void | Promise<void>,
+  ) {
     setDeleteError("");
+    setDeletePassword("");
     setPendingDelete({ message, action });
   }
 
   async function confirmPendingDelete() {
-    if (!pendingDelete || isDeleting) return;
+    if (!pendingDelete || isDeleting || !deletePassword) return;
     setDeleteError("");
     setIsDeleting(true);
     try {
-      await pendingDelete.action();
+      await pendingDelete.action(deletePassword);
       setPendingDelete(null);
+      setDeletePassword("");
     } catch (error) {
       console.error("Failed to complete a confirmed deletion.", error);
       setDeleteError(
@@ -739,9 +799,12 @@ export default function Home() {
     setIsLoadingAccounts(true);
     try {
       const response = await fetch("/api/admin/accounts", { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readJsonSafely(response);
       if (!response.ok) {
-        throw new Error(payload.error || "无法读取账号列表。");
+        throw new Error(buildApiErrorMessage(response, payload, "无法读取账号列表。"));
+      }
+      if (!Array.isArray(payload)) {
+        throw new Error("服务器返回的账号列表格式无效。");
       }
       setLoginAccounts(payload);
       setAccountError("");
@@ -783,8 +846,10 @@ export default function Home() {
               },
         ),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "保存账号失败。");
+      const payload = await readJsonSafely(response);
+      if (!response.ok) {
+        throw new Error(buildApiErrorMessage(response, payload, "保存账号失败。"));
+      }
       await loadLoginAccounts();
     } catch (error) {
       console.error("Failed to save a user account.", error);
@@ -816,14 +881,16 @@ export default function Home() {
   }
 
   function deleteLoginAccount(account: LoginAccount) {
-    requestDelete(`确定要删除登录账号「${account.email}」吗？`, async () => {
+    requestDelete(`确定要删除登录账号「${account.email}」吗？`, async (password) => {
       const response = await fetch("/api/admin/accounts", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: account.id }),
+        body: JSON.stringify({ userId: account.id, deletePassword: password }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "删除账号失败。");
+      const payload = await readJsonSafely(response);
+      if (!response.ok) {
+        throw new Error(buildApiErrorMessage(response, payload, "删除账号失败。"));
+      }
       await loadLoginAccounts();
     });
   }
@@ -4294,6 +4361,19 @@ export default function Home() {
           >
             <h2 className="text-lg font-bold">确认删除</h2>
             <p className="mt-3 text-sm text-gray-700">{pendingDelete.message}</p>
+            <label className="mt-4 block text-sm font-medium">
+              删除密码
+              <input
+                autoComplete="current-password"
+                autoFocus
+                required
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                disabled={isDeleting}
+                className="mt-1 w-full rounded border p-2"
+              />
+            </label>
             {deleteError && (
               <p role="alert" className="mt-2 text-sm text-rose-700">
                 {deleteError}
@@ -4304,6 +4384,8 @@ export default function Home() {
                 type="button"
                 onClick={() => {
                   setPendingDelete(null);
+                  setDeletePassword("");
+                  setDeleteError("");
                 }}
                 disabled={isDeleting}
                 className="rounded border px-4 py-2 text-sm font-semibold hover:bg-gray-50"
@@ -4312,7 +4394,7 @@ export default function Home() {
               </button>
               <button
                 type="submit"
-                disabled={isDeleting}
+                disabled={isDeleting || !deletePassword}
                 className="rounded bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
               >
                 {isDeleting ? "正在删除…" : "确认删除"}
