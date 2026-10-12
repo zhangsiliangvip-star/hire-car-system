@@ -1898,7 +1898,7 @@ export default function Home() {
         </aside>
 
         <section className="min-w-0 flex-1">
-          {activeView === "login" && (
+          {activeView === "login" && currentProfile?.role === "admin" && (
             <div className="p-4 md:p-6">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-bold">ログイン管理</h2>
