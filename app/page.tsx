@@ -446,6 +446,8 @@ export default function Home() {
   const [batchOrderInput, setBatchOrderInput] = useState("");
   const [batchOrderDate, setBatchOrderDate] = useState("");
   const [batchOrderVehicle, setBatchOrderVehicle] = useState("");
+  const [batchOrderSource, setBatchOrderSource] = useState("");
+  const [batchOrderCompany, setBatchOrderCompany] = useState("");
   const [pendingDelete, setPendingDelete] = useState<{
     message: string;
     action: () => void | Promise<void>;
@@ -984,6 +986,8 @@ export default function Home() {
     setBatchOrderInput("");
     setBatchOrderDate(toDateKey(calendarCenterDate));
     setBatchOrderVehicle(vehicle);
+    setBatchOrderSource("");
+    setBatchOrderCompany("");
     setShowBatchOrderForm(true);
   }
 
@@ -1011,10 +1015,14 @@ export default function Home() {
         time: detail.time,
         pickup: detail.pickup,
         destination: detail.destination,
+        orderSource: batchOrderSource.trim(),
+        company: batchOrderCompany.trim(),
       })),
     ]);
     setShowBatchOrderForm(false);
     setBatchOrderInput("");
+    setBatchOrderSource("");
+    setBatchOrderCompany("");
   }
 
   function openNewDriver() {
@@ -3055,7 +3063,7 @@ export default function Home() {
 
       {showBatchOrderForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-bold">批量导入预约</h2>
               <button
@@ -3068,7 +3076,7 @@ export default function Home() {
               </button>
             </div>
             <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              系统会从每条信息中识别“配車時間、上车地点、下车地点”。其余内容不会导入。
+              系统会从每条信息中识别“配車時間、上车地点、下车地点”；以下来源和所属公司将应用于本批所有订单。
             </p>
             <div className="space-y-4">
               <label className="block text-sm font-medium">
@@ -3096,13 +3104,45 @@ export default function Home() {
                 </select>
               </label>
               <label className="block text-sm font-medium">
+                来源
+                <input
+                  type="text"
+                  list="batch-order-sources"
+                  value={batchOrderSource}
+                  onChange={(event) => setBatchOrderSource(event.target.value)}
+                  placeholder="未填写"
+                  className="mt-1 w-full rounded border px-3 py-2"
+                />
+                <datalist id="batch-order-sources">
+                  {orderSources.map((source) => (
+                    <option key={source} value={source} />
+                  ))}
+                </datalist>
+              </label>
+              <label className="block text-sm font-medium">
+                所属公司
+                <input
+                  type="text"
+                  list="batch-order-companies"
+                  value={batchOrderCompany}
+                  onChange={(event) => setBatchOrderCompany(event.target.value)}
+                  placeholder="未填写"
+                  className="mt-1 w-full rounded border px-3 py-2"
+                />
+                <datalist id="batch-order-companies">
+                  {companies.map((company) => (
+                    <option key={company} value={company} />
+                  ))}
+                </datalist>
+              </label>
+              <label className="block text-sm font-medium">
                 预约信息
                 <textarea
                   rows={8}
                   autoFocus
                   value={batchOrderInput}
                   onChange={(event) => setBatchOrderInput(event.target.value)}
-                  placeholder={"06:30 品川 墨田 5 L\n06:45 羽田 台东 5 绿 MF JL42"}
+                  placeholder={"06:30 出发地 结束地\n06:45 出发地 结束地"}
                   className="mt-1 w-full resize-y rounded border p-2 font-mono text-sm"
                 />
               </label>
