@@ -1620,7 +1620,7 @@ export default function Home() {
             !fuelTypes.includes(record.fuelType),
         )
       ) {
-        alert("車両每行请按顺序填写：車名、車両番号、座位数（5/7/8/10）、燃油类型、車検有効期限、自賠責保険有効期限、備考、車両所属（后4项可选）。");
+        alert("車両每行请按顺序填写：車名、車両番号、座位数（5/7/8/10）、燃油类型、車検有効期限、自賠責有効期限、備考、車両所属（后4项可选）。");
         return;
       }
       if (
@@ -2929,7 +2929,7 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">座位数</th>
                       <th className="px-4 py-3 font-semibold">燃油类型</th>
                       <th className="px-4 py-3 font-semibold">車検有効期限</th>
-                      <th className="px-4 py-3 font-semibold">自賠責保険有効期限</th>
+                      <th className="px-4 py-3 font-semibold">自賠責有効期限</th>
                       <th className="px-4 py-3 font-semibold">車両状態</th>
                       <th className="px-4 py-3 font-semibold">車両備考</th>
                       <th className="px-4 py-3 font-semibold">操作</th>
@@ -3871,7 +3871,7 @@ export default function Home() {
                 />
               </label>
               <label className="block text-sm font-medium">
-                自賠責保険有効期限
+                自賠責有効期限
                 <input
                   type="date"
                   className="mt-1 w-full rounded border p-2"
@@ -4175,7 +4175,7 @@ export default function Home() {
               placeholder={batchAddType === "drivers"
                 ? "姓名,携帯番号（可选）,微信号（可选）,WhatsApp（可选）,免許有効期限（可选）"
                 : batchAddType === "vehicles"
-                  ? "車名,車両番号,座位数,燃油类型,車検有効期限,自賠責保険有効期限,備考,車両所属（可选）"
+                  ? "車名,車両番号,座位数,燃油类型,車検有効期限,自賠責有効期限,備考,車両所属（可选）"
                   : batchAddType === "sources"
                     ? "来源,名（可选）,連絡先（可选）,颜色（可选）"
                     : "会社名称,運行管理者（可选）,整備管理者（可选）,会社电话（可选）,点呼位置（可选）,車庫位置（可选）"}
@@ -4290,7 +4290,7 @@ export default function Home() {
                     <dd className="break-words font-medium">{selectedOrderVehicle?.inspectionExpiry || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
-                    <dt className="text-gray-500">自賠責保険有効期限</dt>
+                    <dt className="text-gray-500">自賠責有効期限</dt>
                     <dd className="break-words font-medium">{selectedOrderVehicle?.liabilityExpiry || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
