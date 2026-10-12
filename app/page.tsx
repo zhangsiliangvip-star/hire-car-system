@@ -4258,12 +4258,12 @@ export default function Home() {
                     <dd className="break-words font-medium">{selectedOrderDetails.customer || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
-                    <dt className="text-gray-500">配車時間</dt>
-                    <dd className="break-words font-medium">{selectedOrderDetails.time || "-"}</dd>
-                  </div>
-                  <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">开始日期</dt>
                     <dd className="break-words font-medium">{formatOrderDate(selectedOrderDetails.date)}</dd>
+                  </div>
+                  <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
+                    <dt className="text-gray-500">配車時間</dt>
+                    <dd className="break-words font-medium">{selectedOrderDetails.time || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">开始地点</dt>
