@@ -3267,16 +3267,6 @@ export default function Home() {
                 />
               </label>
 
-              <label className="block text-sm font-medium">
-                配車時間
-                <input
-                  type="time"
-                  className="mt-1 w-full rounded border p-2"
-                  value={form.time}
-                  onChange={(event) => setForm({ ...form, time: event.target.value })}
-                />
-              </label>
-
               {/* 来源 */}
               <label className="block text-sm font-medium">
                 来源
@@ -3524,6 +3514,16 @@ export default function Home() {
                   </div>
                 )}
               </div>
+
+              <label className="block text-sm font-medium">
+                配車時間
+                <input
+                  type="time"
+                  className="mt-1 w-full rounded border p-2"
+                  value={form.time}
+                  onChange={(event) => setForm({ ...form, time: event.target.value })}
+                />
+              </label>
 
               {/* 上车地点 */}
               <label className="block text-sm font-medium">
