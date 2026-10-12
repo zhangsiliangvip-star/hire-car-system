@@ -3011,7 +3011,7 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">来源</th>
-                      <th className="px-4 py-3 font-semibold">名</th>
+                      <th className="px-4 py-3 font-semibold">担当</th>
                       <th className="px-4 py-3 font-semibold">連絡先</th>
                       <th className="px-4 py-3 font-semibold">关联予約</th>
                       <th className="px-4 py-3 font-semibold">操作</th>
