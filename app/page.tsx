@@ -1561,8 +1561,16 @@ export default function Home() {
         `${first.serviceDate} ${first.time}`,
       ),
     );
+  const driverFinanceDrivers = [...new Set(
+    companyDriverFinanceDetails
+      .filter((row) => row.driverWages > 0)
+      .map((row) => row.driver),
+  )].sort((first, second) => first.localeCompare(second, "ja"));
+  const selectedDriverFinanceDriver = driverFinanceDrivers.includes(driverFinanceDriverFilter)
+    ? driverFinanceDriverFilter
+    : "";
   const filteredDriverFinanceDetails = companyDriverFinanceDetails.filter(
-    (row) => !driverFinanceDriverFilter || row.driver === driverFinanceDriverFilter,
+    (row) => !selectedDriverFinanceDriver || row.driver === selectedDriverFinanceDriver,
   );
   const driverFinanceCompanyLabel = driverFinanceCompanyFilter === "__unassigned_company__"
     ? "未设置所属会社"
@@ -4084,13 +4092,16 @@ export default function Home() {
             <FinanceSummaryPanel
               title="給料統計"
               month={financeMonth}
-              onMonthChange={setFinanceMonth}
+              onMonthChange={(month) => {
+                setFinanceMonth(month);
+                setDriverFinanceDriverFilter("");
+              }}
               headerActions={
                 <>
                 <button
                   type="button"
                   onClick={async () => {
-                    if (activeRegionId === ALL_REGIONS_ID || !driverFinanceDriverFilter) {
+                    if (activeRegionId === ALL_REGIONS_ID || !selectedDriverFinanceDriver) {
                       alert("请先选择一个分区和一位司机，再导出月度工资表。");
                       return;
                     }
@@ -4100,7 +4111,7 @@ export default function Home() {
                     }
                     try {
                       await printDriverWages({
-                        driver: `${driverFinanceDriverFilter} ／ ${driverFinanceCompanyLabel}`,
+                        driver: `${selectedDriverFinanceDriver} ／ ${driverFinanceCompanyLabel}`,
                         month: financeMonth,
                         region: regionNameById.get(activeRegionId) || "",
                         rows: filteredDriverFinanceDetails,
@@ -4144,14 +4155,14 @@ export default function Home() {
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
                     運転士
                     <select
-                      value={driverFinanceDriverFilter}
+                      value={selectedDriverFinanceDriver}
                       onChange={(event) => setDriverFinanceDriverFilter(event.target.value)}
                       className="rounded border bg-white px-3 py-2 text-sm text-gray-900"
                     >
                       <option value="">全部運転士</option>
-                      {driverRecords.map((driver) => (
-                        <option key={driver.id} value={driver.name}>
-                          {driver.name}
+                      {driverFinanceDrivers.map((driver) => (
+                        <option key={driver} value={driver}>
+                          {driver}
                         </option>
                       ))}
                     </select>

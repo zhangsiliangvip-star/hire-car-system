@@ -43,6 +43,95 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
+test("wage driver dropdown follows positive monthly company wages, not the driver directory", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const monthly = source.slice(
+    source.indexOf("  const monthlyFinanceOrders ="),
+    source.indexOf("  const filteredOrderFinanceOrders ="),
+  );
+  const wages = source.slice(
+    source.indexOf("  const [driverFinanceYear] ="),
+    source.indexOf("  const driverFinanceCompanyLabel ="),
+  );
+  const script = ts.transpileModule(
+    `${monthly}\n${wages}\nresult = {
+      drivers: driverFinanceDrivers,
+      selected: selectedDriverFinanceDriver,
+      rows: filteredDriverFinanceDetails.map((row) => row.driver),
+    };`,
+    { compilerOptions: { target: ts.ScriptTarget.ES2020 } },
+  ).outputText;
+  const order = (id, company, financeByDate) => ({
+    id, regionId: region, company, date: "2026-09-30", endDate: "2026-11-01",
+    orderPrice: 0, time: "09:00", financeByDate,
+  });
+  const orders = [
+    order(1, "A", {
+      "2026-09-30": { driver: "Previous month", driverWage: 100 },
+      "2026-10-01": { driver: "Driver A", driverWage: 100 },
+      "2026-10-02": { driver: "Driver A", driverWage: 200 },
+      "2026-10-03": { driver: "" },
+      "2026-11-01": { driver: "Next month", driverWage: 300 },
+    }),
+    order(2, "B", { "2026-10-01": { driver: "Driver B", driverWage: 100 } }),
+    order(3, "", { "2026-10-04": { driver: "Historical driver", driverBonusWage: 100 } }),
+    order(4, "A", {}),
+    order(5, "C", {
+      "2026-10-01": { driver: "Zero wage driver", driverWage: 0 },
+      "2026-10-02": { driver: "Advance only driver", driverAdvanceCompanyReport: 1000 },
+    }),
+  ];
+  const evaluate = (company, selected = "", month = "2026-10", records = orders) => {
+    const context = {
+      orders: records, financeMonth: month, driverFinanceCompanyFilter: company,
+      driverFinanceDriverFilter: selected, companyRecords: [],
+      regionNameById: new Map(), accountingAccounts: [],
+      getJapaneseHolidays: () => new Set(),
+      calculateOrderFinance: (finance) => ({
+        driverWages: (finance.driverWage || 0) + (finance.driverBonusWage || 0),
+        driverAdvances: finance.driverAdvanceCompanyReport || 0,
+        requestAmount: 0, companyExpenses: 0, profit: 0,
+      }),
+      getDriverOvertimeFee: () => 0,
+      getOrderFinanceAmount: () => 0,
+      getOrderVehicleNumber: () => "-",
+      getFinanceDayOrder: (order) => order,
+      getAccountingAssigneeName: () => "",
+    };
+    vm.runInNewContext(script, context);
+    return plain(context.result);
+  };
+  assert.deepEqual(evaluate("A"), {
+    drivers: ["Driver A"], selected: "", rows: ["Driver A", "Driver A"],
+  });
+  assert.deepEqual(evaluate("B").drivers, ["Driver B"]);
+  assert.deepEqual(evaluate("__unassigned_company__").drivers, ["Historical driver"]);
+  assert.deepEqual(evaluate("").drivers, ["Driver A", "Driver B", "Historical driver"]);
+  assert.deepEqual(evaluate("C"), {
+    drivers: [], selected: "", rows: ["Advance only driver", "Zero wage driver"],
+  });
+  assert.deepEqual(evaluate("C", "Zero wage driver"), evaluate("C"));
+  assert.deepEqual(evaluate("A", "Driver A").rows, ["Driver A", "Driver A"]);
+  assert.deepEqual(evaluate("A", "Driver B"), evaluate("A"));
+  assert.deepEqual(evaluate("A", "Driver A", "2026-11"), {
+    drivers: ["Next month"], selected: "", rows: ["Next month"],
+  });
+  assert.deepEqual(evaluate("A", "Driver A", "2026-12"), {
+    drivers: [], selected: "", rows: [],
+  });
+  assert.deepEqual(evaluate("A", "Driver A", "2026-10", []), {
+    drivers: [], selected: "", rows: [],
+  });
+
+  const start = source.indexOf('title="給料統計"');
+  const panel = source.slice(start, source.indexOf("</FinanceSummaryPanel>", start));
+  assert.match(panel, /onMonthChange=\{\(month\) => \{\s*setFinanceMonth\(month\);\s*setDriverFinanceDriverFilter\(""\);/);
+  assert.match(panel, /value=\{selectedDriverFinanceDriver\}/);
+  assert.match(panel, /driverFinanceDrivers\.map\(\(driver\) =>/);
+  assert.doesNotMatch(panel, /driverRecords\.map/);
+  assert.match(panel, /activeRegionId === ALL_REGIONS_ID \|\| !selectedDriverFinanceDriver/);
+});
+
 test("calendar orders vehicles by generation and puts out-of-service vehicles last", () => {
   const { compareCalendarVehicles } = load("lib\\vehicle-order.ts");
   const vehicles = [
