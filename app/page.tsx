@@ -1450,7 +1450,7 @@ export default function Home() {
     }
   })();
   const sortedFinanceOrders = [...filteredOrderFinanceOrders].sort((first, second) =>
-    `${second.date} ${second.time}`.localeCompare(`${first.date} ${first.time}`),
+    `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
   );
   const filteredFinanceTotals = summarizeFinance(filteredOrderFinanceOrders);
   const filteredFinanceProfitRate =
@@ -1557,8 +1557,8 @@ export default function Home() {
         }),
     )
     .sort((first, second) =>
-      `${second.serviceDate} ${second.time}`.localeCompare(
-        `${first.serviceDate} ${first.time}`,
+      `${first.serviceDate} ${first.time}`.localeCompare(
+        `${second.serviceDate} ${second.time}`,
       ),
     );
   const driverFinanceDrivers = [...new Set(
@@ -1629,8 +1629,8 @@ export default function Home() {
         }),
     )
     .sort((first, second) =>
-      `${second.serviceDate} ${second.time}`.localeCompare(
-        `${first.serviceDate} ${first.time}`,
+      `${first.serviceDate} ${first.time}`.localeCompare(
+        `${second.serviceDate} ${second.time}`,
       ),
     );
   const vehicleSummaryResult: { rows: VehicleMonthlySummary[]; error: string } = (() => {

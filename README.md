@@ -38,6 +38,8 @@ For an existing ordinary user, select **编辑**, enter and confirm a new passwo
 
 The dashboard includes order accounting (`経理統計`), driver wages (`給料統計`), vehicle finances (`車両統計`), and the monthly balance (`收支平衡`). Clicking an order name in the order accounting report opens that order's existing financial statistics editor, including daily entries, accounting status, deposits, and notes. Saving updates the same order and refreshes its calculated report totals.
 
+All dated statistics lists use ascending chronological order (earliest date first, then earliest departure time on the same date). This applies to order accounting, driver wage details, vehicle daily details, and their corresponding A4 exports. Monthly summary tables without daily dates keep their existing grouping.
+
 Below the accounting status, the financial editor records the invoice status (`未完成` or `已完成`, initially `未完成`) and an optional invoice sent date. These are independent of accounting and deposit status; saving and reopening an order preserves both values. Apply `20261021000000_order_invoice_status.sql` before using these fields. Recording a sent date does not send an invoice.
 
 The order accounting table displays invoice status, deposit status, and then request amount immediately after the vehicle number: pending invoices are red and completed invoices are green. The A4 export uses the same column order, with blank status cells on the totals row.

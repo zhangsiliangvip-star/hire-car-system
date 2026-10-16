@@ -43,6 +43,31 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
+test("dated statistics sort oldest first and use departure time to break date ties", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  for (const [start, end, dateKey] of [
+    ["  const sortedFinanceOrders =", "  const filteredFinanceTotals =", "date"],
+    ["  const companyDriverFinanceDetails =", "  const driverFinanceDrivers =", "serviceDate"],
+    ["  const filteredVehicleFinanceDetails =", "  const vehicleSummaryResult:", "serviceDate"],
+  ]) {
+    const section = source.slice(source.indexOf(start), source.indexOf(end));
+    const comparator = section.match(/\.sort\((\(first, second\) =>[\s\S]*?),\s*\);/);
+    assert.ok(comparator, `Missing comparator in ${start}`);
+    const compare = vm.runInNewContext(`(${comparator[1]})`);
+    const rows = [
+      { [dateKey]: "2026-10-20", time: "09:00", id: "late" },
+      { [dateKey]: "2026-10-01", time: "14:00", id: "afternoon" },
+      { [dateKey]: "2026-10-01", time: "08:00", id: "morning" },
+      { [dateKey]: "2026-09-30", time: "18:00", id: "previous" },
+    ];
+    assert.deepEqual(rows.sort(compare).map((row) => row.id),
+      ["previous", "morning", "afternoon", "late"]);
+  }
+  assert.match(source, /rows: sortedFinanceOrders\.map/);
+  assert.match(source, /rows: filteredDriverFinanceDetails,/);
+  assert.match(source, /rows: filteredVehicleFinanceDetails,/);
+});
+
 test("wage driver dropdown follows positive monthly company wages, not the driver directory", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const monthly = source.slice(
@@ -108,7 +133,7 @@ test("wage driver dropdown follows positive monthly company wages, not the drive
   assert.deepEqual(evaluate("__unassigned_company__").drivers, ["Historical driver"]);
   assert.deepEqual(evaluate("").drivers, ["Driver A", "Driver B", "Historical driver"]);
   assert.deepEqual(evaluate("C"), {
-    drivers: [], selected: "", rows: ["Advance only driver", "Zero wage driver"],
+    drivers: [], selected: "", rows: ["Zero wage driver", "Advance only driver"],
   });
   assert.deepEqual(evaluate("C", "Zero wage driver"), evaluate("C"));
   assert.deepEqual(evaluate("A", "Driver A").rows, ["Driver A", "Driver A"]);
