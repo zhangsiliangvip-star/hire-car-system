@@ -873,17 +873,17 @@ test("balance adds manual income, subtracts only manual expense and prints match
   const { buildBalancePrintHtml } = load("lib\\balance-print.ts", {
     "@/lib/print-a4": { printA4Html() {} },
   });
-  const orders = [{ companyName: "A", requestAmount: 1000 }, { companyName: "B", requestAmount: 50 }];
+  const orders = [{ companyName: "A", requestAmount: 1000, depositMethod: "口座入金" }, { companyName: "B", requestAmount: 50, depositMethod: "现金入金" }];
   const expenses = [{ companyName: "A", name: "Costs", amount: 400 }, { companyName: "B", name: "Cost", amount: 200 }];
   const incomes = [{ companyName: "A", name: "<Income>", amount: 200 }, { companyName: "B", name: "Other", amount: 50 }];
   const summary = balance.summarizeBalance("", ["A", "B"], orders, expenses, incomes);
-  assert.deepEqual(plain(summary.totals), { requestAmount: 1050, incomeTotal: 250, expenseTotal: 600, net: 700 });
+  assert.deepEqual(plain(summary.totals), { requestAmount: 1050, bankRequestAmount: 1000, cashRequestAmount: 50, unassignedRequestAmount: 0, incomeTotal: 250, expenseTotal: 600, net: 700 });
   assert.equal(summary.rows.find((row) => row.companyName === "B").net, -100);
   assert.equal(balance.summarizeBalance("A", [], orders, expenses, incomes).totals.net, 800);
   assert.equal(balance.summarizeBalance("", [], [], [], incomes).totals.net, 250);
   assert.equal(balance.summarizeBalance("", [], orders, expenses).totals.net, 450);
   assert.throws(() => balance.summarizeBalance("", [], [], [], [{ companyName: "", name: "Bad", amount: -1 }]));
-  assert.throws(() => balance.summarizeBalance("", [], [{ companyName: "A", requestAmount: Number.MAX_SAFE_INTEGER }], [],
+  assert.throws(() => balance.summarizeBalance("", [], [{ companyName: "A", requestAmount: Number.MAX_SAFE_INTEGER, depositMethod: "" }], [],
     [{ companyName: "A", name: "Overflow", amount: 1 }]));
   assert.equal(balance.getBalanceServiceMonth({ offDates: ["2026-09-30"] }, ["2026-09-30", "2026-10-01"]), "2026-10");
   const html = buildBalancePrintHtml({ month: "2026-10", region: "Tokyo", company: "All", summary });
@@ -892,6 +892,41 @@ test("balance adds manual income, subtracts only manual expense and prints match
   assert.ok(html.includes("¥700"));
   assert.ok(html.includes('class="number loss">¥-100'));
   assert.ok(html.includes("＋手动其他收入总和－手动支出总和"));
+  assert.ok(html.includes("口座入金：¥1,000"));
+  assert.ok(html.includes("现金入金：¥50"));
+  assert.ok(html.includes("未设置入金方式：¥0"));
+});
+
+test("balance request breakdown reconciles across companies without treating methods as received payments", () => {
+  const { summarizeBalance } = load("lib\\balance-summary.ts");
+  const orders = [
+    { companyName: "A", requestAmount: 100, depositMethod: "口座入金", depositDate: "" },
+    { companyName: "A", requestAmount: 200, depositMethod: "现金入金", depositDate: "2026-11-01" },
+    { companyName: "A", requestAmount: 50, depositMethod: "" },
+    { companyName: "B", requestAmount: 300, depositMethod: "口座入金" },
+    { companyName: "", requestAmount: 25, depositMethod: "" },
+    { companyName: "B", requestAmount: 0, depositMethod: "现金入金" },
+  ];
+  const summary = summarizeBalance("", ["A", "B"], orders, []);
+  assert.equal(summary.totals.bankRequestAmount, 400);
+  assert.equal(summary.totals.cashRequestAmount, 200);
+  assert.equal(summary.totals.unassignedRequestAmount, 75);
+  assert.equal(summary.totals.net, 675);
+  for (const row of [...summary.rows, summary.totals]) {
+    assert.equal(row.requestAmount, row.bankRequestAmount + row.cashRequestAmount + row.unassignedRequestAmount);
+  }
+  const filtered = summarizeBalance("A", [], orders, []).totals;
+  assert.equal(filtered.bankRequestAmount, 100);
+  assert.equal(filtered.cashRequestAmount, 200);
+  assert.equal(filtered.unassignedRequestAmount, 50);
+  assert.equal(summarizeBalance("__unassigned_company__", [], orders, []).totals.unassignedRequestAmount, 25);
+  assert.throws(() => summarizeBalance("", [], [{ companyName: "A", requestAmount: 1, depositMethod: "invalid" }], []), /入金方式无效/);
+  const { buildBalancePrintHtml } = load("lib\\balance-print.ts", { "@/lib/print-a4": {} });
+  const html = buildBalancePrintHtml({ month: "2026-10", region: "Tokyo", company: "All", summary });
+  assert.match(html, /<th>请求总和<\/th><th>口座入金<\/th><th>现金入金<\/th><th>未设置入金方式<\/th>/);
+  assert.match(html, /口座入金：¥400/);
+  assert.match(html, /现金入金：¥200/);
+  assert.match(html, /未设置入金方式：¥75/);
 });
 
 test("actual balance page pipeline uses selected-month income drafts and saves income separately", () => {
@@ -920,7 +955,7 @@ test("actual balance page pipeline uses selected-month income drafts and saves i
     balanceCompanyFilter: "A", balanceMonth: "2026-10", balanceExpenseItems: expenses,
     balanceExpenseAmountDrafts: { "income:2026-10": "350", "expense:2026-10": "450" },
     balanceExpensesMigrationPending: false, companyRows: [{ name: "A" }],
-    orders: [{ company: "A", orderPrice: 1000, offDates: [], dateKeys: ["2026-10-31", "2026-11-01"],
+    orders: [{ company: "A", orderPrice: 1000, depositMethod: "口座入金", offDates: [], dateKeys: ["2026-10-31", "2026-11-01"],
       financeByDate: { "2026-10-31": { requestAmount: 20 }, "2026-11-01": { requestAmount: 30 } } }],
     getOrderDateKeys: (order) => order.dateKeys,
     calculateOrderFinance: (entry) => entry, ...balance,
@@ -933,7 +968,7 @@ test("actual balance page pipeline uses selected-month income drafts and saves i
     return run.result;
   }
   assert.deepEqual(plain(calculate().summary.totals), {
-    requestAmount: 1050, incomeTotal: 350, expenseTotal: 450, net: 950,
+    requestAmount: 1050, bankRequestAmount: 1050, cashRequestAmount: 0, unassignedRequestAmount: 0, incomeTotal: 350, expenseTotal: 450, net: 950,
   });
   assert.equal(calculate({ balanceMonth: "2026-11" }).summary.totals.net, 900);
   assert.equal(calculate({ balanceExpenseAmountDrafts: { "income:2026-10": "" } }).summary.totals.net, 650);

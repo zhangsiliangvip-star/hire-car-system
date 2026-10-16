@@ -3,10 +3,14 @@ import type { Order } from "@/lib/domain";
 type BalanceOrderTotals = {
   companyName: string;
   requestAmount: number;
+  depositMethod: Order["depositMethod"];
 };
 
 export type BalanceExpense = { companyName: string; name: string; amount: number };
-export type BalanceCompanyRow = BalanceOrderTotals & {
+export type BalanceCompanyRow = Omit<BalanceOrderTotals, "depositMethod"> & {
+  bankRequestAmount: number;
+  cashRequestAmount: number;
+  unassignedRequestAmount: number;
   incomeTotal: number;
   expenseTotal: number;
   net: number;
@@ -33,7 +37,7 @@ export function summarizeBalance(
   const groupFor = (name: string) => {
     let row = groups.get(name);
     if (!row) {
-      row = { companyName: name, requestAmount: 0, incomeTotal: 0, expenseTotal: 0, net: 0 };
+      row = { companyName: name, requestAmount: 0, bankRequestAmount: 0, cashRequestAmount: 0, unassignedRequestAmount: 0, incomeTotal: 0, expenseTotal: 0, net: 0 };
       groups.set(name, row);
     }
     return row;
@@ -49,13 +53,17 @@ export function summarizeBalance(
   for (const order of orderTotals.filter((row) => matches(row.companyName))) {
     const row = groupFor(order.companyName);
     row.requestAmount += check(order.requestAmount);
+    if (order.depositMethod === "口座入金") row.bankRequestAmount += order.requestAmount;
+    else if (order.depositMethod === "现金入金") row.cashRequestAmount += order.requestAmount;
+    else if (order.depositMethod === "") row.unassignedRequestAmount += order.requestAmount;
+    else throw new Error("订单入金方式无效，请检查订单资料。");
   }
   const expenses = manualExpenses.filter((row) => matches(row.companyName));
   for (const item of expenses) groupFor(item.companyName).expenseTotal += check(item.amount);
   const incomes = manualIncomes.filter((row) => matches(row.companyName));
   for (const item of incomes) groupFor(item.companyName).incomeTotal += check(item.amount);
   const rows = [...groups.values()].sort((a, b) => a.companyName.localeCompare(b.companyName));
-  const totals = { requestAmount: 0, incomeTotal: 0, expenseTotal: 0, net: 0 };
+  const totals = { requestAmount: 0, bankRequestAmount: 0, cashRequestAmount: 0, unassignedRequestAmount: 0, incomeTotal: 0, expenseTotal: 0, net: 0 };
   for (const row of rows) {
     row.net = row.requestAmount + row.incomeTotal - row.expenseTotal;
     for (const key of Object.keys(totals) as (keyof typeof totals)[]) {

@@ -1445,6 +1445,7 @@ export default function Home() {
         }
         return [{
           companyName: order.company || "",
+          depositMethod: order.depositMethod,
           requestAmount: Object.values(order.financeByDate || {}).reduce(
             (total, finance) => total + calculateOrderFinance(finance, 0).requestAmount,
             order.orderPrice,
@@ -4678,6 +4679,7 @@ export default function Home() {
                 当月利润＝请求总金额＋手动输入的其他收入－下方手动输入的支出总和。不自动扣除车辆费用、司机工资、立替或其他运营支出。
                 整单请求金额（订单价格及全日期的ETC旅报、司机立替旅报、会社立替旅报、超时费）按首个服务日所在月份计入，不按天分摊。
                 首个服务日排除休运日；请求按订单所属会社归集，其他收入和支出按手动项目所属会社及录入月份归集。
+                口座入金、现金入金按订单入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列。
               </p>
               {balanceResult.summary ? (
               <>
@@ -4690,6 +4692,17 @@ export default function Home() {
                   <p className="mt-1 text-xs text-blue-800">
                     整单请求金额归首个服务日所在月份
                   </p>
+                  <dl className="mt-3 space-y-1 border-t border-blue-200 pt-2 text-sm text-blue-950">
+                    {([
+                      ["口座入金", balanceResult.summary.totals.bankRequestAmount],
+                      ["现金入金", balanceResult.summary.totals.cashRequestAmount],
+                      ["未设置入金方式", balanceResult.summary.totals.unassignedRequestAmount],
+                    ] as const).map(([label, amount]) => (
+                      <div key={label} className="flex flex-wrap justify-between gap-x-2">
+                        <dt>{label}</dt><dd className="font-semibold tabular-nums">{formatYen(amount)}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </section>
                 <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm">
                   <p className="text-sm font-semibold text-emerald-800">其他收入总和</p>
@@ -4716,11 +4729,11 @@ export default function Home() {
                 </section>
               </div>
               <div className="mb-5 overflow-x-auto rounded-lg border bg-white">
-                <table className="w-full min-w-[650px] text-left text-sm">
+                <table className="w-full min-w-[1050px] text-left text-sm">
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3">所属会社</th>
-                      {["请求总和", "其他收入（手动）", "支出总和（手动）", "当月利润／亏损"].map((label) => (
+                      {["请求总和", "口座入金", "现金入金", "未设置入金方式", "其他收入（手动）", "支出总和（手动）", "当月利润／亏损"].map((label) => (
                         <th key={label} className="px-4 py-3 text-right">{label}</th>
                       ))}
                     </tr>
@@ -4729,7 +4742,7 @@ export default function Home() {
                     {balanceResult.summary.rows.map((row) => (
                       <tr key={row.companyName} className="border-t">
                         <td className="px-4 py-3">{row.companyName || "未填写"}</td>
-                        {[row.requestAmount, row.incomeTotal, row.expenseTotal].map((amount, index) => (
+                        {[row.requestAmount, row.bankRequestAmount, row.cashRequestAmount, row.unassignedRequestAmount, row.incomeTotal, row.expenseTotal].map((amount, index) => (
                           <td key={index} className="px-4 py-3 text-right tabular-nums">{formatYen(amount)}</td>
                         ))}
                         <td className={`px-4 py-3 text-right font-semibold tabular-nums ${row.net < 0 ? "text-red-600" : "text-black"}`}>{formatYen(row.net)}</td>
@@ -4740,7 +4753,11 @@ export default function Home() {
                     <tr>
                       <td className="px-4 py-3">合计</td>
                       {[
-                        balanceResult.summary.totals.requestAmount, balanceResult.summary.totals.incomeTotal, balanceResult.summary.totals.expenseTotal,
+                        balanceResult.summary.totals.requestAmount,
+                        balanceResult.summary.totals.bankRequestAmount,
+                        balanceResult.summary.totals.cashRequestAmount,
+                        balanceResult.summary.totals.unassignedRequestAmount,
+                        balanceResult.summary.totals.incomeTotal, balanceResult.summary.totals.expenseTotal,
                       ].map((amount, index) => <td key={index} className="px-4 py-3 text-right tabular-nums">{formatYen(amount)}</td>)}
                       <td className={`px-4 py-3 text-right tabular-nums ${balanceResult.summary.totals.net < 0 ? "text-red-600" : "text-black"}`}>{formatYen(balanceResult.summary.totals.net)}</td>
                     </tr>

@@ -36,6 +36,8 @@ For an existing account of either role, select **编辑**, enter and confirm a n
 
 ## Financial reports
 
+In `收支平衡`, the request total is broken down by the order's saved deposit method into `口座入金`, `现金入金`, and `未设置入金方式`. The summary card, per-company rows, totals, and A4 report use the same breakdown. These are request amounts classified by method, not confirmed receipts: no deposit date is required. The three categories sum to the existing request total; the service-month attribution, region/company filters, and profit formula are unchanged.
+
 In reservation management (`予約管理`), the date button immediately after the month filter opens a calendar dialog for that month, not a dropdown. Select a day to show reservations whose service range includes that day, excluding reservations marked off on that day. Source and company filters still apply. `全部日期` restores the monthly list; changing the month or re-entering reservation management clears the selected day. Escape, Cancel, or clicking outside the dialog closes it without changing the filter.
 
 The dashboard includes order accounting (`経理統計`), driver wages (`給料統計`), vehicle finances (`車両統計`), and the monthly balance (`收支平衡`). Clicking an order name in the order accounting report opens that order's existing financial statistics editor, including daily entries, accounting status, deposits, and notes. Saving updates the same order and refreshes its calculated report totals.
