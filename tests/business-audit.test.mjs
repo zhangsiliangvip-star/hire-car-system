@@ -219,6 +219,13 @@ test("order conflicts cover editing, multi-day ranges, and close departure times
   assert.ok(!source.includes("if (editingOrderId === null && !skipConflictCheck)"));
 });
 
+test("overlapping multi-day orders stack inside the same calendar cell row", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.ok(!source.includes("gridRow: isSingleDayOrder ? 1 : orderLane + 1"));
+  assert.ok(source.includes("const laneOffset = orderLane * orderCardHeight;"));
+  assert.ok(source.includes("const orderCardHeights = new Map("));
+});
+
 test("calendar rows use each vehicle record's own plate shown above the name", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.ok(source.includes("filteredCalendarVehicleRecords.map((vehicleRecord) =>"));

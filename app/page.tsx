@@ -5090,6 +5090,18 @@ export default function Home() {
               laneEndDates[laneIndex] = order.endDate || order.date;
               orderLanes.set(order.id, laneIndex);
             }
+            // Every order sits in the date cells' grid row, stacked by lane.
+            const orderCardHeights = new Map(
+              visibleOrders.map((order) => {
+                const maxCount = Math.max(
+                  1,
+                  ...dates
+                    .filter((day) => day.date >= order.date && day.date <= (order.endDate || order.date))
+                    .map((day) => dailyOrderCounts.get(day.date) ?? 1),
+                );
+                return [order.id, maxCount >= 3 ? 22 : maxCount === 2 ? 24 : 56];
+              }),
+            );
             const singleDayCellHeights = new Map(
               dates.map((day) => {
                 const orderCount = dailyOrderCounts.get(day.date) ?? 0;
@@ -5098,17 +5110,13 @@ export default function Home() {
                   : orderCount >= 3
                     ? 30
                     : 76;
-                const lastSingleDayLane = visibleOrders.reduce((lastLane, order) => {
-                  if (
-                    order.date !== day.date ||
-                    (order.endDate || order.date) !== day.date
-                  ) {
-                    return lastLane;
+                const stackedHeight = visibleOrders.reduce((height, order) => {
+                  if (order.date > day.date || (order.endDate || order.date) < day.date) {
+                    return height;
                   }
-                  return Math.max(lastLane, orderLanes.get(order.id) ?? 0);
-                }, -1);
-                const singleDayCardHeight = orderCount >= 3 ? 22 : orderCount === 2 ? 24 : 56;
-                const stackedHeight = (lastSingleDayLane + 1) * singleDayCardHeight;
+                  const cardHeight = orderCardHeights.get(order.id) ?? 56;
+                  return Math.max(height, ((orderLanes.get(order.id) ?? 0) + 1) * cardHeight);
+                }, 0);
 
                 return [day.date, `${Math.max(baseHeight, stackedHeight)}px`];
               }),
@@ -5357,7 +5365,7 @@ export default function Home() {
                     : maxDailyOrderCount === 2
                       ? 24
                       : 56;
-                  const laneOffset = isSingleDayOrder ? orderLane * orderCardHeight : 0;
+                  const laneOffset = orderLane * orderCardHeight;
                   const centerOffset = maxDailyOrderCount === 1
                     ? (76 - orderCardHeight) / 2 - (isSingleDayOrder ? 0 : 4)
                     : 0;
@@ -5381,7 +5389,7 @@ export default function Home() {
                       key={order.id}
                       style={{
                         gridColumn: `${startIndex + 2} / ${endIndex + 3}`,
-                        gridRow: isSingleDayOrder ? 1 : orderLane + 1,
+                        gridRow: 1,
                         transform: laneOffset + centerOffset > 0
                           ? `translateY(${laneOffset + centerOffset}px)`
                           : undefined,
@@ -5411,7 +5419,7 @@ export default function Home() {
                         }
                         openEditOrder(order);
                       }}
-                      className={`relative mx-1 ${isSingleDayOrder ? "my-0" : "my-1"} cursor-grab overflow-hidden rounded-lg border px-2 text-center shadow-sm active:cursor-grabbing ${maxDailyOrderCount >= 2 ? "py-0 text-[10px] leading-[10px]" : "py-1 text-xs leading-3"} ${statusStyles[order.status]} ${draggingOrderId === order.id ? "opacity-50" : ""}`}
+                      className={`relative mx-1 ${isSingleDayOrder || maxDailyOrderCount >= 2 ? "my-0" : "my-1"} cursor-grab overflow-hidden rounded-lg border px-2 text-center shadow-sm active:cursor-grabbing ${maxDailyOrderCount >= 2 ? "py-0 text-[10px] leading-[10px]" : "py-1 text-xs leading-3"} ${statusStyles[order.status]} ${draggingOrderId === order.id ? "opacity-50" : ""}`}
                     >
                       <div
                         aria-hidden={!isSelectingSplit}
