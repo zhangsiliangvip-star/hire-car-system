@@ -1300,7 +1300,10 @@ export default function Home() {
     if (calendarVehicleFilter === "hiace") return !isOutsourced && modelOrder === 1;
     if (calendarVehicleFilter === "tesla") return !isOutsourced && modelOrder === 2;
     return isOutsourced;
-  }).sort(compareCalendarVehicles);
+  })
+    .map((vehicle) => ({ vehicle, outOfService: getVehicleDisplayStatus(vehicle) !== "运营中", name: vehicle.name, id: vehicle.id }))
+    .sort(compareCalendarVehicles)
+    .map(({ vehicle }) => vehicle);
   const availableVehicleRecords = vehicleRecords.filter(
     (vehicle) => getVehicleDisplayStatus(vehicle) === "运营中",
   );

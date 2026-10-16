@@ -44,15 +44,29 @@ export function compareVehicles(
   return compareVehicleNames(first.name, second.name) || first.id.localeCompare(second.id);
 }
 
-function isCalendarPinnedVehicle(name: string) {
-  return /四代/.test(name) && !isOutsourcedVehicle(name);
+function getCalendarVehicleRank(name: string) {
+  if (isOutsourcedVehicle(name)) return 7;
+  const modelOrder = getVehicleModelOrder(name);
+  if (modelOrder === 0) {
+    if (/四代/.test(name)) return 0;
+    if (/三代/.test(name)) return 1;
+    if (/二代/.test(name)) return 4;
+    return 2;
+  }
+  if (modelOrder === 1) return 3;
+  if (modelOrder === 2) return 5;
+  return 6;
 }
 
-/** Calendar order: non-outsourced 「四代」 vehicles first, then the normal vehicle order. */
+/**
+ * Calendar order: Alphard 四代 → 三代 → Alphard → Hiace → Alphard 二代 → Tesla → others → 外注;
+ * vehicles out of service always go to the bottom.
+ */
 export function compareCalendarVehicles(
-  first: { name: string; id: string },
-  second: { name: string; id: string },
+  first: { name: string; id: string; outOfService?: boolean },
+  second: { name: string; id: string; outOfService?: boolean },
 ) {
-  return Number(isCalendarPinnedVehicle(second.name)) - Number(isCalendarPinnedVehicle(first.name)) ||
+  return Number(Boolean(first.outOfService)) - Number(Boolean(second.outOfService)) ||
+    getCalendarVehicleRank(first.name) - getCalendarVehicleRank(second.name) ||
     compareVehicles(first, second);
 }

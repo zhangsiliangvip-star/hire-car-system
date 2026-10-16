@@ -43,21 +43,26 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
-test("calendar pins non-outsourced 四代 vehicles to the top", () => {
+test("calendar orders vehicles by generation and puts out-of-service vehicles last", () => {
   const { compareCalendarVehicles } = load("lib\\vehicle-order.ts");
   const vehicles = [
-    { id: "1", name: "Alphard" },
-    { id: "2", name: "Hiace" },
-    { id: "3", name: "外注 Alphard 四代" },
-    { id: "4", name: "Alphard 四代" },
-    { id: "5", name: "Alphard 四代" },
+    { id: "a", name: "Tesla" },
+    { id: "b", name: "Alphard 二代" },
+    { id: "c", name: "Hiace" },
+    { id: "d", name: "Alphard" },
+    { id: "e", name: "外注 Alphard 四代" },
+    { id: "f", name: "Alphard 三代" },
+    { id: "g", name: "Alphard 四代" },
+    { id: "h", name: "Alphard 四代", outOfService: true },
+    { id: "i", name: "Hiace", outOfService: true },
   ];
   assert.deepEqual(
     vehicles.slice().sort(compareCalendarVehicles).map((vehicle) => vehicle.id),
-    ["4", "5", "1", "2", "3"],
+    ["g", "f", "d", "c", "b", "a", "e", "h", "i"],
   );
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  assert.match(source, /return isOutsourced;\s*\}\)\.sort\(compareCalendarVehicles\);/);
+  assert.match(source, /outOfService: getVehicleDisplayStatus\(vehicle\) !== "运营中"/);
+  assert.match(source, /\.sort\(compareCalendarVehicles\)/);
 });
 
 test("vehicle list can be filtered by owner company", () => {
