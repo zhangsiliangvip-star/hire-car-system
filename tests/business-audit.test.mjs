@@ -43,6 +43,14 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
+test("vehicle list can be filtered by owner company", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /aria-label="車両所属筛选"/);
+  assert.match(source, /vehicleRows\.filter\(\(vehicle\) => \(vehicle\.ownerCompany \|\| ""\) === vehicleOwnerFilter\)/);
+  assert.match(source, /\{filteredVehicleRows\.map\(\(vehicle\) =>/);
+  assert.match(source, /共 \{filteredVehicleRows\.length\} 両/);
+});
+
 test("vehicle form selects start empty so the first fuel type, seat count, and company can be saved", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /<option value="">请选择燃油类型<\/option>\s*\{fuelTypes\.map/);

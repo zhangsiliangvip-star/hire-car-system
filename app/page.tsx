@@ -745,6 +745,7 @@ export default function Home() {
   const [calendarCenterDate, setCalendarCenterDate] = useState(() => getCenteredTodayDate());
   const [calendarVehicleFilter, setCalendarVehicleFilter] =
     useState<CalendarVehicleFilter>("all");
+  const [vehicleOwnerFilter, setVehicleOwnerFilter] = useState<string | null>(null);
   const dates = createSlidingDates(calendarCenterDate, 11);
   const calendarDaysInMonth = new Date(
     calendarCenterDate.getFullYear(),
@@ -1281,6 +1282,15 @@ export default function Home() {
       status: "运营中" as const,
     })),
   ].sort(compareVehicles);
+  const vehicleOwnerOptions = Array.from(
+    new Set([
+      ...companyRecords.map((company) => company.name),
+      ...vehicleRows.map((vehicle) => vehicle.ownerCompany),
+    ].filter(Boolean)),
+  );
+  const filteredVehicleRows = vehicleOwnerFilter === null
+    ? vehicleRows
+    : vehicleRows.filter((vehicle) => (vehicle.ownerCompany || "") === vehicleOwnerFilter);
   const filteredCalendarVehicleRecords = vehicleRecords.filter(({ name: vehicle }) => {
     const modelOrder = getVehicleModelOrder(vehicle);
     const isOutsourced = isOutsourcedVehicle(vehicle);
@@ -5666,7 +5676,27 @@ export default function Home() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold">車両列表</h2>
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span className="text-sm text-gray-500">共 {vehicleRows.length} 両</span>
+                  <label className="flex items-center gap-2 text-sm text-gray-600">
+                    車両所属
+                    <select
+                      aria-label="車両所属筛选"
+                      className="rounded border px-2 py-1.5 text-sm text-gray-900"
+                      value={vehicleOwnerFilter === null ? "__all__" : vehicleOwnerFilter || "__none__"}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setVehicleOwnerFilter(
+                          value === "__all__" ? null : value === "__none__" ? "" : value,
+                        );
+                      }}
+                    >
+                      <option value="__all__">全部</option>
+                      {vehicleOwnerOptions.map((owner) => (
+                        <option key={owner} value={owner}>{owner}</option>
+                      ))}
+                      <option value="__none__">未设置</option>
+                    </select>
+                  </label>
+                  <span className="text-sm text-gray-500">共 {filteredVehicleRows.length} 両</span>
                   <button
                     type="button"
                     onClick={() => openBatchAdd("vehicles")}
@@ -5700,7 +5730,7 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {vehicleRows.map((vehicle) => (
+                    {filteredVehicleRows.map((vehicle) => (
                       <tr key={vehicle.id} className="border-t">
                         <td className="whitespace-nowrap px-4 py-3 font-medium">{vehicle.name}</td>
                         <td className="px-4 py-3">{vehicle.plate || "-"}</td>
