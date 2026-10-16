@@ -6685,9 +6685,14 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, ownerCompany: event.target.value })
                   }
                 >
+                  <option value="">请选择所属会社</option>
                   {companyRecords.map((company) => (
                     <option key={company.id} value={company.name}>{company.name}</option>
                   ))}
+                  {vehicleForm.ownerCompany &&
+                    !companyRecords.some((company) => company.name === vehicleForm.ownerCompany) && (
+                    <option value={vehicleForm.ownerCompany}>{vehicleForm.ownerCompany}</option>
+                  )}
                 </select>
               </label>
               <label className="block text-sm font-medium">
@@ -6699,9 +6704,13 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, seats: event.target.value })
                   }
                 >
+                  <option value="">请选择座位数</option>
                   {["5", "7", "8", "10"].map((seats) => (
                     <option key={seats} value={seats}>{seats}座</option>
                   ))}
+                  {vehicleForm.seats && !["5", "7", "8", "10"].includes(vehicleForm.seats) && (
+                    <option value={vehicleForm.seats}>{vehicleForm.seats}座</option>
+                  )}
                 </select>
               </label>
               <label className="block text-sm font-medium">
@@ -6713,11 +6722,15 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, fuelType: event.target.value })
                   }
                 >
+                  <option value="">请选择燃油类型</option>
                   {fuelTypes.map((fuelType) => (
                     <option key={fuelType} value={fuelType}>
                       {fuelType}
                     </option>
                   ))}
+                  {vehicleForm.fuelType && !fuelTypes.includes(vehicleForm.fuelType) && (
+                    <option value={vehicleForm.fuelType}>{vehicleForm.fuelType}</option>
+                  )}
                 </select>
               </label>
               <label className="block text-sm font-medium">

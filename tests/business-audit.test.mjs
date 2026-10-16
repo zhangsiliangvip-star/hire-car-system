@@ -43,6 +43,13 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
+test("vehicle form selects start empty so the first fuel type, seat count, and company can be saved", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /<option value="">请选择燃油类型<\/option>\s*\{fuelTypes\.map/);
+  assert.match(source, /<option value="">请选择座位数<\/option>/);
+  assert.match(source, /<option value="">请选择所属会社<\/option>/);
+});
+
 test("orders link vehicles by plate so vehicle names may repeat, while plates stay unique", () => {
   const { orderUsesVehicle, resolveOrderVehicle } = load("lib\\vehicle-order.ts");
   const vehicles = [
