@@ -1263,7 +1263,12 @@ export default function Home() {
     })),
   ].sort(compareVehicles);
   const vehicles = vehicleRecords.map((vehicle) => vehicle.name);
-  const filteredCalendarVehicles = vehicles.filter((vehicle) => {
+  const calendarVehicleNameCounts = new Map<string, number>();
+  for (const vehicle of vehicleRecords) {
+    const key = `${vehicle.regionId}::${vehicle.name}`;
+    calendarVehicleNameCounts.set(key, (calendarVehicleNameCounts.get(key) ?? 0) + 1);
+  }
+  const filteredCalendarVehicleRecords = vehicleRecords.filter(({ name: vehicle }) => {
     const modelOrder = getVehicleModelOrder(vehicle);
     const isOutsourced = isOutsourcedVehicle(vehicle);
     if (calendarVehicleFilter === "all") return true;
@@ -2887,6 +2892,20 @@ export default function Home() {
       return;
     }
 
+    if (
+      allVehicleRecords.some(
+        (vehicle) =>
+          vehicle.regionId === vehicleRegionId &&
+          vehicle.name === savedVehicle.name &&
+          vehicle.id !== editingVehicleId,
+      )
+    ) {
+      alert(
+        `同一地域已有车名「${savedVehicle.name}」的车辆。订单按车名关联车辆，请使用不同的车名（例如加上番号：${savedVehicle.name} ${savedVehicle.plate || "番号"}）。`,
+      );
+      return;
+    }
+
     if (editingVehicleId === null) {
       setVehicleRecords((current) => [
         ...current,
@@ -2902,13 +2921,24 @@ export default function Home() {
       );
     }
 
-    if (editingVehicleName && editingVehicleName !== savedVehicle.name) {
+    const oldNameStillUsed = Boolean(editingVehicleName) && allVehicleRecords.some(
+      (vehicle) =>
+        vehicle.regionId === vehicleRegionId &&
+        vehicle.name === editingVehicleName &&
+        vehicle.id !== editingVehicleId,
+    );
+    if (editingVehicleName && editingVehicleName !== savedVehicle.name && !oldNameStillUsed) {
       setOrders((current) =>
         current.map((order) =>
           order.regionId === vehicleRegionId && order.vehicle === editingVehicleName
             ? { ...order, vehicle: savedVehicle.name }
             : order,
         ),
+      );
+    }
+    if (editingVehicleName && editingVehicleName !== savedVehicle.name && oldNameStillUsed) {
+      alert(
+        `仍有其他车辆使用车名「${editingVehicleName}」，原有予約无法判断属于哪台车，已保留在原车名下。请在予約编辑中通过車両番号把属于本车的予約改到「${savedVehicle.name}」。`,
       );
     }
 
@@ -3025,6 +3055,14 @@ export default function Home() {
         plates.some((plate) => vehicleRecords.some((vehicle) => vehicle.plate === plate))
       ) {
         alert("車両番号不能重复，请检查批量内容。");
+        return;
+      }
+      const names = records.map((record) => record.name);
+      if (
+        new Set(names).size !== names.length ||
+        names.some((name) => vehicleRecords.some((vehicle) => vehicle.name === name))
+      ) {
+        alert("同一地域内車名不能重复（订单按车名关联车辆），请为同型号车辆加上区分，例如「阿尔法 4543」。");
         return;
       }
       setVehicleRecords((current) => [
@@ -4925,12 +4963,17 @@ export default function Home() {
             ))}
           </div>
 
-          {filteredCalendarVehicles.map((vehicle) => {
+          {filteredCalendarVehicleRecords.map((vehicleRecord) => {
+            const vehicle = vehicleRecord.name;
+            const hasDuplicateName = (calendarVehicleNameCounts.get(
+              `${vehicleRecord.regionId}::${vehicle}`,
+            ) ?? 0) > 1;
             const isOutsourced = isOutsourcedVehicle(vehicle);
             const visibleOrders = orders
               .filter(
                 (order) =>
                   order.vehicle === vehicle &&
+                  order.regionId === vehicleRecord.regionId &&
                   order.date <= dates[dates.length - 1].date &&
                   (order.endDate || order.date) >= dates[0].date,
               )
@@ -4982,7 +5025,7 @@ export default function Home() {
 
             return (
               <div
-                key={vehicle}
+                key={vehicleRecord.id}
                 className="grid auto-rows-min"
                 onDragOver={(event) => {
                   event.preventDefault();
@@ -5046,32 +5089,37 @@ export default function Home() {
               >
                 <div className="row-start-1 flex min-h-[72px] items-center border-b border-r bg-slate-50 p-2">
                   {(() => {
-                    const vehicleRecord = vehicleRecords.find(
-                      (record) => record.name === vehicle,
-                    );
-                    const plate = vehicleRecord?.plate || "-";
-                    const notes = vehicleRecord?.notes || "-";
-                    const status = vehicleStatusByName.get(vehicle) ?? "运营中";
+                    const plate = vehicleRecord.plate || "未登记番号";
+                    const notes = vehicleRecord.notes || "-";
+                    const status = getVehicleDisplayStatus(vehicleRecord);
                     return (
                       <div className="flex min-w-0 flex-col items-center text-center">
+                        <button
+                          type="button"
+                          onClick={() => copyCalendarVehicleField(plate, "車両番号")}
+                          title="点击复制車両番号"
+                          aria-label={`复制車両番号 ${plate}`}
+                          className={`max-w-full truncate text-center text-base font-bold hover:text-blue-700 focus:outline-none focus:underline ${vehicleRecord.plate ? "" : "text-gray-400"}`}
+                        >
+                          {plate}
+                        </button>
                         <button
                           type="button"
                           onClick={() => copyCalendarVehicleField(vehicle, "車名")}
                           title="点击复制車名"
                           aria-label={`复制車名 ${vehicle}`}
-                          className="max-w-full truncate text-center font-bold hover:text-blue-700 focus:outline-none focus:underline"
+                          className="mt-1 max-w-full truncate text-center text-xs text-slate-600 hover:text-blue-700 focus:outline-none focus:underline"
                         >
                           {vehicle}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => copyCalendarVehicleField(plate, "车牌号")}
-                          title="点击复制车牌号"
-                          aria-label={`复制车牌号 ${plate}`}
-                          className="mt-1 max-w-full truncate text-center text-xs text-slate-600 hover:text-blue-700 focus:outline-none focus:underline"
-                        >
-                          {plate}
-                        </button>
+                        {hasDuplicateName && (
+                          <span
+                            className="mt-1 text-[11px] font-bold text-rose-600"
+                            title="同一地域内有同名车辆，订单无法区分。请在车辆管理中把车名改为唯一（例如加上番号）。"
+                          >
+                            ⚠ 车名重复
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => copyCalendarVehicleField(notes, "備考")}

@@ -158,3 +158,7 @@ Vehicle schedule conflicts are checked when creating **and** when saving an edit
 ## Live data sync
 
 After login, the dashboard re-reads business data from the server every 10 seconds while the tab is visible, and immediately when the window regains focus, so changes made by other users appear without a manual refresh. A background sync never overwrites local edits: it is skipped while any of your own saves are pending, and results from a fetch that started before a local edit are discarded. Failed sync attempts are retried silently on the next interval. Open forms keep their in-progress values; when two users edit the same record, the last save wins.
+
+## Calendar vehicle rows and unique vehicle names
+
+The calendar shows one row per registered vehicle. Each row header displays that vehicle's own **車両番号** in large text with the vehicle name in small text below (missing plates show **未登记番号**), and only lists orders from the vehicle's region. Because orders reference vehicles by name, vehicle names must be unique within a region: adding, batch-adding or renaming a vehicle to an existing name in the same region is rejected. Existing duplicate names are flagged in the calendar with **⚠ 车名重复**; rename them (for example `阿尔法 4543`). When renaming one of several same-named vehicles, existing orders stay on the old name because they cannot be attributed automatically; reassign them through the reservation's **車両番号** selector.

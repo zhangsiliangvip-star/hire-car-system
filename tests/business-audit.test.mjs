@@ -87,6 +87,21 @@ test("order conflicts cover editing, multi-day ranges, and close departure times
   assert.ok(!source.includes("if (editingOrderId === null && !skipConflictCheck)"));
 });
 
+test("calendar rows use each vehicle record's own plate and flag duplicate names", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.ok(source.includes("filteredCalendarVehicleRecords.map((vehicleRecord) =>"));
+  assert.ok(!source.includes("filteredCalendarVehicles"));
+  assert.ok(source.includes("key={vehicleRecord.id}"));
+  assert.ok(source.includes("order.regionId === vehicleRecord.regionId"));
+  const label = source.slice(source.indexOf('const plate = vehicleRecord.plate || "未登记番号"'));
+  assert.ok(label.indexOf('copyCalendarVehicleField(plate, "車両番号")') < label.indexOf('copyCalendarVehicleField(vehicle, "車名")'));
+  assert.ok(!source.includes("vehicleRecords.find(\n                      (record) => record.name === vehicle"));
+  assert.ok(source.includes("⚠ 车名重复"));
+  assert.ok(source.includes("同一地域已有车名"));
+  assert.ok(source.includes("同一地域内車名不能重复"));
+  assert.ok(source.includes("!oldNameStillUsed"));
+});
+
 test("accounting assignees display names without falling back to emails", () => {
   const { getAccountingAssigneeName } = load("lib\\accounting-assignee.ts");
   const accounts = [
