@@ -5208,7 +5208,7 @@ export default function Home() {
                   gridTemplateColumns: `135px repeat(${dates.length}, minmax(130px, 1fr))`,
                 }}
               >
-                <div className="relative row-start-1 flex min-h-[72px] items-center border-b border-r bg-slate-50 p-2 pl-5">
+                <div className="relative row-start-1 flex min-h-[72px] items-center justify-center border-b border-r bg-slate-50 py-2 pl-4 pr-1">
                   <span
                     draggable
                     role="button"
@@ -5233,13 +5233,13 @@ export default function Home() {
                     const notes = vehicleRecord.notes || "-";
                     const status = getVehicleDisplayStatus(vehicleRecord);
                     return (
-                      <div className="flex min-w-0 flex-col items-center text-center">
+                      <div className="flex w-full min-w-0 flex-col items-center text-center">
                         <button
                           type="button"
                           onClick={() => copyCalendarVehicleField(plate, "車両番号")}
                           title="点击复制車両番号"
                           aria-label={`复制車両番号 ${plate}`}
-                          className={`max-w-full truncate text-center text-base font-bold hover:text-blue-700 focus:outline-none focus:underline ${vehicleRecord.plate ? "" : "text-gray-400"}`}
+                          className={`max-w-full break-all text-center text-[13px] font-bold leading-tight tracking-tight hover:text-blue-700 focus:outline-none focus:underline ${vehicleRecord.plate ? "" : "text-gray-400"}`}
                         >
                           {plate}
                         </button>

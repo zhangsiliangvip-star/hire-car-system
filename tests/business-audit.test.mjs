@@ -88,6 +88,7 @@ test("calendar vehicle order can be dragged and is shared through the database",
   assert.match(route, /calendarOrder: row\.calendar_order \?\? null/);
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /setData\("application\/x-calendar-vehicle", vehicleRecord\.id\)/);
+  assert.match(source, /break-all text-center text-\[13px\] font-bold/);
   assert.match(source, /reorderCalendarVehicle\(\s*draggingCalendarVehicleId,/);
   assert.match(source, /\{ id: vehicle\.id, \.\.\.savedVehicle, calendarOrder: vehicle\.calendarOrder \?\? null \}/);
 });
