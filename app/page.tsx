@@ -3842,9 +3842,6 @@ export default function Home() {
                       <option value="admin">管理员</option>
                     </select>
                   </label>
-                  {(editingLoginAccountId === null ||
-                    (loginAccountForm.role === "user" &&
-                      loginAccounts.find((account) => account.id === editingLoginAccountId)?.role === "user")) && (
                     <div className="rounded border bg-slate-50 p-3 sm:col-span-2 xl:col-span-3">
                       <p className="mb-2 text-sm text-gray-600">
                         {editingLoginAccountId === null
@@ -3874,7 +3871,6 @@ export default function Home() {
                         </button>
                       )}
                     </div>
-                  )}
                   <div className="flex items-end">
                     <button type="submit" disabled={accountBusy} className="w-full rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
                       {accountBusy ? "正在处理…" : editingLoginAccountId === null

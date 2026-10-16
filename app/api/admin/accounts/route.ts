@@ -196,9 +196,6 @@ export async function PUT(request: Request) {
       );
     }
     if (!target) return jsonResponse({ error: "该账号不存在或已删除。" }, { status: 404 });
-    if (target.role !== "user") {
-      return jsonResponse({ error: "只能设置普通用户的密码，不能修改管理员密码。" }, { status: 403 });
-    }
     const { error } = await admin.auth.admin.updateUserById(parsed.data.userId, {
       password: parsed.data.password,
       email_confirm: true,

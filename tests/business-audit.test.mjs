@@ -603,11 +603,17 @@ test("administrator password creation and reset enforce roles, validation and ex
   assert.ok(calls.some(([type]) => type === "create"));
   assert.equal(calls.find(([type]) => type === "profile")[1].role, "admin");
   calls.length = 0;
-  for (const [record, status] of [[{ role: "admin" }, 403], [null, 404]]) {
-    target = record;
-    assert.equal((await route.PUT(request("PUT", { userId: id, password }))).status, status);
-    assert.equal(calls.length, 0);
+  target = { role: "admin" };
+  for (const userId of [id, "70000000-0000-4000-8000-000000000002"]) {
+    response = await route.PUT(request("PUT", { userId, password }));
+    assert.equal(response.status, 200);
+    assert.deepEqual(plain(calls[0]), ["password", [userId, { password, email_confirm: true }]]);
+    assert.ok(!(await response.text()).includes(password));
+    calls.length = 0;
   }
+  target = null;
+  assert.equal((await route.PUT(request("PUT", { userId: id, password }))).status, 404);
+  assert.equal(calls.length, 0);
   target = { role: "user" };
   targetError = { code: "42501" };
   response = await route.PUT(request("PUT", { userId: id, password }));
@@ -635,6 +641,9 @@ test("administrator password creation and reset enforce roles, validation and ex
   assert.ok(page.includes('method: "PUT"'));
   assert.ok(page.includes('type="password" autoComplete="new-password"'));
   assert.ok(page.includes("accountPassword !== accountPasswordConfirmation"));
+  const passwordFields = page.slice(page.indexOf('<option value="admin">管理员</option>'), page.indexOf("设置新密码\n"));
+  assert.ok(passwordFields.includes('autoComplete="new-password"'));
+  assert.doesNotMatch(passwordFields, /loginAccountForm\.role === "user"|loginAccounts\.find/);
   assert.ok(!fs.readFileSync(path.join(root, "app\\api\\admin\\accounts\\route.ts"), "utf8").includes("inviteUserByEmail"));
 });
 
