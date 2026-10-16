@@ -686,6 +686,46 @@ test("persistence strips audit metadata, merges saved stamp without losing queue
   assert.equal(pending.reduce((sum, value) => sum + value, 0), 0);
 });
 
+test("background sync applies server data only when no local edits are pending or newer", async () => {
+  let state = [];
+  let releaseSave;
+  const client = load("lib\\api-client.ts");
+  const fetchMock = () => new Promise((resolve) => {
+    releaseSave = () => resolve({ ok: true, json: async () => ({ ok: true, saved: [{ id, lastOperation: operation }] }) });
+  });
+  const hook = load("lib\\use-persisted-collection.ts", {
+    react: { useState: () => [state, (next) => { state = next; }],
+      useRef: (value) => ({ current: value }), useCallback: (callback) => callback },
+    "@/lib/api-client": client, "@/lib/audit": audit,
+  }, { fetch: fetchMock });
+  const collection = hook.usePersistedCollection("drivers", () => {}, () => {}, () => "", () => region);
+  collection.replaceItems([{ id, regionId: region, name: "Old" }]);
+
+  const remote = [{ id, regionId: region, name: "Remote" }];
+  let version = collection.getChangeVersion();
+  assert.equal(collection.syncItems(remote, version), true);
+  assert.equal(state[0].name, "Remote");
+  assert.equal(collection.syncItems(remote, version), false, "unchanged data is not re-applied");
+
+  version = collection.getChangeVersion();
+  collection.updateItems((items) => items.map((item) => ({ ...item, name: "Local" })));
+  assert.equal(collection.syncItems([{ id, regionId: region, name: "Stale" }], collection.getChangeVersion()), false,
+    "pending save blocks sync");
+  await new Promise((resolve) => setImmediate(resolve));
+  releaseSave();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(collection.syncItems([{ id, regionId: region, name: "Stale" }], version), false,
+    "fetch started before a local edit is discarded");
+  assert.equal(state[0].name, "Local");
+  assert.equal(collection.syncItems([{ id, regionId: region, name: "Newer remote" }], collection.getChangeVersion()), true);
+  assert.equal(state[0].name, "Newer remote");
+
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.ok(source.includes("DATA_SYNC_INTERVAL_MS = 10_000"));
+  assert.ok(source.includes('document.visibilityState !== "visible"'));
+});
+
 test("last-operation labels escape operator names and render historical rows", () => {
   const { LastOperation } = load("components\\last-operation.tsx", { "@/lib/audit": audit });
   const html = renderToStaticMarkup(React.createElement(LastOperation, {

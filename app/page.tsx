@@ -63,6 +63,7 @@ import { findOrderConflicts, type OrderConflict } from "@/lib/order-conflicts";
 
 const DEFAULT_VEHICLE_NAME = "Alphard 01";
 const ALL_REGIONS_ID = "__all_regions__";
+const DATA_SYNC_INTERVAL_MS = 10_000;
 const TOKYO_REGION_ID = "60000000-0000-4000-8000-000000000001";
 const LOGIN_ACCOUNT_POSITIONS = ["役员", "操作", "会计"] as const;
 
@@ -778,6 +779,8 @@ export default function Home() {
     items: allOrders,
     updateItems: setOrders,
     replaceItems: replaceOrders,
+    syncItems: syncOrders,
+    getChangeVersion: getVersionOrders,
   } = usePersistedCollection<Order>(
     "orders",
     reportPersistenceError,
@@ -789,6 +792,8 @@ export default function Home() {
     items: allOrderSourceRecords,
     updateItems: setOrderSourceRecords,
     replaceItems: replaceOrderSourceRecords,
+    syncItems: syncOrderSourceRecords,
+    getChangeVersion: getVersionOrderSourceRecords,
   } = usePersistedCollection<OrderSource>(
     "orderSources",
     reportPersistenceError,
@@ -800,6 +805,8 @@ export default function Home() {
     items: allCompanyRecords,
     updateItems: setCompanyRecords,
     replaceItems: replaceCompanyRecords,
+    syncItems: syncCompanyRecords,
+    getChangeVersion: getVersionCompanyRecords,
   } = usePersistedCollection<Company>(
     "companies",
     reportPersistenceError,
@@ -811,6 +818,8 @@ export default function Home() {
     items: allDriverRecords,
     updateItems: setDriverRecords,
     replaceItems: replaceDriverRecords,
+    syncItems: syncDriverRecords,
+    getChangeVersion: getVersionDriverRecords,
   } = usePersistedCollection<Driver>(
     "drivers",
     reportPersistenceError,
@@ -822,6 +831,8 @@ export default function Home() {
     items: allVehicleRecords,
     updateItems: setVehicleRecords,
     replaceItems: replaceVehicleRecords,
+    syncItems: syncVehicleRecords,
+    getChangeVersion: getVersionVehicleRecords,
   } = usePersistedCollection<Vehicle>(
     "vehicles",
     reportPersistenceError,
@@ -833,6 +844,8 @@ export default function Home() {
     items: allVehicleMonthlyFinanceRecords,
     updateItems: setVehicleMonthlyFinanceRecords,
     replaceItems: replaceVehicleMonthlyFinanceRecords,
+    syncItems: syncVehicleMonthlyFinanceRecords,
+    getChangeVersion: getVersionVehicleMonthlyFinanceRecords,
   } = usePersistedCollection<VehicleMonthlyFinance>(
     "vehicleMonthlyFinances",
     reportPersistenceError,
@@ -844,6 +857,8 @@ export default function Home() {
     items: allBalanceExpenseItems,
     updateItems: setBalanceExpenseItems,
     replaceItems: replaceBalanceExpenseItems,
+    syncItems: syncBalanceExpenseItems,
+    getChangeVersion: getVersionBalanceExpenseItems,
   } = usePersistedCollection<BalanceExpenseItem>(
     "balanceExpenseItems",
     reportPersistenceError,
@@ -1096,6 +1111,74 @@ export default function Home() {
     replaceVehicleRecords,
     replaceVehicleMonthlyFinanceRecords,
     replaceBalanceExpenseItems,
+  ]);
+  useEffect(() => {
+    if (!isDataReady) return;
+    let disposed = false;
+    let inFlight = false;
+    const collections = [
+      { key: "orders", sync: syncOrders, version: getVersionOrders },
+      { key: "drivers", sync: syncDriverRecords, version: getVersionDriverRecords },
+      { key: "vehicles", sync: syncVehicleRecords, version: getVersionVehicleRecords },
+      { key: "orderSources", sync: syncOrderSourceRecords, version: getVersionOrderSourceRecords },
+      { key: "companies", sync: syncCompanyRecords, version: getVersionCompanyRecords },
+      {
+        key: "vehicleMonthlyFinances",
+        sync: syncVehicleMonthlyFinanceRecords,
+        version: getVersionVehicleMonthlyFinanceRecords,
+      },
+      { key: "balanceExpenseItems", sync: syncBalanceExpenseItems, version: getVersionBalanceExpenseItems },
+    ] as const;
+
+    async function syncFromServer() {
+      if (disposed || inFlight || document.visibilityState !== "visible") return;
+      inFlight = true;
+      const startedVersions = collections.map(({ version }) => version());
+      try {
+        const response = await fetch("/api/data", { cache: "no-store" });
+        if (!response.ok || disposed) return;
+        const payload = (await readJsonSafely(response)) as Record<string, unknown> | null;
+        if (!payload || typeof payload !== "object" || disposed) return;
+        collections.forEach(({ key, sync }, index) => {
+          const serverItems = payload[key];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (Array.isArray(serverItems)) sync(serverItems as any[], startedVersions[index]);
+        });
+      } catch (error) {
+        console.warn("Background data sync failed; will retry.", error);
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    const intervalId = window.setInterval(() => void syncFromServer(), DATA_SYNC_INTERVAL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void syncFromServer();
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [
+    isDataReady,
+    syncOrders,
+    syncDriverRecords,
+    syncVehicleRecords,
+    syncOrderSourceRecords,
+    syncCompanyRecords,
+    syncVehicleMonthlyFinanceRecords,
+    syncBalanceExpenseItems,
+    getVersionOrders,
+    getVersionDriverRecords,
+    getVersionVehicleRecords,
+    getVersionOrderSourceRecords,
+    getVersionCompanyRecords,
+    getVersionVehicleMonthlyFinanceRecords,
+    getVersionBalanceExpenseItems,
   ]);
   const orderSources = orderSourceRecords.map((source) => source.companyName);
   const orderSourceColorByRegion = new Map(

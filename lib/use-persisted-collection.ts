@@ -29,10 +29,24 @@ export function usePersistedCollection<T extends Identified>(
   const [items, setItems] = useState<T[]>([]);
   const itemsRef = useRef(items);
   const saveQueue = useRef(Promise.resolve());
+  const pendingSaves = useRef(0);
+  const changeVersion = useRef(0);
 
   const replaceItems = useCallback((nextItems: T[]) => {
     itemsRef.current = nextItems;
     setItems(nextItems);
+  }, []);
+
+  /** Version of local edits; any edit after a sync fetch started invalidates that fetch. */
+  const getChangeVersion = useCallback(() => changeVersion.current, []);
+
+  /** Apply server data from a background sync unless local edits happened or are still saving. */
+  const syncItems = useCallback((serverItems: T[], startedAtVersion: number) => {
+    if (pendingSaves.current > 0 || changeVersion.current !== startedAtVersion) return false;
+    if (JSON.stringify(serverItems) === JSON.stringify(itemsRef.current)) return false;
+    itemsRef.current = serverItems;
+    setItems(serverItems);
+    return true;
   }, []);
 
   const updateItems = useCallback<Dispatch<SetStateAction<T[]>>>((action) => {
@@ -53,6 +67,7 @@ export function usePersistedCollection<T extends Identified>(
 
     itemsRef.current = next;
     setItems(next);
+    changeVersion.current += 1;
 
     const nextById = new Map(next.map((item) => [item.id, item]));
     const upsert = next.filter(
@@ -69,6 +84,7 @@ export function usePersistedCollection<T extends Identified>(
 
     if (upsert.length === 0 && deleteIds.length === 0) return;
     reportPending(1);
+    pendingSaves.current += 1;
 
     saveQueue.current = saveQueue.current
       .then(async () => {
@@ -97,6 +113,7 @@ export function usePersistedCollection<T extends Identified>(
         );
         itemsRef.current = current;
         setItems(current);
+        changeVersion.current += 1;
       })
       .catch((error: unknown) => {
         const message =
@@ -104,8 +121,11 @@ export function usePersistedCollection<T extends Identified>(
         console.error(`Failed to persist ${collection}.`, error);
         reportError(message);
       })
-      .finally(() => reportPending(-1));
+      .finally(() => {
+        pendingSaves.current -= 1;
+        reportPending(-1);
+      });
   }, [collection, getDeletePassword, getRegionId, reportError, reportPending]);
 
-  return { items, updateItems, replaceItems };
+  return { items, updateItems, replaceItems, syncItems, getChangeVersion };
 }
