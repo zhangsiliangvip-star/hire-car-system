@@ -92,7 +92,7 @@ The reservation calendar's `全体车辆` tab includes registered owned and outs
 
 Calendar reservation backgrounds use the source's exact configured color in the order's region, without mixing it with white. Text automatically uses whichever of black or white has higher contrast. Orders without a configured source color retain their status colors. Rest-day overlays and split controls remain visible; expired-driver warnings retain red text on a white background.
 
-When multiple reservations overlap on a vehicle's calendar row, each card keeps its full 56px height and normal text size, with a 4px gap between cards. The vehicle row grows automatically to contain all occupied lanes rather than compressing cards. Multi-day reservations keep the same lane across their entire range; non-overlapping reservations reuse lanes.
+When multiple reservations overlap on a vehicle's calendar row, each card keeps its full 56px height and normal text size, with a 4px gap between cards. The vehicle row grows automatically to contain all occupied lanes rather than compressing cards, and leaves at least 44px of blank clickable space below the cards to add a reservation for that vehicle and date. Multi-day reservations keep the same lane across their entire range; non-overlapping reservations reuse lanes.
 
 The calendar grid scrolls vertically and horizontally inside a container capped at 75% of the viewport height. Its date header stays pinned at the top while scrolling vehicle rows, and shares horizontal scrolling with the grid to keep dates aligned. Ordinary mouse-wheel input scrolls vertically rather than being converted to horizontal movement; horizontal trackpad/scrollbar input remains available.
 

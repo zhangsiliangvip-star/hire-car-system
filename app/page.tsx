@@ -5115,10 +5115,10 @@ export default function Home() {
                   if (order.date > day.date || (order.endDate || order.date) < day.date) {
                     return height;
                   }
-                  return Math.max(height, ((orderLanes.get(order.id) ?? 0) + 1) * (orderCardHeight + orderCardGap) + orderCardGap);
+                  return Math.max(height, ((orderLanes.get(order.id) ?? 0) + 1) * (orderCardHeight + orderCardGap));
                 }, 0);
 
-                return [day.date, `${Math.max(96, stackedHeight)}px`];
+                return [day.date, `${Math.max(96, stackedHeight + 44)}px`];
               }),
             );
 

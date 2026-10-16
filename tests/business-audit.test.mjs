@@ -435,16 +435,18 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
     }));
     const { heights, offsets, cardHeight } = evaluate(orders);
     assert.equal(cardHeight, 56);
-    assert.deepEqual(heights, Array(2).fill(`${Math.max(96, count * 60 + 4)}px`));
+    assert.deepEqual(heights, Array(2).fill(`${Math.max(96, count * 60 + 44)}px`));
     for (let index = 1; index < offsets.length; index++) {
       assert.ok(offsets[index] >= offsets[index - 1] + cardHeight + 4);
     }
-    assert.ok(offsets.at(-1) + cardHeight <= parseFloat(heights[0]));
+    assert.ok(parseFloat(heights[0]) - (offsets.at(-1) + cardHeight) >= 44);
   }
   assert.deepEqual(evaluate([
     { id: "first", date: "2026-10-01", endDate: "2026-10-01" },
     { id: "second", date: "2026-10-02", endDate: "2026-10-02" },
   ]).offsets, [4, 4]);
+  assert.deepEqual(evaluate([]).heights, ["96px", "96px"]);
+  assert.ok(source.includes("openNewOrder(vehicleRecord, d.date);"));
 });
 
 test("calendar rows use each vehicle record's own plate shown above the name", () => {
