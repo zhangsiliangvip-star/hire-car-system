@@ -43,6 +43,52 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
+test("reservation date filter includes service ranges, excludes off days and preserves other filters", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const script = source.slice(source.indexOf("  const monthlyOrders ="), source.indexOf("  const monthlyFinanceOrders ="));
+  const base = { date: "2026-10-01", endDate: "2026-10-03", offDates: [], orderSource: "S", company: "A" };
+  const orders = [
+    { ...base, id: "multi" },
+    { ...base, id: "off", offDates: ["2026-10-02"] },
+    { ...base, id: "single", date: "2026-10-02", endDate: "" },
+    { ...base, id: "later", date: "2026-10-03" },
+    { ...base, id: "other-company", company: "B" },
+    { ...base, id: "other-source", orderSource: "T" },
+    { ...base, id: "cross-month", date: "2026-09-29" },
+    { ...base, id: "outside-month", date: "2026-09-01", endDate: "2026-09-30" },
+  ];
+  const evaluate = (day, company = "", sourceFilter = "") => {
+    const context = {
+      orders, orderMonth: "2026-10", orderDateFilter: day,
+      orderCompanyFilter: company, orderSourceFilter: sourceFilter, UNSOURCED_ORDER: "__unsourced__",
+    };
+    vm.runInNewContext(`${script}\nresult = monthlyOrders.map((order) => order.id);`, context);
+    return plain(context.result);
+  };
+  assert.deepEqual(evaluate("2026-10-02", "A", "S"), ["multi", "single", "cross-month"]);
+  assert.deepEqual(evaluate("", "A", "S"), ["multi", "off", "single", "later", "cross-month"]);
+  assert.deepEqual(evaluate("2026-10-31"), []);
+  assert.deepEqual(evaluate("2026-10-02", "B"), ["other-company"]);
+  assert.match(source, /setOrderMonth\(event\.target\.value\);\s*setOrderDateFilter\(""\);/);
+  assert.match(source, /aria-haspopup="dialog"/);
+});
+
+test("reservation date dialog renders a month calendar instead of a dropdown", () => {
+  const { OrderDateFilterDialog } = load("components\\order-date-filter-dialog.tsx");
+  const render = (month, selected = "") => renderToStaticMarkup(React.createElement(OrderDateFilterDialog, {
+    month, selected, onSelect() {}, onClose() {},
+  }));
+  const leap = render("2028-02", "2028-02-29");
+  assert.match(leap, /<dialog/);
+  assert.match(leap, /aria-label="2028-02-29" aria-pressed="true"/);
+  assert.equal((leap.match(/aria-label="2028-02-\d{2}"/g) || []).length, 29);
+  const february = render("2026-02");
+  assert.equal((february.match(/aria-label="2026-02-\d{2}"/g) || []).length, 28);
+  assert.doesNotMatch(february, /<select/);
+  assert.match(february, /全部日期/);
+  assert.match(february, /取消/);
+});
+
 test("dated statistics sort oldest first and use departure time to break date ties", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   for (const [start, end, dateKey] of [

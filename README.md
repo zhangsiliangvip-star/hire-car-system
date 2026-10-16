@@ -36,6 +36,8 @@ For an existing ordinary user, select **编辑**, enter and confirm a new passwo
 
 ## Financial reports
 
+In reservation management (`予約管理`), the date button immediately after the month filter opens a calendar dialog for that month, not a dropdown. Select a day to show reservations whose service range includes that day, excluding reservations marked off on that day. Source and company filters still apply. `全部日期` restores the monthly list; changing the month or re-entering reservation management clears the selected day. Escape, Cancel, or clicking outside the dialog closes it without changing the filter.
+
 The dashboard includes order accounting (`経理統計`), driver wages (`給料統計`), vehicle finances (`車両統計`), and the monthly balance (`收支平衡`). Clicking an order name in the order accounting report opens that order's existing financial statistics editor, including daily entries, accounting status, deposits, and notes. Saving updates the same order and refreshes its calculated report totals.
 
 All dated statistics lists use ascending chronological order (earliest date first, then earliest departure time on the same date). This applies to order accounting, driver wage details, vehicle daily details, and their corresponding A4 exports. Monthly summary tables without daily dates keep their existing grouping.

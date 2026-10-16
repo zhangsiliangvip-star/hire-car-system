@@ -46,6 +46,7 @@ import { printVehicleFinance, printVehicleSummary } from "@/lib/vehicle-finance-
 import { summarizeVehicles, totalVehicleSummaries, type VehicleMonthlySummary } from "@/lib/vehicle-finance-summary";
 import { printCompanyWages, printDriverWages } from "@/lib/driver-wage-print";
 import { DriverSelectionDialog } from "@/components/driver-selection-dialog";
+import { OrderDateFilterDialog } from "@/components/order-date-filter-dialog";
 import { rankDriversByRecentService } from "@/lib/driver-selection";
 import Image from "next/image";
 import { CompanySealUpload } from "@/components/company-seal-upload";
@@ -951,6 +952,8 @@ export default function Home() {
   const [accountingFinanceNote, setAccountingFinanceNote] = useState("");
   const [activeView, setActiveView] = useState<ActiveView>("calendar");
   const [orderMonth, setOrderMonth] = useState(getCurrentMonthKey);
+  const [orderDateFilter, setOrderDateFilter] = useState("");
+  const [showOrderDateFilter, setShowOrderDateFilter] = useState(false);
   const [financeMonth, setFinanceMonth] = useState(getCurrentMonthKey);
   const [balanceMonth, setBalanceMonth] = useState(getCurrentMonthKey);
   const [balanceCompanyFilter, setBalanceCompanyFilter] = useState("");
@@ -1349,6 +1352,10 @@ export default function Home() {
     (order) =>
       order.date <= `${orderMonth}-31` &&
       (order.endDate || order.date) >= `${orderMonth}-01` &&
+      (!orderDateFilter ||
+        (order.date <= orderDateFilter &&
+          (order.endDate || order.date) >= orderDateFilter &&
+          !order.offDates.includes(orderDateFilter))) &&
       (orderSourceFilter === "" ||
         (orderSourceFilter === UNSOURCED_ORDER
           ? !order.orderSource
@@ -3713,6 +3720,7 @@ export default function Home() {
                 onClick={() => {
                   if (item.id === "orders" && activeView !== "orders") {
                     setOrderMonth(getCurrentMonthKey());
+                    setOrderDateFilter("");
                     setOrderSourceFilter("");
                     setOrderCompanyFilter("");
                   }
@@ -5565,9 +5573,34 @@ export default function Home() {
                     id="order-month"
                     type="month"
                     value={orderMonth}
-                    onChange={(event) => setOrderMonth(event.target.value)}
+                    onChange={(event) => {
+                      setOrderMonth(event.target.value);
+                      setOrderDateFilter("");
+                    }}
                     className="rounded border bg-white px-3 py-2 text-sm"
                   />
+                  <span className="text-sm font-medium text-gray-600">日期</span>
+                  <button
+                    type="button"
+                    aria-label="选择预约筛选日期"
+                    aria-haspopup="dialog"
+                    disabled={!orderMonth}
+                    onClick={() => setShowOrderDateFilter(true)}
+                    className="rounded border bg-white px-3 py-2 text-sm disabled:opacity-40"
+                  >
+                    {orderDateFilter || "全部日期"}
+                  </button>
+                  {showOrderDateFilter && (
+                    <OrderDateFilterDialog
+                      month={orderMonth}
+                      selected={orderDateFilter}
+                      onSelect={(date) => {
+                        setOrderDateFilter(date);
+                        setShowOrderDateFilter(false);
+                      }}
+                      onClose={() => setShowOrderDateFilter(false)}
+                    />
+                  )}
                   <label htmlFor="order-source-filter" className="text-sm font-medium text-gray-600">
                     来源
                   </label>
