@@ -43,6 +43,39 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
+test("calendar uses exact regional source colors with readable black or white text", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const helper = source.slice(source.indexOf("function getSourceTextColor("), source.indexOf("const sourceColorOptions ="));
+  const getTextColor = vm.runInNewContext(
+    ts.transpileModule(`${helper}\ngetSourceTextColor;`, {
+      compilerOptions: { target: ts.ScriptTarget.ES2020 },
+    }).outputText,
+  );
+  const contrast = (background, foreground) => {
+    const channels = [1, 3, 5].map((offset) => {
+      const channel = parseInt(background.slice(offset, offset + 2), 16) / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    return foreground === "#000000" ? (luminance + 0.05) / 0.05 : 1.05 / (luminance + 0.05);
+  };
+  assert.equal(getTextColor("#000000"), "#ffffff");
+  assert.equal(getTextColor("#ffffff"), "#000000");
+  for (const red of [0, 64, 128, 192, 255]) {
+    for (const green of [0, 64, 128, 192, 255]) {
+      for (const blue of [0, 64, 128, 192, 255]) {
+        const color = `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+        assert.ok(contrast(color, getTextColor(color)) >= 4.5, color);
+      }
+    }
+  }
+  assert.match(source, /const sourceColor = orderSourceColorByRegion\.get\(`\$\{order\.regionId\}:\$\{order\.orderSource\}`\)/);
+  assert.match(source, /backgroundColor: sourceColor \|\| undefined/);
+  assert.match(source, /color: sourceColor \? getSourceTextColor\(sourceColor\) : undefined/);
+  assert.doesNotMatch(source, /color-mix\(in srgb/);
+  assert.match(source, /orderDriverExpired \? "rounded bg-white px-1 font-semibold text-red-600"/);
+});
+
 test("reservation date filter includes service ranges, excludes off days and preserves other filters", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const script = source.slice(source.indexOf("  const monthlyOrders ="), source.indexOf("  const monthlyFinanceOrders ="));

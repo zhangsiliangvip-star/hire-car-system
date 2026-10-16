@@ -127,6 +127,17 @@ function getDistinctSourceColor(index: number) {
   return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
 }
 
+function getSourceTextColor(color: string) {
+  const channels = [1, 3, 5].map((offset) => {
+    const channel = parseInt(color.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05)
+    ? "#000000"
+    : "#ffffff";
+}
+
 const sourceColorOptions = Array.from({ length: 64 }, (_, index) =>
   getDistinctSourceColor(index),
 );
@@ -5398,6 +5409,7 @@ export default function Home() {
                     (driver) =>
                       driver.name === order.driver && isDriverLicenseExpired(driver),
                   );
+                  const sourceColor = orderSourceColorByRegion.get(`${order.regionId}:${order.orderSource}`);
 
                   return (
                     <div
@@ -5411,9 +5423,8 @@ export default function Home() {
                         height: `${orderCardHeight}px`,
                         minHeight: 0,
                         zIndex: 1,
-                        backgroundColor: orderSourceColorByRegion.has(`${order.regionId}:${order.orderSource}`)
-                          ? `color-mix(in srgb, ${orderSourceColorByRegion.get(`${order.regionId}:${order.orderSource}`)} 18%, white)`
-                          : undefined,
+                        backgroundColor: sourceColor || undefined,
+                        color: sourceColor ? getSourceTextColor(sourceColor) : undefined,
                       }}
                       draggable={!isSelectingSplit}
                       onDragStart={(event) => {
@@ -5537,7 +5548,7 @@ export default function Home() {
                                 {order.orderSource || "未填写"}
                               </div>
                               <div
-                                className={`min-w-0 truncate ${orderDriverExpired ? "font-semibold text-red-600" : ""}`}
+                                className={`min-w-0 truncate ${orderDriverExpired ? "rounded bg-white px-1 font-semibold text-red-600" : ""}`}
                                 title={order.driver || "未安排"}
                               >
                                 {order.driver || "未安排"}
