@@ -5095,16 +5095,6 @@ export default function Home() {
                   (order.endDate || order.date) >= dates[0].date,
               )
               .sort((first, second) => first.date.localeCompare(second.date));
-            const dailyOrderCounts = new Map(
-              dates.map((day) => [
-                day.date,
-                visibleOrders.filter(
-                  (order) =>
-                    order.date <= day.date &&
-                    (order.endDate || order.date) >= day.date,
-                ).length,
-              ]),
-            );
             const orderLanes = new Map<string, number>();
             const laneEndDates: string[] = [];
 
@@ -5117,34 +5107,18 @@ export default function Home() {
               orderLanes.set(order.id, laneIndex);
             }
             // Every order sits in the date cells' grid row, stacked by lane.
-            const orderCardHeights = new Map(
-              visibleOrders.map((order) => {
-                const maxCount = Math.max(
-                  1,
-                  ...dates
-                    .filter((day) => day.date >= order.date && day.date <= (order.endDate || order.date))
-                    .map((day) => dailyOrderCounts.get(day.date) ?? 1),
-                );
-                return [order.id, maxCount >= 3 ? 22 : maxCount === 2 ? 24 : 56];
-              }),
-            );
+            const orderCardHeight = 56;
+            const orderCardGap = 4;
             const singleDayCellHeights = new Map(
               dates.map((day) => {
-                const orderCount = dailyOrderCounts.get(day.date) ?? 0;
-                const baseHeight = orderCount === 2
-                  ? 48
-                  : orderCount >= 3
-                    ? 30
-                    : 76;
                 const stackedHeight = visibleOrders.reduce((height, order) => {
                   if (order.date > day.date || (order.endDate || order.date) < day.date) {
                     return height;
                   }
-                  const cardHeight = orderCardHeights.get(order.id) ?? 56;
-                  return Math.max(height, ((orderLanes.get(order.id) ?? 0) + 1) * cardHeight);
+                  return Math.max(height, ((orderLanes.get(order.id) ?? 0) + 1) * (orderCardHeight + orderCardGap) + orderCardGap);
                 }, 0);
 
-                return [day.date, `${Math.max(baseHeight, stackedHeight)}px`];
+                return [day.date, `${Math.max(96, stackedHeight)}px`];
               }),
             );
 
@@ -5371,30 +5345,15 @@ export default function Home() {
                       currentSegmentStart = -1;
                     }
                   }
-                  const cardFontSize = dailyOrderCounts.get(barDates[0]?.date ?? "") === 1
-                    ? 12
-                    : 10;
+                  const cardFontSize = 12;
                   const infoSegmentWidth = (infoSegmentEnd - infoSegmentStart) * 130 - 34;
                   const showStatusOnTitleLine =
                     infoSegmentStart !== -1 &&
                     order.customer.length * cardFontSize +
                       order.status.length * cardFontSize +
                       8 <= infoSegmentWidth;
-                  const maxDailyOrderCount = Math.max(
-                    1,
-                    ...barDates.map((day) => dailyOrderCounts.get(day.date) ?? 1),
-                  );
-                  const isSingleDayOrder = (order.endDate || order.date) === order.date;
                   const orderLane = orderLanes.get(order.id) ?? 0;
-                  const orderCardHeight = maxDailyOrderCount >= 3
-                    ? 22
-                    : maxDailyOrderCount === 2
-                      ? 24
-                      : 56;
-                  const laneOffset = orderLane * orderCardHeight;
-                  const centerOffset = maxDailyOrderCount === 1
-                    ? (76 - orderCardHeight) / 2 - (isSingleDayOrder ? 0 : 4)
-                    : 0;
+                  const laneOffset = orderLane * (orderCardHeight + orderCardGap) + orderCardGap;
                   const isSelectingSplit =
                     isSplittable && splitSelection?.orderId === order.id;
                   const selectedStartDate = isSelectingSplit ? splitSelection.startDate : null;
@@ -5417,9 +5376,7 @@ export default function Home() {
                       style={{
                         gridColumn: `${startIndex + 2} / ${endIndex + 3}`,
                         gridRow: 1,
-                        transform: laneOffset + centerOffset > 0
-                          ? `translateY(${laneOffset + centerOffset}px)`
-                          : undefined,
+                        transform: `translateY(${laneOffset}px)`,
                         height: `${orderCardHeight}px`,
                         minHeight: 0,
                         zIndex: 1,
@@ -5445,7 +5402,7 @@ export default function Home() {
                         }
                         openEditOrder(order);
                       }}
-                      className={`relative mx-1 ${isSingleDayOrder || maxDailyOrderCount >= 2 ? "my-0" : "my-1"} cursor-grab overflow-hidden rounded-lg border px-2 text-center shadow-sm active:cursor-grabbing ${maxDailyOrderCount >= 2 ? "py-0 text-[10px] leading-[10px]" : "py-1 text-xs leading-3"} ${statusStyles[order.status]} ${draggingOrderId === order.id ? "opacity-50" : ""}`}
+                      className={`relative mx-1 my-0 cursor-grab overflow-hidden rounded-lg border px-2 py-1 text-center text-xs leading-3 shadow-sm active:cursor-grabbing ${statusStyles[order.status]} ${draggingOrderId === order.id ? "opacity-50" : ""}`}
                     >
                       <div
                         aria-hidden={!isSelectingSplit}

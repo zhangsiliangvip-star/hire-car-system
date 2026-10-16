@@ -415,8 +415,36 @@ test("order conflicts cover editing, multi-day ranges, and close departure times
 test("overlapping multi-day orders stack inside the same calendar cell row", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.ok(!source.includes("gridRow: isSingleDayOrder ? 1 : orderLane + 1"));
-  assert.ok(source.includes("const laneOffset = orderLane * orderCardHeight;"));
-  assert.ok(source.includes("const orderCardHeights = new Map("));
+  assert.ok(source.includes("const laneOffset = orderLane * (orderCardHeight + orderCardGap) + orderCardGap;"));
+  assert.ok(source.includes("const orderCardHeight = 56;"));
+  assert.doesNotMatch(source, /maxDailyOrderCount|orderCardHeights/);
+  const layout = source.slice(source.indexOf("            const orderLanes ="), source.indexOf("\n            return (", source.indexOf("            const orderLanes =")));
+  const evaluate = (visibleOrders) => {
+    const context = { visibleOrders, dates: [{ date: "2026-10-01" }, { date: "2026-10-02" }] };
+    const script = ts.transpileModule(`${layout}\nresult = {
+      heights: [...singleDayCellHeights.values()],
+      offsets: visibleOrders.map((order) => (orderLanes.get(order.id) || 0) * (orderCardHeight + orderCardGap) + orderCardGap),
+      cardHeight: orderCardHeight,
+    };`, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+    vm.runInNewContext(script, context);
+    return plain(context.result);
+  };
+  for (const count of [1, 2, 3, 5, 10]) {
+    const orders = Array.from({ length: count }, (_, index) => ({
+      id: String(index), date: "2026-10-01", endDate: "2026-10-02",
+    }));
+    const { heights, offsets, cardHeight } = evaluate(orders);
+    assert.equal(cardHeight, 56);
+    assert.deepEqual(heights, Array(2).fill(`${Math.max(96, count * 60 + 4)}px`));
+    for (let index = 1; index < offsets.length; index++) {
+      assert.ok(offsets[index] >= offsets[index - 1] + cardHeight + 4);
+    }
+    assert.ok(offsets.at(-1) + cardHeight <= parseFloat(heights[0]));
+  }
+  assert.deepEqual(evaluate([
+    { id: "first", date: "2026-10-01", endDate: "2026-10-01" },
+    { id: "second", date: "2026-10-02", endDate: "2026-10-02" },
+  ]).offsets, [4, 4]);
 });
 
 test("calendar rows use each vehicle record's own plate shown above the name", () => {
