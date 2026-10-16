@@ -43,3 +43,16 @@ export function compareVehicles(
 ) {
   return compareVehicleNames(first.name, second.name) || first.id.localeCompare(second.id);
 }
+
+function isCalendarPinnedVehicle(name: string) {
+  return /四代/.test(name) && !isOutsourcedVehicle(name);
+}
+
+/** Calendar order: non-outsourced 「四代」 vehicles first, then the normal vehicle order. */
+export function compareCalendarVehicles(
+  first: { name: string; id: string },
+  second: { name: string; id: string },
+) {
+  return Number(isCalendarPinnedVehicle(second.name)) - Number(isCalendarPinnedVehicle(first.name)) ||
+    compareVehicles(first, second);
+}

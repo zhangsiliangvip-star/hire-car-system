@@ -43,6 +43,23 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("value={vehicle.id}"));
 });
 
+test("calendar pins non-outsourced 四代 vehicles to the top", () => {
+  const { compareCalendarVehicles } = load("lib\\vehicle-order.ts");
+  const vehicles = [
+    { id: "1", name: "Alphard" },
+    { id: "2", name: "Hiace" },
+    { id: "3", name: "外注 Alphard 四代" },
+    { id: "4", name: "Alphard 四代" },
+    { id: "5", name: "Alphard 四代" },
+  ];
+  assert.deepEqual(
+    vehicles.slice().sort(compareCalendarVehicles).map((vehicle) => vehicle.id),
+    ["4", "5", "1", "2", "3"],
+  );
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /return isOutsourced;\s*\}\)\.sort\(compareCalendarVehicles\);/);
+});
+
 test("vehicle list can be filtered by owner company", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /aria-label="車両所属筛选"/);

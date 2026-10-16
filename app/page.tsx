@@ -54,6 +54,7 @@ import { printBalance } from "@/lib/balance-print";
 import { getBalanceServiceMonth, summarizeBalance } from "@/lib/balance-summary";
 import {
   compareVehicles,
+  compareCalendarVehicles,
   getVehicleModelOrder,
   isOutsourcedVehicle,
   orderUsesVehicle,
@@ -1299,7 +1300,7 @@ export default function Home() {
     if (calendarVehicleFilter === "hiace") return !isOutsourced && modelOrder === 1;
     if (calendarVehicleFilter === "tesla") return !isOutsourced && modelOrder === 2;
     return isOutsourced;
-  });
+  }).sort(compareCalendarVehicles);
   const availableVehicleRecords = vehicleRecords.filter(
     (vehicle) => getVehicleDisplayStatus(vehicle) === "运营中",
   );
