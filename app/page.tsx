@@ -3951,7 +3951,6 @@ export default function Home() {
                       className="rounded border bg-white px-3 py-2 text-sm text-gray-900"
                     >
                       <option value="">全部会社</option>
-                      <option value="__unassigned_company__">未填写</option>
                       {companyRows.map((company) => (
                         <option key={company.id} value={company.name}>
                           {company.name}
@@ -4640,7 +4639,6 @@ export default function Home() {
                       className="rounded border bg-white px-3 py-2 text-sm text-gray-900"
                     >
                       <option value="">全部会社</option>
-                      <option value="__unassigned_company__">未填写</option>
                       {balanceCompanyOptions.map((companyName) => (
                         <option key={companyName} value={companyName}>
                           {companyName}
@@ -5578,7 +5576,6 @@ export default function Home() {
                     className="rounded border bg-white px-3 py-2 text-sm"
                   >
                     <option value="">全部会社</option>
-                    <option value="__unassigned_company__">未填写</option>
                     {companyRows.map((company) => (
                       <option key={company.id} value={company.name}>
                         {company.name}

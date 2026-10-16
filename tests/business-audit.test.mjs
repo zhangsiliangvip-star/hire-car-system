@@ -93,6 +93,12 @@ test("calendar vehicle order can be dragged and is shared through the database",
   assert.match(source, /\{ id: vehicle\.id, \.\.\.savedVehicle, calendarOrder: vehicle\.calendarOrder \?\? null \}/);
 });
 
+test("company filter dropdowns no longer offer an 未填写 option", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.doesNotMatch(source, /<option value="__unassigned_company__">未填写<\/option>/);
+  assert.equal((source.match(/<option value="">全部会社<\/option>/g) ?? []).length, 3);
+});
+
 test("vehicle list can be filtered by owner company", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /aria-label="車両所属筛选"/);
