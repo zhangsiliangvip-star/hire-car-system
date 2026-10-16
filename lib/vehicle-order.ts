@@ -59,14 +59,34 @@ function getCalendarVehicleRank(name: string) {
 }
 
 /**
- * Calendar order: Alphard 四代 → 三代 → Alphard → Hiace → Alphard 二代 → Tesla → others → 外注;
- * vehicles out of service always go to the bottom.
+ * Calendar order: out-of-service vehicles always last; then the shared manual order
+ * (vehicles never dragged follow those that were); otherwise
+ * Alphard 四代 → 三代 → Alphard → Hiace → Alphard 二代 → Tesla → others → 外注.
  */
 export function compareCalendarVehicles(
-  first: { name: string; id: string; outOfService?: boolean },
-  second: { name: string; id: string; outOfService?: boolean },
+  first: { name: string; id: string; outOfService?: boolean; calendarOrder?: number | null },
+  second: { name: string; id: string; outOfService?: boolean; calendarOrder?: number | null },
 ) {
+  const firstOrder = first.calendarOrder ?? null;
+  const secondOrder = second.calendarOrder ?? null;
   return Number(Boolean(first.outOfService)) - Number(Boolean(second.outOfService)) ||
+    (firstOrder !== null && secondOrder !== null ? firstOrder - secondOrder : 0) ||
+    Number(firstOrder === null) - Number(secondOrder === null) ||
     getCalendarVehicleRank(first.name) - getCalendarVehicleRank(second.name) ||
     compareVehicles(first, second);
+}
+
+/** Move `draggedId` before (or after) `targetId` in an ordered id list. */
+export function moveCalendarVehicle(
+  orderedIds: string[],
+  draggedId: string,
+  targetId: string,
+  placeAfter: boolean,
+) {
+  if (draggedId === targetId || !orderedIds.includes(draggedId) || !orderedIds.includes(targetId)) {
+    return orderedIds;
+  }
+  const remaining = orderedIds.filter((id) => id !== draggedId);
+  const targetIndex = remaining.indexOf(targetId) + (placeAfter ? 1 : 0);
+  return [...remaining.slice(0, targetIndex), draggedId, ...remaining.slice(targetIndex)];
 }

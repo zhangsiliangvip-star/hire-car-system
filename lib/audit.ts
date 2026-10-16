@@ -76,7 +76,7 @@ const fieldLabels: Record<string, string> = {
   finance_by_date: "每日财务", name: "名称", wechat: "微信", whatsapp: "WhatsApp",
   license_expiry: "免許有効期限", plate: "車両番号", owner_company: "車両所属",
   default_parking_fee: "默认停车场费", default_insurance_fee: "默认保险费",
-  seats: "座位数", fuel_type: "燃油类型", inspection_expiry: "車検有効期限",
+  seats: "座位数", fuel_type: "燃油类型", calendar_order: "カレンダー顺序", inspection_expiry: "車検有効期限",
   liability_expiry: "自賠責有効期限", vehicle_id: "车辆编号", month: "月份",
   parking_fee: "停车场费", insurance_fee: "保险费", inspection_fee: "点检费",
   repair_fee: "维修费", supplies: "备品", start_odometer: "起始里程", end_odometer: "结束里程",

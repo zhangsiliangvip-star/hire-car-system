@@ -81,6 +81,7 @@ export type Database = {
         liability_expiry: string | null;
         notes: string;
         status: "运营中" | "停运中";
+        calendar_order: number | null;
       }>;
       vehicle_monthly_finances: AuditedTable<{
         id: string;

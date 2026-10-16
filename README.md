@@ -166,3 +166,9 @@ The calendar shows one row per registered vehicle. Each row header displays that
 Reservations reference their vehicle by **車両番号** (`orders.vehicle_plate`, plus `vehiclePlate` in per-day finance entries), so several vehicles may share the same name. Vehicle names may repeat freely; **車両番号 must be unique within a region** and adding, batch-adding or editing a vehicle to an existing plate is rejected with a warning. When a name is shared by several vehicles, the reservation form asks for the specific 車両番号 before saving. Conflict checks compare plates when both reservations have one. Renaming a vehicle or changing its plate updates the reservations linked to it.
 
 Migration `20261030000000_order_vehicle_plate.sql` adds the column and backfills plates for reservations whose car name matched exactly one vehicle in its region. Older reservations on a shared name keep an empty plate; they appear in every row with that name until you open them and pick the 車両番号.
+
+### Calendar vehicle order
+
+Vehicles that are out of service (status 停运中 or an expired 車検/自賠責) are always listed last. Otherwise the default order is Alphard 四代 → Alphard 三代 → Alphard → Hiace → Alphard 二代 → Tesla → other → 外注.
+
+Drag the ⠿ handle on the left of a calendar row onto another row to reorder. The order is saved in `vehicles.calendar_order` (migration `20261031000000_vehicle_calendar_order.sql`) and shared by all users. Vehicles that have never been dragged follow the reordered ones in the default order. **恢复默认顺序** clears the manual order for the current region.

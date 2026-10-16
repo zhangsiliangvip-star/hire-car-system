@@ -107,6 +107,8 @@ export type Vehicle = AuditedRecord & {
   liabilityExpiry: string;
   notes: string;
   status: VehicleStatus;
+  /** Shared manual calendar position; null means the default generation order. */
+  calendarOrder?: number | null;
 };
 
 export type VehicleDraft = Omit<Vehicle, "id">;

@@ -55,6 +55,7 @@ import { getBalanceServiceMonth, summarizeBalance } from "@/lib/balance-summary"
 import {
   compareVehicles,
   compareCalendarVehicles,
+  moveCalendarVehicle,
   getVehicleModelOrder,
   isOutsourcedVehicle,
   orderUsesVehicle,
@@ -928,6 +929,9 @@ export default function Home() {
   const [batchInput, setBatchInput] = useState("");
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
   const [dragTargetKey, setDragTargetKey] = useState<string | null>(null);
+  const [draggingCalendarVehicleId, setDraggingCalendarVehicleId] = useState<string | null>(null);
+  const [calendarVehicleDropTarget, setCalendarVehicleDropTarget] =
+    useState<{ id: string; after: boolean } | null>(null);
   const [splitSelection, setSplitSelection] = useState<{
     orderId: string;
     startDate: string | null;
@@ -1292,7 +1296,20 @@ export default function Home() {
   const filteredVehicleRows = vehicleOwnerFilter === null
     ? vehicleRows
     : vehicleRows.filter((vehicle) => (vehicle.ownerCompany || "") === vehicleOwnerFilter);
-  const filteredCalendarVehicleRecords = vehicleRecords.filter(({ name: vehicle }) => {
+  const calendarSortedVehicleRecords = vehicleRecords
+    .map((vehicle) => ({
+      vehicle,
+      outOfService: getVehicleDisplayStatus(vehicle) !== "运营中",
+      name: vehicle.name,
+      id: vehicle.id,
+      calendarOrder: vehicle.calendarOrder,
+    }))
+    .sort(compareCalendarVehicles)
+    .map(({ vehicle }) => vehicle);
+  const hasManualCalendarOrder = vehicleRecords.some(
+    (vehicle) => vehicle.calendarOrder !== null && vehicle.calendarOrder !== undefined,
+  );
+  const filteredCalendarVehicleRecords = calendarSortedVehicleRecords.filter(({ name: vehicle }) => {
     const modelOrder = getVehicleModelOrder(vehicle);
     const isOutsourced = isOutsourcedVehicle(vehicle);
     if (calendarVehicleFilter === "all") return true;
@@ -1300,10 +1317,7 @@ export default function Home() {
     if (calendarVehicleFilter === "hiace") return !isOutsourced && modelOrder === 1;
     if (calendarVehicleFilter === "tesla") return !isOutsourced && modelOrder === 2;
     return isOutsourced;
-  })
-    .map((vehicle) => ({ vehicle, outOfService: getVehicleDisplayStatus(vehicle) !== "运营中", name: vehicle.name, id: vehicle.id }))
-    .sort(compareCalendarVehicles)
-    .map(({ vehicle }) => vehicle);
+  });
   const availableVehicleRecords = vehicleRecords.filter(
     (vehicle) => getVehicleDisplayStatus(vehicle) === "运营中",
   );
@@ -2198,6 +2212,33 @@ export default function Home() {
     }
   }
 
+  function reorderCalendarVehicle(draggedId: string, targetId: string, placeAfter: boolean) {
+    const currentIds = calendarSortedVehicleRecords.map((vehicle) => vehicle.id);
+    const nextIds = moveCalendarVehicle(currentIds, draggedId, targetId, placeAfter);
+    if (nextIds === currentIds) return;
+    const positions = new Map(nextIds.map((id, index) => [id, index]));
+    setVehicleRecords((current) =>
+      current.map((vehicle) => {
+        const position = positions.get(vehicle.id);
+        return position === undefined || vehicle.calendarOrder === position
+          ? vehicle
+          : { ...vehicle, calendarOrder: position };
+      }),
+    );
+  }
+
+  function resetCalendarVehicleOrder() {
+    if (!window.confirm("恢复カレンダー默认车辆顺序？所有人看到的顺序都会恢复。")) return;
+    const ids = new Set(vehicleRecords.map((vehicle) => vehicle.id));
+    setVehicleRecords((current) =>
+      current.map((vehicle) =>
+        ids.has(vehicle.id) && vehicle.calendarOrder !== null && vehicle.calendarOrder !== undefined
+          ? { ...vehicle, calendarOrder: null }
+          : vehicle,
+      ),
+    );
+  }
+
   function moveOrderToCell(orderId: string, target: CalendarVehicleTarget, targetDate: string) {
     setOrders((currentOrders) =>
       currentOrders.map((order) => {
@@ -2932,7 +2973,7 @@ export default function Home() {
       setVehicleRecords((current) =>
         current.map((vehicle) =>
           vehicle.id === editingVehicleId
-            ? { id: vehicle.id, ...savedVehicle }
+            ? { id: vehicle.id, ...savedVehicle, calendarOrder: vehicle.calendarOrder ?? null }
             : vehicle,
         ),
       );
@@ -4868,6 +4909,16 @@ export default function Home() {
             {label}
           </button>
         ))}
+        <span className="ml-auto self-center text-xs text-slate-500">拖动车辆左侧 ⠿ 可调整顺序</span>
+        {hasManualCalendarOrder && (
+          <button
+            type="button"
+            onClick={resetCalendarVehicleOrder}
+            className="self-center rounded border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100"
+          >
+            恢复默认顺序
+          </button>
+        )}
       </div>
       {/* 日期控制 */}
       <div className="border-b bg-white px-4 py-3">
@@ -5068,9 +5119,26 @@ export default function Home() {
             return (
               <div
                 key={vehicleRecord.id}
-                className="grid auto-rows-min"
+                className={`grid auto-rows-min ${
+                  calendarVehicleDropTarget?.id === vehicleRecord.id
+                    ? calendarVehicleDropTarget.after
+                      ? "shadow-[inset_0_-3px_0_0_#1d4ed8]"
+                      : "shadow-[inset_0_3px_0_0_#1d4ed8]"
+                    : ""
+                } ${draggingCalendarVehicleId === vehicleRecord.id ? "opacity-50" : ""}`}
                 onDragOver={(event) => {
                   event.preventDefault();
+                  if (draggingCalendarVehicleId) {
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    const after = event.clientY > bounds.top + bounds.height / 2;
+                    if (
+                      calendarVehicleDropTarget?.id !== vehicleRecord.id ||
+                      calendarVehicleDropTarget.after !== after
+                    ) {
+                      setCalendarVehicleDropTarget({ id: vehicleRecord.id, after });
+                    }
+                    return;
+                  }
                   const bounds = event.currentTarget.getBoundingClientRect();
                   const dayWidth = (bounds.width - 135) / dates.length;
                   const dateIndex = Math.max(
@@ -5084,6 +5152,17 @@ export default function Home() {
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
+                  if (draggingCalendarVehicleId) {
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    reorderCalendarVehicle(
+                      draggingCalendarVehicleId,
+                      vehicleRecord.id,
+                      event.clientY > bounds.top + bounds.height / 2,
+                    );
+                    setDraggingCalendarVehicleId(null);
+                    setCalendarVehicleDropTarget(null);
+                    return;
+                  }
                   const bounds = event.currentTarget.getBoundingClientRect();
                   const dayWidth = (bounds.width - 180) / dates.length;
                   const dateIndex = Math.max(
@@ -5129,7 +5208,26 @@ export default function Home() {
                   gridTemplateColumns: `135px repeat(${dates.length}, minmax(130px, 1fr))`,
                 }}
               >
-                <div className="row-start-1 flex min-h-[72px] items-center border-b border-r bg-slate-50 p-2">
+                <div className="relative row-start-1 flex min-h-[72px] items-center border-b border-r bg-slate-50 p-2 pl-5">
+                  <span
+                    draggable
+                    role="button"
+                    tabIndex={-1}
+                    title="拖动调整车辆顺序"
+                    aria-label={`拖动调整车辆顺序 ${vehicleRecord.plate || vehicle}`}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("application/x-calendar-vehicle", vehicleRecord.id);
+                      setDraggingCalendarVehicleId(vehicleRecord.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingCalendarVehicleId(null);
+                      setCalendarVehicleDropTarget(null);
+                    }}
+                    className="absolute inset-y-0 left-0 flex w-4 cursor-grab select-none items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 active:cursor-grabbing"
+                  >
+                    ⠿
+                  </span>
                   {(() => {
                     const plate = vehicleRecord.plate || "未登记番号";
                     const notes = vehicleRecord.notes || "-";

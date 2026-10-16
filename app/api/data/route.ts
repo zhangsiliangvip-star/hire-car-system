@@ -110,6 +110,7 @@ const vehicleSchema = z.object({
   liabilityExpiry: z.union([dateSchema, z.literal("")]),
   notes: z.string().max(5000),
   status: z.enum(["运营中", "停运中"]),
+  calendarOrder: z.number().int().min(0).max(1_000_000).nullable().default(null),
 }).strict();
 const vehicleMonthlyFinanceSchema = z.object({
   id: idSchema,
@@ -356,6 +357,7 @@ function toVehicle(row: Database["public"]["Tables"]["vehicles"]["Row"]): Vehicl
     liabilityExpiry: row.liability_expiry || "",
     notes: row.notes,
     status: row.status,
+    calendarOrder: row.calendar_order ?? null,
   };
 }
 
@@ -488,6 +490,7 @@ function toVehicleRow(vehicle: Vehicle): Database["public"]["Tables"]["vehicles"
     liability_expiry: vehicle.liabilityExpiry || null,
     notes: vehicle.notes,
     status: vehicle.status,
+    calendar_order: vehicle.calendarOrder ?? null,
   };
 }
 

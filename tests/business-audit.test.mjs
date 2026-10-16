@@ -65,6 +65,33 @@ test("calendar orders vehicles by generation and puts out-of-service vehicles la
   assert.match(source, /\.sort\(compareCalendarVehicles\)/);
 });
 
+test("calendar vehicle order can be dragged and is shared through the database", () => {
+  const { compareCalendarVehicles, moveCalendarVehicle } = load("lib\\vehicle-order.ts");
+  const sorted = [
+    { id: "t", name: "Tesla", calendarOrder: 0 },
+    { id: "a4", name: "Alphard 四代", calendarOrder: 1 },
+    { id: "h", name: "Hiace", calendarOrder: null },
+    { id: "a3", name: "Alphard 三代" },
+    { id: "x", name: "Alphard 四代", calendarOrder: 0, outOfService: true },
+  ].sort(compareCalendarVehicles).map((vehicle) => vehicle.id);
+  assert.deepEqual(sorted, ["t", "a4", "a3", "h", "x"]);
+  const ids = ["a", "b", "c", "d"];
+  assert.deepEqual(plain(moveCalendarVehicle(ids, "d", "a", false)), ["d", "a", "b", "c"]);
+  assert.deepEqual(plain(moveCalendarVehicle(ids, "a", "c", true)), ["b", "c", "a", "d"]);
+  assert.equal(moveCalendarVehicle(ids, "a", "a", false), ids);
+
+  const migration = fs.readFileSync(path.join(root, "supabase\\migrations\\20261031000000_vehicle_calendar_order.sql"), "utf8");
+  assert.match(migration, /add column if not exists calendar_order integer/);
+  const route = fs.readFileSync(path.join(root, "app\\api\\data\\route.ts"), "utf8");
+  assert.match(route, /calendarOrder: z\.number\(\)\.int\(\)\.min\(0\)\.max\(1_000_000\)\.nullable\(\)\.default\(null\)/);
+  assert.match(route, /calendar_order: vehicle\.calendarOrder \?\? null/);
+  assert.match(route, /calendarOrder: row\.calendar_order \?\? null/);
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /setData\("application\/x-calendar-vehicle", vehicleRecord\.id\)/);
+  assert.match(source, /reorderCalendarVehicle\(\s*draggingCalendarVehicleId,/);
+  assert.match(source, /\{ id: vehicle\.id, \.\.\.savedVehicle, calendarOrder: vehicle\.calendarOrder \?\? null \}/);
+});
+
 test("vehicle list can be filtered by owner company", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /aria-label="車両所属筛选"/);
