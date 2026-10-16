@@ -41,6 +41,7 @@ import { usePersistedCollection } from "@/lib/use-persisted-collection";
 import { createClient as createSupabaseClient } from "@/lib/supabase/browser";
 import { printOrderExpenses } from "@/lib/order-expense-print";
 import { printOrderFinance } from "@/lib/order-finance-print";
+import { summarizeRequestAmounts } from "@/lib/request-amount-summary";
 import { printInvoice } from "@/lib/invoice-print";
 import { printVehicleFinance, printVehicleSummary } from "@/lib/vehicle-finance-print";
 import { summarizeVehicles, totalVehicleSummaries, type VehicleMonthlySummary } from "@/lib/vehicle-finance-summary";
@@ -1472,6 +1473,12 @@ export default function Home() {
     `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
   );
   const filteredFinanceTotals = summarizeFinance(filteredOrderFinanceOrders);
+  const filteredFinanceRequestAmounts = summarizeRequestAmounts(
+    filteredOrderFinanceOrders.map((order) => ({
+      depositMethod: order.depositMethod,
+      requestAmount: getOrderFinanceForOrder(order).requestAmount,
+    })),
+  );
   const filteredFinanceProfitRate =
     filteredFinanceTotals.requestAmount === 0
       ? 0
@@ -1500,6 +1507,7 @@ export default function Home() {
           vehicleNumber: getOrderVehicleNumber(order),
           invoiceStatus: order.invoiceStatus,
           paid: Boolean(order.depositDate),
+          depositMethod: order.depositMethod,
           ...getOrderFinanceForOrder(order),
         })),
       });
@@ -4011,10 +4019,22 @@ export default function Home() {
             >
               <div className="mb-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-4">
-                  <p className="text-sm font-semibold text-blue-800">总卖上</p>
+                  <p className="text-sm font-semibold text-blue-800">总请求金额</p>
                   <p className="mt-2 text-2xl font-bold tabular-nums text-blue-950">
                     {formatYen(filteredFinanceTotals.requestAmount)}
                   </p>
+                  <dl className="mt-3 space-y-1 border-t border-blue-200 pt-2 text-sm text-blue-950">
+                    {([
+                      ["口座入金", filteredFinanceRequestAmounts.bank],
+                      ["现金入金", filteredFinanceRequestAmounts.cash],
+                      ["未设置入金方式", filteredFinanceRequestAmounts.unassigned],
+                    ] as const).map(([label, amount]) => (
+                      <div key={label} className="flex flex-wrap justify-between gap-x-2">
+                        <dt>{label}</dt><dd className="font-semibold tabular-nums">{formatYen(amount)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="mt-2 text-xs text-blue-800">按订单入金方式分类，不代表已实际收款。</p>
                 </div>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4">
                   <p className="text-sm font-semibold text-emerald-800">利润总和</p>

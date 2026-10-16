@@ -868,6 +868,45 @@ test("inline operation markers remain in reservation editor and details but not 
   assert.ok(source.includes('activeView === "audit" && currentProfile.role === "admin"'));
 });
 
+test("accounting total requests split by deposit method in the page and A4 report", () => {
+  const helper = load("lib\\request-amount-summary.ts");
+  const { buildOrderFinancePrintHtml } = load("lib\\order-finance-print.ts", {
+    "@/lib/print-a4": {},
+    "@/lib/request-amount-summary": helper,
+  });
+  const rows = [
+    { depositMethod: "口座入金", requestAmount: 1000, paid: false },
+    { depositMethod: "现金入金", requestAmount: 2000, paid: true },
+    { depositMethod: "", requestAmount: 300, paid: false },
+    { depositMethod: "口座入金", requestAmount: 50, paid: true },
+  ].map((row) => ({
+    date: "2026-10-01", customer: "Order", source: "Source", driver: "Driver",
+    vehicleNumber: "1234", invoiceStatus: "未完成", driverAdvances: 0,
+    companyExpenses: 0, driverWages: 0, profit: 100, ...row,
+  }));
+  assert.deepEqual(plain(helper.summarizeRequestAmounts(rows)), { bank: 1050, cash: 2000, unassigned: 300 });
+  assert.deepEqual(plain(helper.summarizeRequestAmounts([])), { bank: 0, cash: 0, unassigned: 0 });
+  assert.deepEqual(plain(helper.summarizeRequestAmounts(rows.filter((row) => row.paid))), { bank: 50, cash: 2000, unassigned: 0 });
+  assert.throws(() => helper.summarizeRequestAmounts([{ depositMethod: "invalid", requestAmount: 1 }]), /入金方式无效/);
+  const html = buildOrderFinancePrintHtml({
+    month: "2026-10", region: "Tokyo", source: "All", company: "All",
+    depositStatus: "All", invoiceStatus: "All", rows,
+  });
+  assert.match(html, /总请求金额<strong>¥3,350/);
+  assert.match(html, /口座入金：¥1,050/);
+  assert.match(html, /现金入金：¥2,000/);
+  assert.match(html, /未设置入金方式：¥300/);
+  assert.doesNotMatch(html, /总卖上/);
+  const page = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(page, /summarizeRequestAmounts\(\s*filteredOrderFinanceOrders\.map/);
+  assert.match(page, /requestAmount: getOrderFinanceForOrder\(order\)\.requestAmount/);
+  assert.match(page, /总请求金额<\/p>/);
+  for (const key of ["bank", "cash", "unassigned"]) {
+    assert.ok(page.includes(`filteredFinanceRequestAmounts.${key}`));
+  }
+  assert.match(page, /paid: Boolean\(order\.depositDate\),\s*depositMethod: order\.depositMethod/);
+});
+
 test("balance adds manual income, subtracts only manual expense and prints matching A4 totals", () => {
   const balance = load("lib\\balance-summary.ts");
   const { buildBalancePrintHtml } = load("lib\\balance-print.ts", {

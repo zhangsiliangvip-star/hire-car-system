@@ -36,6 +36,8 @@ For an existing account of either role, select **编辑**, enter and confirm a n
 
 ## Financial reports
 
+In `経理統計`, the former `总卖上` card is labeled `总请求金额`, with `口座入金`, `现金入金`, and `未设置入金方式` underneath. The breakdown follows the current month, region, source, company, invoice, and deposit-status filters and uses the same request amounts as the list. The A4 report uses the same label and breakdown. Classification uses the saved deposit method, not proof of receipt; totals, profits, and profit rates are unchanged.
+
 In `收支平衡`, the request total is broken down by the order's saved deposit method into `口座入金`, `现金入金`, and `未设置入金方式`. The summary card, per-company rows, totals, and A4 report use the same breakdown. These are request amounts classified by method, not confirmed receipts: no deposit date is required. The three categories sum to the existing request total; the service-month attribution, region/company filters, and profit formula are unchanged.
 
 In reservation management (`予約管理`), the date button immediately after the month filter opens a calendar dialog for that month, not a dropdown. Select a day to show reservations whose service range includes that day, excluding reservations marked off on that day. Source and company filters still apply. `全部日期` restores the monthly list; changing the month or re-entering reservation management clears the selected day. Escape, Cancel, or clicking outside the dialog closes it without changing the filter.
