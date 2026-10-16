@@ -19,7 +19,7 @@ export async function getAuthenticatedProfile() {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, company, position, role, email_confirmed")
+    .select("id, email, full_name, company, position, region_id, role, email_confirmed")
     .eq("id", user.id)
     .single();
 
@@ -33,6 +33,7 @@ export async function getAuthenticatedProfile() {
     fullName: data.full_name,
     company: data.company,
     position: data.position,
+    regionId: data.region_id,
     role: data.role,
     emailConfirmed: data.email_confirmed,
   };

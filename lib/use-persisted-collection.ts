@@ -9,14 +9,22 @@ import {
 } from "react";
 import { buildApiErrorMessage, readJsonSafely } from "@/lib/api-client";
 import type { CollectionName } from "@/lib/domain";
+import { toLastOperation, type AuditedRecord } from "@/lib/audit";
 
-type Identified = { id: string };
+type Identified = AuditedRecord & { id: string; regionId?: string };
+
+function withoutOperation<T extends Identified>(item: T) {
+  const { lastOperation, ...data } = item;
+  void lastOperation;
+  return data;
+}
 
 export function usePersistedCollection<T extends Identified>(
   collection: CollectionName,
   reportError: (message: string) => void,
   reportPending: (change: number) => void,
   getDeletePassword: () => string,
+  getRegionId: () => string | null,
 ) {
   const [items, setItems] = useState<T[]>([]);
   const itemsRef = useRef(items);
@@ -29,16 +37,30 @@ export function usePersistedCollection<T extends Identified>(
 
   const updateItems = useCallback<Dispatch<SetStateAction<T[]>>>((action) => {
     const previous = itemsRef.current;
-    const next = typeof action === "function" ? action(previous) : action;
-    if (next === previous) return;
+    const requested = typeof action === "function" ? action(previous) : action;
+    if (requested === previous) return;
+
+    const previousById = new Map(previous.map((item) => [item.id, item]));
+    const defaultRegionId = getRegionId();
+    const next = requested.map((item) => ({
+      ...item,
+      regionId: item.regionId || previousById.get(item.id)?.regionId || defaultRegionId || "",
+    }));
+    if (next.some((item) => !item.regionId)) {
+      reportError("新增业务数据前，请先选择一个具体地域。");
+      return;
+    }
 
     itemsRef.current = next;
     setItems(next);
 
-    const previousById = new Map(previous.map((item) => [item.id, item]));
     const nextById = new Map(next.map((item) => [item.id, item]));
     const upsert = next.filter(
-      (item) => JSON.stringify(previousById.get(item.id)) !== JSON.stringify(item),
+      (item) => {
+        const previousItem = previousById.get(item.id);
+        return !previousItem ||
+          JSON.stringify(withoutOperation(previousItem)) !== JSON.stringify(withoutOperation(item));
+      },
     );
     const deleteIds = previous
       .filter((item) => !nextById.has(item.id))
@@ -53,12 +75,28 @@ export function usePersistedCollection<T extends Identified>(
         const response = await fetch("/api/data", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ collection, upsert, deleteIds, deletePassword }),
+          body: JSON.stringify({ collection, upsert: upsert.map(withoutOperation), deleteIds, deletePassword }),
         });
         const result = await readJsonSafely(response);
         if (!response.ok) {
           throw new Error(buildApiErrorMessage(response, result, `保存${collection}失败。`));
         }
+        if (typeof result !== "object" || result === null || !("saved" in result) ||
+          !Array.isArray(result.saved)) {
+          throw new Error("保存后未收到操作信息，请重新载入核对。");
+        }
+        const operations = new Map(result.saved.map((record: unknown) => {
+          if (typeof record !== "object" || record === null ||
+            !("id" in record) || typeof record.id !== "string" || !("lastOperation" in record)) {
+            throw new Error("服务器返回的操作信息格式不正确。");
+          }
+          return [record.id, toLastOperation(record.lastOperation)] as const;
+        }));
+        const current = itemsRef.current.map((item) =>
+          operations.has(item.id) ? { ...item, lastOperation: operations.get(item.id) } : item,
+        );
+        itemsRef.current = current;
+        setItems(current);
       })
       .catch((error: unknown) => {
         const message =
@@ -67,7 +105,7 @@ export function usePersistedCollection<T extends Identified>(
         reportError(message);
       })
       .finally(() => reportPending(-1));
-  }, [collection, getDeletePassword, reportError, reportPending]);
+  }, [collection, getDeletePassword, getRegionId, reportError, reportPending]);
 
   return { items, updateItems, replaceItems };
 }

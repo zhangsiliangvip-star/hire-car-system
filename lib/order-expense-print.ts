@@ -1,0 +1,104 @@
+import { printA4Html } from "@/lib/print-a4";
+
+export type OrderExpensePrintRow = {
+  date: string;
+  driver: string;
+  vehicleNumber: string;
+  offDate: boolean;
+  etcCompany: number;
+  etcTrip: number;
+  fuelCost: number;
+  fuelLiters: number;
+  driverAdvanceCompany: number;
+  driverAdvanceTrip: number;
+  companyAdvanceCompany: number;
+  companyAdvanceTrip: number;
+  overtime: number;
+  wages: number;
+};
+
+type ExpensePrintData = {
+  name: string;
+  period: string;
+  note: string;
+  rows: OrderExpensePrintRow[];
+};
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character]!);
+}
+
+export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
+  const number = (value: number) =>
+    value.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
+  const sum = (key: keyof Omit<OrderExpensePrintRow, "date" | "driver" | "vehicleNumber" | "offDate">) =>
+    data.rows.reduce((total, row) => total + row[key], 0);
+  const unitPrice = (cost: number, liters: number) => liters > 0 ? number(cost / liters) : "—";
+  const detail = (label: string, value: string, span = 1) =>
+    `<td colspan="${span}"><small>${label}</small><strong>${value}</strong></td>`;
+  const dailyRows = [...data.rows].sort((first, second) => first.date.localeCompare(second.date))
+    .map((row) => `<section class="day">
+    <div class="day-heading"><strong>${escapeHtml(row.date)}${row.offDate ? "（休运）" : ""}</strong>
+    <span>司机：${escapeHtml(row.driver || "—")}</span><span>車両番号：${escapeHtml(row.vehicleNumber || "—")}</span></div>
+    <table><tbody><tr>
+    ${detail("ETC（社报）", number(row.etcCompany))}${detail("ETC（旅报）", number(row.etcTrip))}
+    ${detail("燃油费", number(row.fuelCost))}${detail("燃油消耗（L）", number(row.fuelLiters))}
+    ${detail("油价（JPY/L）", unitPrice(row.fuelCost, row.fuelLiters))}${detail("超时费（工资内数）", number(row.overtime))}
+    </tr><tr>${detail("司机立替（社报）", number(row.driverAdvanceCompany))}${detail("司机立替（旅报）", number(row.driverAdvanceTrip))}
+    ${detail("会社立替（社报）", number(row.companyAdvanceCompany))}${detail("会社立替（旅报）", number(row.companyAdvanceTrip))}
+    ${detail("司机工资（含超时及奖励）", number(row.wages), 2)}
+    </tr></tbody></table></section>`).join("");
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    <title>团务费用明细</title><style>
+    @page { size: A4 portrait; margin: 10mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; color: #172033; background: white; }
+    body { font: 10px Arial, "Microsoft YaHei", sans-serif; }
+    .sheet { width: 190mm; height: 276mm; overflow: hidden; }
+    .content { width: 190mm; transform-origin: top left; }
+    header { border-bottom: 2px solid #263b53; padding-bottom: 12px; }
+    h1 { margin: 0 0 10px; font-size: 23px; letter-spacing: 3px; }
+    .meta { display: flex; gap: 20px; flex-wrap: wrap; }
+    .name { font-size: 13px; font-weight: bold; overflow-wrap: anywhere; }
+    h2 { margin: 16px 0 6px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    td { border: 1px solid #bac3cd; padding: 4px; overflow-wrap: anywhere; width: 16.666%; }
+    td strong { display: block; text-align: right; font-variant-numeric: tabular-nums; margin-top: 3px; }
+    .day { margin-top: 8px; break-inside: avoid; }
+    .day-heading { display: flex; flex-wrap: wrap; gap: 6px 18px; background: #edf1f5; border: 1px solid #bac3cd; border-bottom: 0; padding: 5px; overflow-wrap: anywhere; }
+    small { display: block; color: #555; }
+    .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
+    .card { border: 1px solid #bac3cd; padding: 9px; }
+    .card strong { display: block; font-size: 16px; margin-top: 5px; }
+    .note { border: 1px solid #bac3cd; padding: 8px; min-height: 50px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .signatures { display: flex; justify-content: space-between; margin-top: 22px; padding-bottom: 10px; }
+    footer { margin-top: 12px; font-size: 9px; color: #555; }
+    </style></head><body><div class="sheet"><article class="content">
+    <header><h1>团务费用明细</h1><p class="name">${escapeHtml(data.name || "未填写订单名称")}</p>
+    <div class="meta"><span>行程日期：${escapeHtml(data.period)}</span><span>金额单位：JPY ／ 燃油：L ／ 油价：JPY/L</span></div></header>
+    <h2>每日司机与成本明细</h2>${dailyRows}
+    <h2>整单费用汇总</h2>
+    <table><tbody><tr>
+    ${detail("ETC（社报）合计", number(sum("etcCompany")))}${detail("ETC（旅报）合计", number(sum("etcTrip")))}
+    ${detail("燃油费合计", number(sum("fuelCost")))}${detail("燃油消耗合计（L）", number(sum("fuelLiters")))}
+    ${detail("平均油价（JPY/L）", unitPrice(sum("fuelCost"), sum("fuelLiters")))}${detail("超时费合计（工资内数）", number(sum("overtime")))}
+    </tr><tr>${detail("司机立替（社报）合计", number(sum("driverAdvanceCompany")))}${detail("司机立替（旅报）合计", number(sum("driverAdvanceTrip")))}
+    ${detail("会社立替（社报）合计", number(sum("companyAdvanceCompany")))}${detail("会社立替（旅报）合计", number(sum("companyAdvanceTrip")))}
+    ${detail("司机工资合计（含超时及奖励）", number(sum("wages")), 2)}</tr></tbody></table>
+    <div class="cards">
+    <div class="card">ETC 总额<strong>${number(sum("etcCompany") + sum("etcTrip"))}</strong></div>
+    <div class="card">燃油费合计<strong>${number(sum("fuelCost"))}</strong></div>
+    <div class="card">司机立替合计<strong>${number(sum("driverAdvanceCompany") + sum("driverAdvanceTrip"))}</strong></div>
+    <div class="card">会社立替合计<strong>${number(sum("companyAdvanceCompany") + sum("companyAdvanceTrip"))}</strong></div>
+    <div class="card">司机工资合计<strong>${number(sum("wages"))}</strong></div></div>
+    <h2>备注</h2><div class="note">${escapeHtml(data.note)}</div>
+    <div class="signatures"><span>填报：________________</span><span>核对：________________</span><span>日期：________________</span></div>
+    <footer>按当前财务编辑内容生成（未自动保存）。油价合计按总燃油费 ÷ 总消耗计算。超时费已包含在司机工资中，请勿重复计入。</footer>
+    </article></div></body></html>`;
+}
+
+export async function printOrderExpenses(data: ExpensePrintData) {
+  await printA4Html(buildOrderExpensePrintHtml(data), "团务费用明细打印");
+}

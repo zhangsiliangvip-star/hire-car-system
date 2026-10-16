@@ -24,3 +24,137 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.dashboard,
+.auth-screen {
+  color-scheme: light;
+}
+
+.login-screen {
+  background: radial-gradient(ellipse at top left, #e8effb 0, transparent 55%), #f3f5f8;
+}
+
+.login-brand {
+  background: radial-gradient(ellipse at bottom right, #244877 0, transparent 65%), #14263e;
+}
+
+.dashboard :is(button, a, input, select, textarea):focus-visible,
+.auth-screen :is(button, a, input):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.dashboard .overflow-x-auto,
+.dashboard .overflow-auto {
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 639px) {
+  .dashboard-header h1 {
+    font-size: 1.125rem;
+  }
+
+  .dashboard-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-actions > label,
+  .dashboard-actions > button {
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .dashboard-actions > label select {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dashboard-sidebar > p {
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+
+  .dashboard-sidebar nav {
+    padding: 2px 2px 6px;
+    scroll-padding-inline: 2px;
+  }
+
+  .dashboard-sidebar nav button {
+    min-height: 44px;
+    gap: 6px;
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+
+  .workspace-content > div > .mb-4.flex {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workspace-content > div > .mb-4.flex > .flex {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .dashboard :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .dashboard :is(form, label) {
+    min-width: 0;
+  }
+
+  .dashboard :is(form button, table td button, .calendar-date-controls button),
+  .workspace-content > div > .mb-4 button {
+    min-height: 44px;
+  }
+
+  .calendar-date-controls {
+    justify-content: center;
+  }
+
+  .calendar-date-controls > button {
+    min-width: 44px;
+  }
+
+  .calendar-day-slider {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .calendar-day-slider input {
+    min-height: 24px;
+  }
+
+  .dashboard .fixed.inset-0 {
+    padding: 8px;
+  }
+
+  .dashboard .fixed.inset-0 > :is(div, section) {
+    min-width: 0;
+    max-width: 100%;
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard .fixed.inset-0 .flex.items-center.justify-between {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .dashboard .fixed.inset-0 button {
+    min-height: 44px;
+  }
+
+  .dashboard .fixed.inset-0 [class*="grid-cols-[120px_1fr]"] {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+}

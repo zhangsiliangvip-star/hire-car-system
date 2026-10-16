@@ -6,12 +6,19 @@ import { jsonResponse } from "@/lib/api-response";
 import { readAllPages } from "@/lib/supabase/pagination";
 import { verifyDeletePassword } from "@/lib/delete-password";
 
-const inviteSchema = z.object({
+const createSchema = z.object({
   email: z.email().max(320),
   fullName: z.string().trim().min(1).max(200),
   company: z.string().trim().min(1).max(200),
   position: z.string().trim().min(1).max(200),
+  regionId: z.string().uuid(),
   role: z.enum(["admin", "user"]),
+  password: z.string().min(8).max(128),
+}).strict();
+
+const passwordSchema = z.object({
+  userId: z.string().uuid(),
+  password: z.string().min(8).max(128),
 }).strict();
 
 const updateSchema = z.object({
@@ -19,6 +26,7 @@ const updateSchema = z.object({
   fullName: z.string().trim().min(1).max(200),
   company: z.string().trim().min(1).max(200),
   position: z.string().trim().min(1).max(200),
+  regionId: z.string().uuid(),
   role: z.enum(["admin", "user"]),
 }).strict();
 
@@ -33,6 +41,7 @@ function toAccountProfile(row: {
   full_name: string;
   company: string;
   position: string;
+  region_id: string;
   role: AccountProfile["role"];
   email_confirmed: boolean;
 }): AccountProfile {
@@ -42,6 +51,7 @@ function toAccountProfile(row: {
     fullName: row.full_name,
     company: row.company,
     position: row.position,
+    regionId: row.region_id,
     role: row.role,
     emailConfirmed: row.email_confirmed,
   };
@@ -66,7 +76,7 @@ export async function GET() {
     const data = await readAllPages((from, to) =>
       identity.supabase
         .from("profiles")
-        .select("id, email, full_name, company, position, role, email_confirmed")
+        .select("id, email, full_name, company, position, region_id, role, email_confirmed")
         .order("created_at")
         .order("id")
         .range(from, to),
@@ -90,42 +100,122 @@ export async function POST(request: Request) {
     } catch {
       return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
     }
-    const parsed = inviteSchema.safeParse(body);
+    const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonResponse({ error: "请填写有效的邮箱、姓名、所属会社、职位和角色。" }, { status: 400 });
+      return jsonResponse({ error: "请填写有效的账号资料；设置密码时需为 8 至 128 个字符。" }, { status: 400 });
     }
 
     const admin = createAdminClient();
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(
-      parsed.data.email.trim().toLowerCase(),
-      {
-        data: {
-          full_name: parsed.data.fullName,
-          company: parsed.data.company,
-          position: parsed.data.position,
-        },
-        redirectTo: new URL("/auth/confirm?next=/reset-password", request.url).toString(),
-      },
-    );
+    const metadata = {
+      full_name: parsed.data.fullName,
+      company: parsed.data.company,
+      position: parsed.data.position,
+      region_id: parsed.data.regionId,
+    };
+    const { data, error } = await admin.auth.admin.createUser({
+          email: parsed.data.email.trim().toLowerCase(),
+          password: parsed.data.password,
+          email_confirm: true,
+          user_metadata: metadata,
+        });
 
     if (error || !data.user) {
-      console.error("Failed to invite user.", error);
+      console.error("Failed to create account.", { code: error?.code, status: error?.status });
+      if (error?.code === "weak_password") {
+        return jsonResponse({ error: "密码不符合认证服务的强度要求，请使用更强的密码。" }, { status: 400 });
+      }
+      if (error?.status === 429 || error?.code === "over_request_rate_limit") {
+        return jsonResponse(
+          { error: "账号创建请求过于频繁，请勿连续重试，稍后再试。" },
+          { status: 429 },
+        );
+      }
+      if (error?.code === "email_exists" || error?.code === "user_already_exists") {
+        return jsonResponse(
+          { error: "该邮箱已注册，请在账号列表中编辑该用户并设置密码，不要重复新增。" },
+          { status: 409 },
+        );
+      }
+      if (error?.message.includes("Database error saving new user")) {
+        return jsonResponse(
+          { error: "认证服务保存新用户时发生数据库错误。请管理员检查 Supabase 的 Auth／Postgres 日志、用户资料触发器及数据库迁移。" },
+          { status: 500 },
+        );
+      }
       return jsonResponse(
-        { error: "无法发送邀请，请确认邮箱未注册并检查 Supabase 邮件配置。" },
-        { status: 400 },
+        { error: "无法创建账号，请管理员检查 Supabase 认证日志。" },
+        { status: error?.status && error.status >= 500 ? 502 : 400 },
       );
     }
 
-    const { error: profileError } = await admin
+    const { data: savedProfile, error: profileError } = await admin
       .from("profiles")
-      .update({ role: parsed.data.role })
-      .eq("id", data.user.id);
-    if (profileError) throw profileError;
+      .update({ role: parsed.data.role, region_id: parsed.data.regionId })
+      .eq("id", data.user.id)
+      .select("id")
+      .maybeSingle();
+    if (profileError || !savedProfile) {
+      console.error("Account created but profile setup failed.", { code: profileError?.code });
+      return jsonResponse(
+        { error: "认证账号已创建，但用户资料配置失败。请勿重复新增；修复 profiles 权限或触发器后，在账号列表核对地域和角色。", userId: data.user.id },
+        { status: 500 },
+      );
+    }
 
     return jsonResponse({ ok: true, userId: data.user.id }, { status: 201 });
   } catch (error) {
-    console.error("Failed to create user invitation.", error);
-    return jsonResponse({ error: "发送邀请失败，请稍后重试。" }, { status: 500 });
+    console.error("Failed to create account.", { name: error instanceof Error ? error.name : "UnknownError" });
+    return jsonResponse({ error: "创建账号请求未完成，请先核对账号列表再重试。" }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const { response } = await requireAdmin();
+    if (response) return response;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+    }
+    const parsed = passwordSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonResponse({ error: "请提供有效的用户编号及 8 至 128 个字符的新密码。" }, { status: 400 });
+    }
+    const admin = createAdminClient();
+    const { data: target, error: targetError } = await admin
+      .from("profiles").select("role").eq("id", parsed.data.userId).maybeSingle();
+    if (targetError) {
+      console.error("Failed to read password reset target profile.", { code: targetError.code });
+      return jsonResponse(
+        { error: targetError.code === "42501"
+          ? "设置密码未执行：服务端没有 profiles 表的读取权限（42501）。请在 Supabase SQL Editor 应用 20261029000000_account_profile_service_permissions.sql 后重试。"
+          : "设置密码未执行：无法读取目标用户资料，请管理员检查数据库日志。" },
+        { status: 500 },
+      );
+    }
+    if (!target) return jsonResponse({ error: "该账号不存在或已删除。" }, { status: 404 });
+    if (target.role !== "user") {
+      return jsonResponse({ error: "只能设置普通用户的密码，不能修改管理员密码。" }, { status: 403 });
+    }
+    const { error } = await admin.auth.admin.updateUserById(parsed.data.userId, {
+      password: parsed.data.password,
+      email_confirm: true,
+    });
+    if (error) {
+      console.error("Failed to set user password.", { code: error.code, status: error.status });
+      return jsonResponse(
+        { error: error.code === "weak_password"
+          ? "密码不符合认证服务的强度要求，请使用更强的密码。"
+          : "设置密码失败，请检查认证服务日志；如用户已被删除，请刷新账号列表。" },
+        { status: error.status && error.status >= 500 ? 502 : 400 },
+      );
+    }
+    return jsonResponse({ ok: true });
+  } catch (error) {
+    console.error("Failed to set user password.", { name: error instanceof Error ? error.name : "UnknownError" });
+    return jsonResponse({ error: "设置密码失败，请检查账号资料权限及认证服务。" }, { status: 500 });
   }
 }
 
@@ -158,6 +248,7 @@ export async function PATCH(request: Request) {
         full_name: parsed.data.fullName,
         company: parsed.data.company,
         position: parsed.data.position,
+        region_id: parsed.data.regionId,
         role: parsed.data.role,
       })
       .eq("id", parsed.data.userId)
