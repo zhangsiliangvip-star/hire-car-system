@@ -74,8 +74,9 @@ function isMultiDay(order: ConflictCheckOrder) {
 
 /**
  * Non-cancelled orders in the same region sharing an active date with the same
- * vehicle or the same driver. When both orders are single-day with valid
- * times, they only conflict if departures are less than 2 hours apart.
+ * vehicle or the same driver. Orders without a valid dispatch time never
+ * conflict. When both orders are single-day, they only conflict if departures
+ * are less than 2 hours apart.
  */
 export function findOrderConflicts<T extends ConflictCheckOrder>(
   draft: ConflictCheckOrder,
@@ -86,6 +87,7 @@ export function findOrderConflicts<T extends ConflictCheckOrder>(
   const draftDays = getDailyAssignments(draft);
   if (draftDays.size === 0) return [];
   const draftTime = timeToMinutes(draft.time);
+  if (draftTime === null) return [];
   const conflicts: OrderConflict<T>[] = [];
 
   for (const order of orders) {
@@ -97,15 +99,14 @@ export function findOrderConflicts<T extends ConflictCheckOrder>(
       continue;
     }
 
-    if (!isMultiDay(order) && !isMultiDay(draft)) {
-      const existingTime = timeToMinutes(order.time);
-      if (
-        draftTime !== null &&
-        existingTime !== null &&
-        Math.abs(existingTime - draftTime) >= SAME_DAY_CONFLICT_MINUTES
-      ) {
-        continue;
-      }
+    const existingTime = timeToMinutes(order.time);
+    if (existingTime === null) continue;
+    if (
+      !isMultiDay(order) &&
+      !isMultiDay(draft) &&
+      Math.abs(existingTime - draftTime) >= SAME_DAY_CONFLICT_MINUTES
+    ) {
+      continue;
     }
 
     const vehicles = new Set<string>();

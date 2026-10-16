@@ -189,6 +189,11 @@ test("order conflicts cover editing, multi-day ranges, and close departure times
   assert.deepEqual(ids({ date: "2026-10-04", endDate: "2026-10-04", time: "08:00" }), []);
   assert.deepEqual(ids({ date: "2026-09-30", endDate: "2026-10-03", time: "07:00" }), [1, 2]);
   assert.deepEqual(ids({ date: "2026-10-01", endDate: "2026-10-01", time: "10:00", regionId: "r2" }), []);
+  assert.deepEqual(ids({ date: "2026-10-01", endDate: "2026-10-01", time: "" }), []);
+  assert.deepEqual(ids({ date: "2026-09-30", endDate: "2026-10-03", time: "" }), []);
+  const timeless = [...orders, { ...base, id: 5, date: "2026-10-01", endDate: "2026-10-01", time: "" },
+    { ...base, id: 6, date: "2026-10-01", endDate: "2026-10-02", time: "" }];
+  assert.deepEqual([...findOrderConflicts({ ...base, date: "2026-10-01", endDate: "2026-10-01", time: "09:00" }, timeless)].map(({ order }) => order.id), [1]);
 
   const driverOrders = [
     { ...base, id: 10, vehicle: "Car A", driver: "Tanaka", date: "2026-11-01", endDate: "2026-11-01", time: "09:00" },

@@ -153,7 +153,7 @@ npm run dev
 
 Run `npm run lint` and `npm run build` before deployment.
 
-Vehicle schedule conflicts are checked when creating **and** when saving an edited reservation (the order being edited is excluded). A conflict is any non-cancelled order in the same region that shares an active date (rest days excluded) with the same vehicle **or the same driver**. Per-day vehicle/driver assignments from order financial statistics override the order defaults for that day; blank drivers are ignored. For two single-day orders, departures less than 2 hours apart (or a missing time) count as a conflict; multi-day orders conflict on any shared active date. The warning lists each conflicting order with whether the vehicle and/or driver is duplicated, and lets you cancel or save anyway.
+Vehicle schedule conflicts are checked when creating **and** when saving an edited reservation (the order being edited is excluded). A conflict is any non-cancelled order in the same region that shares an active date (rest days excluded) with the same vehicle **or the same driver**. Per-day vehicle/driver assignments from order financial statistics override the order defaults for that day; blank drivers are ignored. Reservations without a 配車時間 (missing or invalid time) never conflict, on either side. For two single-day orders, departures less than 2 hours apart count as a conflict; multi-day orders with a time conflict on any shared active date. The warning lists each conflicting order with whether the vehicle and/or driver is duplicated, and lets you cancel or save anyway.
 
 ## Live data sync
 
