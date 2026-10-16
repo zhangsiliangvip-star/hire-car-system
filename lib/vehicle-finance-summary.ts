@@ -4,6 +4,7 @@ import { compareVehicleNames } from "@/lib/vehicle-order";
 type VehicleDailyTotals = {
   regionId?: string;
   vehicleName: string;
+  vehicleId?: string;
   requestAmount: number;
   driverAdvances: number;
   companyExpenses: number;
@@ -61,16 +62,16 @@ export function summarizeVehicles(
   for (const detail of details) {
     const nameKey = keyFor(detail.regionId, detail.vehicleName);
     const matches = vehiclesByName.get(nameKey) || [];
-    if (matches.length > 1) {
-      throw new Error(`车辆“${detail.vehicleName}”在同一分区存在重名，无法准确归集，请先修正车辆名称。`);
-    }
-    const key = matches[0]?.id || nameKey;
+    const ambiguous = !detail.vehicleId && matches.length > 1;
+    const key = (detail.vehicleId && groups.has(detail.vehicleId) ? detail.vehicleId : "") ||
+      (matches.length === 1 ? matches[0].id : nameKey);
     namesByKey.set(key, detail.vehicleName);
+    const unknownLabel = ambiguous
+      ? `番号未指定（${detail.vehicleName} 有多台，请在予約中选择車両番号）`
+      : "番号未知（车辆资料未找到）";
     const group = groups.get(key) || {
       key, month, regionId: detail.regionId,
-      vehicleNumber: detail.vehicleName.includes("外注")
-        ? "外注 · 番号未知（车辆资料未找到）"
-        : "番号未知（车辆资料未找到）",
+      vehicleNumber: detail.vehicleName.includes("外注") ? `外注 · ${unknownLabel}` : unknownLabel,
       requestAmount: 0, driverAdvances: 0, companyExpenses: 0, driverWages: 0,
       fixedExpenses: 0, profit: 0,
     };

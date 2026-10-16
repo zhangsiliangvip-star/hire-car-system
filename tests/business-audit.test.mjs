@@ -40,7 +40,63 @@ test("vehicle statistics filter displays plates instead of vehicle names", () =>
   assert.ok(filter.includes("全部車両番号"));
   assert.ok(filter.includes('{vehicle.plate || "未登记番号"}'));
   assert.ok(!/>\s*\{vehicle\.name\}\s*<\/option>/.test(filter));
-  assert.ok(filter.includes("value={vehicle.name}"));
+  assert.ok(filter.includes("value={vehicle.id}"));
+});
+
+test("orders link vehicles by plate so vehicle names may repeat, while plates stay unique", () => {
+  const { orderUsesVehicle, resolveOrderVehicle } = load("lib\\vehicle-order.ts");
+  const vehicles = [
+    { id: "a", regionId: "r1", name: "Alphard", plate: "4543" },
+    { id: "b", regionId: "r1", name: "Alphard", plate: "5678" },
+    { id: "c", regionId: "r1", name: "Hiace", plate: "1111" },
+    { id: "d", regionId: "r2", name: "Alphard", plate: "4543" },
+  ];
+  assert.equal(orderUsesVehicle({ regionId: "r1", vehicle: "Alphard", vehiclePlate: "5678" }, vehicles[0]), false);
+  assert.equal(orderUsesVehicle({ regionId: "r1", vehicle: "Alphard", vehiclePlate: "5678" }, vehicles[1]), true);
+  assert.equal(orderUsesVehicle({ regionId: "r2", vehicle: "Alphard", vehiclePlate: "4543" }, vehicles[0]), false);
+  assert.equal(orderUsesVehicle({ regionId: "r1", vehicle: "Hiace", vehiclePlate: "" }, vehicles[2]), true);
+  assert.equal(resolveOrderVehicle(vehicles, { regionId: "r1", vehicle: "Alphard", vehiclePlate: "4543" })?.id, "a");
+  assert.equal(resolveOrderVehicle(vehicles, { regionId: "r1", vehicle: "Alphard", vehiclePlate: "" }), undefined);
+  assert.equal(resolveOrderVehicle(vehicles, { regionId: "r1", vehicle: "Hiace", vehiclePlate: "" })?.id, "c");
+
+  const { findOrderConflicts } = load("lib\\order-conflicts.ts");
+  const base = { regionId: "r1", vehicle: "Alphard", status: "予約確定", offDates: [], date: "2026-12-01", endDate: "2026-12-01", time: "09:00" };
+  const existing = [
+    { ...base, id: 1, vehiclePlate: "4543" },
+    { ...base, id: 2, vehiclePlate: "5678", financeByDate: { "2026-12-01": { vehicle: "Hiace", vehiclePlate: "1111" } } },
+  ];
+  const conflictIds = (draft) => plain(findOrderConflicts({ ...base, ...draft }, existing)).map(({ order }) => order.id);
+  assert.deepEqual(conflictIds({ vehiclePlate: "4543" }), [1]);
+  assert.deepEqual(conflictIds({ vehiclePlate: "9999" }), []);
+  assert.deepEqual(conflictIds({ vehicle: "Hiace", vehiclePlate: "1111" }), [2]);
+  assert.deepEqual(conflictIds({ vehiclePlate: "" }), [1]);
+
+  const { summarizeVehicles } = load("lib\\vehicle-finance-summary.ts", {
+    "@/lib/vehicle-order": load("lib\\vehicle-order.ts"),
+  });
+  const fleet = vehicles.slice(0, 2).map((vehicle) => ({ ...vehicle, defaultParkingFee: 0, defaultInsuranceFee: 0 }));
+  const totals = { requestAmount: 100, driverAdvances: 0, companyExpenses: 0, driverWages: 0 };
+  const rows = plain(summarizeVehicles("2026-12", fleet, [], [
+    { ...totals, regionId: "r1", vehicleName: "Alphard", vehicleId: "b" },
+    { ...totals, regionId: "r1", vehicleName: "Alphard" },
+  ]));
+  assert.equal(rows.find((row) => row.key === "b").requestAmount, 100);
+  assert.equal(rows.find((row) => row.key === "a").requestAmount, 0);
+  assert.ok(rows.some((row) => row.vehicleNumber.includes("番号未指定") && row.requestAmount === 100));
+
+  const migration = fs.readFileSync(path.join(root, "supabase\\migrations\\20261030000000_order_vehicle_plate.sql"), "utf8");
+  assert.ok(migration.includes("add column if not exists vehicle_plate text not null default ''"));
+  const route = fs.readFileSync(path.join(root, "app\\api\\data\\route.ts"), "utf8");
+  assert.ok(route.includes("vehicle_plate: order.vehiclePlate"));
+  assert.ok(route.includes('vehiclePlate: row.vehicle_plate ?? ""'));
+
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.ok(source.includes("orderUsesVehicle(order, vehicleRecord) &&"));
+  assert.ok(source.includes("車両番号不能重复"));
+  assert.ok(source.includes("車両番号不能重复："));
+  assert.ok(!source.includes("车名重复"));
+  assert.ok(!source.includes("同一地域已有车名"));
+  assert.ok(!source.includes("同一地域内車名不能重复"));
 });
 
 test("order conflicts cover editing, multi-day ranges, and close departure times", () => {
@@ -87,19 +143,15 @@ test("order conflicts cover editing, multi-day ranges, and close departure times
   assert.ok(!source.includes("if (editingOrderId === null && !skipConflictCheck)"));
 });
 
-test("calendar rows use each vehicle record's own plate and flag duplicate names", () => {
+test("calendar rows use each vehicle record's own plate shown above the name", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.ok(source.includes("filteredCalendarVehicleRecords.map((vehicleRecord) =>"));
   assert.ok(!source.includes("filteredCalendarVehicles"));
   assert.ok(source.includes("key={vehicleRecord.id}"));
-  assert.ok(source.includes("order.regionId === vehicleRecord.regionId"));
   const label = source.slice(source.indexOf('const plate = vehicleRecord.plate || "未登记番号"'));
   assert.ok(label.indexOf('copyCalendarVehicleField(plate, "車両番号")') < label.indexOf('copyCalendarVehicleField(vehicle, "車名")'));
-  assert.ok(!source.includes("vehicleRecords.find(\n                      (record) => record.name === vehicle"));
-  assert.ok(source.includes("⚠ 车名重复"));
-  assert.ok(source.includes("同一地域已有车名"));
-  assert.ok(source.includes("同一地域内車名不能重复"));
-  assert.ok(source.includes("!oldNameStillUsed"));
+  assert.ok(source.includes("moveOrderToCell(dragData, vehicleTarget, dates[dateIndex].date)"));
+  assert.ok(source.includes("openNewOrder(vehicleRecord, d.date)"));
 });
 
 test("accounting assignees display names without falling back to emails", () => {
@@ -151,8 +203,10 @@ test("finance driver dropdown includes new drivers regardless of current name an
   assert.ok(!source.includes("finance-drivers-"));
 });
 
-test("reservation plate selector links vehicles, retains unavailable selections and rejects ambiguous names", () => {
-  const { OrderVehiclePlateSelect } = load("components\\order-vehicle-plate-select.tsx");
+test("reservation plate selector links vehicles by plate, retains unavailable selections and supports shared names", () => {
+  const { OrderVehiclePlateSelect } = load("components\\order-vehicle-plate-select.tsx", {
+    "@/lib/vehicle-order": load("lib\\vehicle-order.ts"),
+  });
   const vehicles = [
     { id: "a", name: "Alphard 01", plate: "品川 100", status: "运营中" },
     { id: "b", name: "Hiace 01", plate: "品川 200", status: "运营中" },
@@ -160,10 +214,10 @@ test("reservation plate selector links vehicles, retains unavailable selections 
     { id: "d", name: "Tesla 01", plate: "品川 300", status: "停运中" },
   ];
   const changes = [];
-  function render(name, records = vehicles, financeMode = false) {
+  function render(name, records = vehicles, financeMode = false, plate = "") {
     const tree = OrderVehiclePlateSelect({
-      vehicles: records, vehicleName: name, getStatus: (vehicle) => vehicle.status,
-      onSelect: (value) => changes.push(value),
+      vehicles: records, vehicleName: name, vehiclePlate: plate, getStatus: (vehicle) => vehicle.status,
+      onSelect: (value) => changes.push(plain(value)),
       financeMode,
     });
     const nodes = [];
@@ -184,7 +238,7 @@ test("reservation plate selector links vehicles, retains unavailable selections 
   assert.equal(renderToStaticMarkup(view.options.find((option) => option.props.value === "a")),
     '<option value="a">品川 100</option>');
   view.select.props.onChange({ target: { value: "b" } });
-  assert.deepEqual(changes, ["Hiace 01"]);
+  assert.deepEqual(changes, [{ name: "Hiace 01", plate: "品川 200" }]);
   assert.equal(render("Hiace 01").select.props.value, "b");
   assert.equal(render("外注其他").select.props.value, "");
   assert.ok(render("外注其他").html.includes("当前车辆未登记番号"));
@@ -195,25 +249,27 @@ test("reservation plate selector links vehicles, retains unavailable selections 
   view.select.props.onChange({ target: { value: "d" } });
   view.select.props.onChange({ target: { value: "invalid" } });
   assert.equal(changes.length, 1);
-  view = render("Alphard 01", [...vehicles, { ...vehicles[0], id: "duplicate", plate: "品川 400" }]);
+  const shared = [...vehicles, { ...vehicles[0], id: "duplicate", plate: "品川 400" }];
+  view = render("Alphard 01", shared);
   assert.equal(view.select.props.value, "");
-  assert.ok(view.html.includes("车名重复"));
+  assert.ok(view.html.includes("请选择具体的車両番号"));
+  assert.equal(render("Alphard 01", shared, false, "品川 400").select.props.value, "duplicate");
   view.select.props.onChange({ target: { value: "duplicate" } });
-  assert.equal(changes.length, 1);
+  assert.deepEqual(changes.at(-1), { name: "Alphard 01", plate: "品川 400" });
   assert.equal(render("", []).options.length, 1);
   view = render("Tesla 01", vehicles, true);
   assert.ok(view.html.includes("当日車両番号"));
   assert.ok(!view.html.includes("Tesla 01"));
   assert.equal(view.options.find((option) => option.props.value === "d").props.disabled, false);
   view.select.props.onChange({ target: { value: "d" } });
-  assert.equal(changes.at(-1), "Tesla 01");
+  assert.deepEqual(changes.at(-1), { name: "Tesla 01", plate: "品川 300" });
   view.select.props.onChange({ target: { value: "" } });
-  assert.equal(changes.at(-1), "");
+  assert.deepEqual(changes.at(-1), { name: "", plate: "" });
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.ok(source.includes('editingOrderId === null ? getRegionForNewRecords() : form.regionId'));
   assert.ok(source.includes("vehicle.regionId === orderFormRegionId"));
   assert.ok(source.indexOf("<OrderVehiclePlateSelect") > source.indexOf("value={form.vehicle}"));
-  assert.ok(source.includes("onSelect={(vehicle) => setForm((current) => ({ ...current, vehicle }))}"));
+  assert.ok(source.includes("vehicle: vehicle.name, vehiclePlate: vehicle.plate"));
   assert.ok(source.includes("{getOrderVehicleNumber(accountingPreviewOrder)}"));
   assert.ok(source.includes("vehicle.regionId === accountingPreviewOrder.regionId"));
   assert.ok(!source.includes("finance-vehicles-"));

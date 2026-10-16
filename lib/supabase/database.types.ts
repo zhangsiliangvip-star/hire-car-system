@@ -33,6 +33,7 @@ export type Database = {
         id: string;
         region_id: string;
         vehicle: string;
+        vehicle_plate: string;
         date: string;
         end_date: string;
         off_dates: string[];

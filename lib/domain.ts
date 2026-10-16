@@ -26,6 +26,7 @@ export type CalendarVehicleFilter = "all" | "alphard" | "hiace" | "tesla" | "ext
 export type OrderFinance = {
   driver: string;
   vehicle: string;
+  vehiclePlate: string;
   etcCompanyReport: number;
   etcTripReport: number;
   fuelCost: number;
@@ -49,6 +50,7 @@ export type Order = AuditedRecord & {
   id: string;
   regionId?: string;
   vehicle: string;
+  vehiclePlate: string;
   date: string;
   endDate: string;
   offDates: string[];

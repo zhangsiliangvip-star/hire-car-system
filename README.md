@@ -159,6 +159,10 @@ Vehicle schedule conflicts are checked when creating **and** when saving an edit
 
 After login, the dashboard re-reads business data from the server every 10 seconds while the tab is visible, and immediately when the window regains focus, so changes made by other users appear without a manual refresh. A background sync never overwrites local edits: it is skipped while any of your own saves are pending, and results from a fetch that started before a local edit are discarded. Failed sync attempts are retried silently on the next interval. Open forms keep their in-progress values; when two users edit the same record, the last save wins.
 
-## Calendar vehicle rows and unique vehicle names
+## Calendar vehicle rows and vehicle identity
 
-The calendar shows one row per registered vehicle. Each row header displays that vehicle's own **車両番号** in large text with the vehicle name in small text below (missing plates show **未登记番号**), and only lists orders from the vehicle's region. Because orders reference vehicles by name, vehicle names must be unique within a region: adding, batch-adding or renaming a vehicle to an existing name in the same region is rejected. Existing duplicate names are flagged in the calendar with **⚠ 车名重复**; rename them (for example `阿尔法 4543`). When renaming one of several same-named vehicles, existing orders stay on the old name because they cannot be attributed automatically; reassign them through the reservation's **車両番号** selector.
+The calendar shows one row per registered vehicle. Each row header displays that vehicle's own **車両番号** in large text with the vehicle name in small text below (missing plates show **未登记番号**).
+
+Reservations reference their vehicle by **車両番号** (`orders.vehicle_plate`, plus `vehiclePlate` in per-day finance entries), so several vehicles may share the same name. Vehicle names may repeat freely; **車両番号 must be unique within a region** and adding, batch-adding or editing a vehicle to an existing plate is rejected with a warning. When a name is shared by several vehicles, the reservation form asks for the specific 車両番号 before saving. Conflict checks compare plates when both reservations have one. Renaming a vehicle or changing its plate updates the reservations linked to it.
+
+Migration `20261030000000_order_vehicle_plate.sql` adds the column and backfills plates for reservations whose car name matched exactly one vehicle in its region. Older reservations on a shared name keep an empty plate; they appear in every row with that name until you open them and pick the 車両番号.

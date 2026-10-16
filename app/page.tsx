@@ -52,7 +52,13 @@ import { CompanySealUpload } from "@/components/company-seal-upload";
 import { isCompanySealDataUrl } from "@/lib/company-seal";
 import { printBalance } from "@/lib/balance-print";
 import { getBalanceServiceMonth, summarizeBalance } from "@/lib/balance-summary";
-import { compareVehicles, getVehicleModelOrder, isOutsourcedVehicle } from "@/lib/vehicle-order";
+import {
+  compareVehicles,
+  getVehicleModelOrder,
+  isOutsourcedVehicle,
+  orderUsesVehicle,
+  resolveOrderVehicle,
+} from "@/lib/vehicle-order";
 import { LastOperation } from "@/components/last-operation";
 import { AuditHistory } from "@/components/audit-history";
 import { DEFAULT_VEHICLE_NAME_OPTIONS as vehicleNameOptions, MANUAL_VEHICLE_NAME, VehicleNameSelect } from "@/components/vehicle-name-select";
@@ -426,6 +432,7 @@ const orderFinanceSections: {
 const emptyOrderFinance: OrderFinance = {
   driver: "",
   vehicle: "",
+  vehiclePlate: "",
   etcCompanyReport: 0,
   etcTripReport: 0,
   fuelCost: 0,
@@ -446,9 +453,11 @@ const emptyOrderFinance: OrderFinance = {
 function createEmptyDraft(
   vehicle: string = DEFAULT_VEHICLE_NAME,
   date: string = "2026-09-29",
+  vehiclePlate = "",
 ): OrderDraft {
   return {
     vehicle,
+    vehiclePlate,
     date,
     endDate: date,
     offDates: [],
@@ -491,7 +500,7 @@ function formatYen(amount: number) {
 
 function getOrderFinanceAmount(
   order: Partial<OrderFinance>,
-  field: Exclude<keyof OrderFinance, "driver" | "vehicle">,
+  field: Exclude<keyof OrderFinance, "driver" | "vehicle" | "vehiclePlate">,
 ) {
   const amount = order[field];
   return typeof amount === "number" && Number.isFinite(amount) && amount >= 0
@@ -512,6 +521,7 @@ function normalizeOrderFinance(order: Partial<OrderFinance>): OrderFinance {
   return {
     driver: typeof order.driver === "string" ? order.driver : "",
     vehicle: typeof order.vehicle === "string" ? order.vehicle : "",
+    vehiclePlate: typeof order.vehiclePlate === "string" ? order.vehiclePlate : "",
     etcCompanyReport: getOrderFinanceAmount(order, "etcCompanyReport"),
     etcTripReport: getOrderFinanceAmount(order, "etcTripReport"),
     fuelCost: getOrderFinanceAmount(order, "fuelCost"),
@@ -531,6 +541,15 @@ function normalizeOrderFinance(order: Partial<OrderFinance>): OrderFinance {
     driverWage: getOrderFinanceAmount(order, "driverWage"),
     driverBonusWage: getOrderFinanceAmount(order, "driverBonusWage"),
   };
+}
+
+/** The order as seen on one service day, honouring a per-day vehicle override. */
+type CalendarVehicleTarget = { name: string; plate: string };
+
+function getFinanceDayOrder(order: Order, finance: Partial<OrderFinance>): Order {
+  return finance.vehicle
+    ? { ...order, vehicle: finance.vehicle, vehiclePlate: finance.vehiclePlate || "" }
+    : order;
 }
 
 function calculateOrderFinance(
@@ -1262,12 +1281,6 @@ export default function Home() {
       status: "运营中" as const,
     })),
   ].sort(compareVehicles);
-  const vehicles = vehicleRecords.map((vehicle) => vehicle.name);
-  const calendarVehicleNameCounts = new Map<string, number>();
-  for (const vehicle of vehicleRecords) {
-    const key = `${vehicle.regionId}::${vehicle.name}`;
-    calendarVehicleNameCounts.set(key, (calendarVehicleNameCounts.get(key) ?? 0) + 1);
-  }
   const filteredCalendarVehicleRecords = vehicleRecords.filter(({ name: vehicle }) => {
     const modelOrder = getVehicleModelOrder(vehicle);
     const isOutsourced = isOutsourcedVehicle(vehicle);
@@ -1277,11 +1290,8 @@ export default function Home() {
     if (calendarVehicleFilter === "tesla") return !isOutsourced && modelOrder === 2;
     return isOutsourced;
   });
-  const vehicleStatusByName = new Map(
-    vehicleRecords.map((vehicle) => [vehicle.name, getVehicleDisplayStatus(vehicle)]),
-  );
-  const availableVehicles = vehicles.filter(
-    (vehicle) => vehicleStatusByName.get(vehicle) === "运营中",
+  const availableVehicleRecords = vehicleRecords.filter(
+    (vehicle) => getVehicleDisplayStatus(vehicle) === "运营中",
   );
   const orderFormRegionId = editingOrderId === null ? getRegionForNewRecords() : form.regionId;
   const orderFormVehicles = allVehicleRecords
@@ -1294,7 +1304,7 @@ export default function Home() {
     .filter((vehicle) => getVehicleDisplayStatus(vehicle) === "运营中")
     .map((vehicle) => vehicle.name);
   const selectedOrderVehicle = selectedOrderDetails
-    ? vehicleRecords.find((vehicle) => vehicle.name === selectedOrderDetails.vehicle)
+    ? resolveOrderVehicle(vehicleRecords, selectedOrderDetails)
     : undefined;
   const selectedOrderVehicleCompany = selectedOrderVehicle
     ? companyRecords.find((company) => company.name === selectedOrderVehicle.ownerCompany)
@@ -1420,9 +1430,7 @@ export default function Home() {
       ? 0
       : (filteredFinanceTotals.profit / filteredFinanceTotals.requestAmount) * 100;
   function getOrderVehicleNumber(order: Order) {
-    return vehicleRecords.find(
-      (vehicle) => vehicle.regionId === order.regionId && vehicle.name === order.vehicle,
-    )?.plate || "-";
+    return resolveOrderVehicle(vehicleRecords, order)?.plate || order.vehiclePlate || "-";
   }
   async function exportOrderFinance() {
     if (sortedFinanceOrders.length === 0) {
@@ -1498,7 +1506,7 @@ export default function Home() {
             })(),
             customer: order.customer || "未填写",
             vehicleNumber:
-              getOrderVehicleNumber({ ...order, vehicle: finance.vehicle || order.vehicle }),
+              getOrderVehicleNumber(getFinanceDayOrder(order, finance)),
             time: order.time,
             driver: finance.driver,
             requestAmount: totals.requestAmount,
@@ -1557,15 +1565,15 @@ export default function Home() {
   const filteredVehicleFinanceDetails = monthlyFinanceOrders
     .flatMap((order) =>
       Object.entries(order.financeByDate || {})
-        .filter(([, finance]) => {
-          const vehicleName = finance.vehicle || order.vehicle;
-          return (
-            vehicleName &&
-            (vehicleFinanceVehicleFilter === "" ||
-              vehicleName === vehicleFinanceVehicleFilter)
-          );
-        })
         .map(([serviceDate, finance]) => {
+          const dayOrder = getFinanceDayOrder(order, finance);
+          return { serviceDate, finance, dayOrder, dayVehicle: resolveOrderVehicle(vehicleRecords, dayOrder) };
+        })
+        .filter(({ dayOrder, dayVehicle }) =>
+          Boolean(dayOrder.vehicle) &&
+          (vehicleFinanceVehicleFilter === "" || dayVehicle?.id === vehicleFinanceVehicleFilter),
+        )
+        .map(({ serviceDate, finance, dayOrder, dayVehicle }) => {
           const totals = calculateOrderFinance(
             finance,
             serviceDate === order.date ? order.orderPrice : 0,
@@ -1575,9 +1583,10 @@ export default function Home() {
             serviceDate,
             customer: order.customer || "未填写",
             driver: finance.driver || "未安排",
-            vehicleName: finance.vehicle || order.vehicle,
+            vehicleName: dayOrder.vehicle,
+            vehicleId: dayVehicle?.id,
             regionId: order.regionId,
-            vehicleNumber: getOrderVehicleNumber({ ...order, vehicle: finance.vehicle || order.vehicle }),
+            vehicleNumber: getOrderVehicleNumber(dayOrder),
             time: order.time,
             ...totals,
           };
@@ -1601,7 +1610,7 @@ export default function Home() {
   })();
   const vehicleSummaryTotals = totalVehicleSummaries(vehicleSummaryResult.rows);
   const selectedVehicleForFinance = vehicleRecords.find(
-    (vehicle) => vehicle.name === vehicleFinanceVehicleFilter,
+    (vehicle) => vehicle.id === vehicleFinanceVehicleFilter,
   );
   const selectedVehicleMonthlyFinance = selectedVehicleForFinance
     ? vehicleMonthlyFinanceRecords.find(
@@ -1611,8 +1620,8 @@ export default function Home() {
       )
     : undefined;
 
-  function getVehicleMonthlyFinanceForm(vehicleName: string, month: string) {
-    const vehicle = vehicleRecords.find((item) => item.name === vehicleName);
+  function getVehicleMonthlyFinanceForm(vehicleId: string, month: string) {
+    const vehicle = vehicleRecords.find((item) => item.id === vehicleId);
     if (!vehicle) {
       return {
         parkingFee: "",
@@ -1820,12 +1829,8 @@ export default function Home() {
       alert("当前月份及分区暂无车辆财务记录。");
       return;
     }
-    if (vehicleFinanceVehicleFilter && (
-      !selectedVehicleForFinance || vehicleRecords.filter(
-        (vehicle) => vehicle.name === vehicleFinanceVehicleFilter,
-      ).length !== 1
-    )) {
-      alert("无法唯一识别车辆，请先选择具体分区后重新选择车辆。");
+    if (vehicleFinanceVehicleFilter && !selectedVehicleForFinance) {
+      alert("无法识别所选车辆，请重新选择車両番号。");
       return;
     }
     try {
@@ -2179,7 +2184,7 @@ export default function Home() {
     }
   }
 
-  function moveOrderToCell(orderId: string, vehicle: string, targetDate: string) {
+  function moveOrderToCell(orderId: string, target: CalendarVehicleTarget, targetDate: string) {
     setOrders((currentOrders) =>
       currentOrders.map((order) => {
         if (order.id !== orderId) return order;
@@ -2198,7 +2203,8 @@ export default function Home() {
 
         return {
           ...order,
-          vehicle,
+          vehicle: target.name,
+          vehiclePlate: target.plate,
           date: targetDate,
           endDate: shiftDateKey(targetDate, duration),
           offDates: (order.offDates || []).map((offDate) =>
@@ -2214,13 +2220,16 @@ export default function Home() {
 
   function moveSplitRangeToVehicle(
     orderId: string,
-    vehicle: string,
+    target: CalendarVehicleTarget,
     startDate: string,
     endDate: string,
   ) {
     setOrders((currentOrders) => {
       return currentOrders.flatMap((order) => {
-        if (order.id !== orderId || order.vehicle === vehicle) return [order];
+        if (
+          order.id !== orderId ||
+          orderUsesVehicle(order, { ...target, regionId: order.regionId })
+        ) return [order];
 
         const orderEndDate = order.endDate || order.date;
         const movedOffDates = order.offDates.filter(
@@ -2228,7 +2237,7 @@ export default function Home() {
         );
 
         if (startDate <= order.date && endDate >= orderEndDate) {
-          return [{ ...order, vehicle, offDates: movedOffDates }];
+          return [{ ...order, vehicle: target.name, vehiclePlate: target.plate, offDates: movedOffDates }];
         }
 
         const hasBefore = order.date < startDate;
@@ -2268,7 +2277,8 @@ export default function Home() {
         remainingOrders.push({
           ...order,
           id: createId(),
-          vehicle,
+          vehicle: target.name,
+          vehiclePlate: target.plate,
           date: startDate,
           endDate,
           orderPrice: hasBefore ? 0 : order.orderPrice,
@@ -2315,19 +2325,19 @@ export default function Home() {
     return true;
   }
 
-  function openNewOrder(vehicle: string, date: string) {
+  function openNewOrder(vehicle: Vehicle | undefined, date: string) {
     if (!requireSpecificRegionForNewData()) return;
-    if (!vehicle || vehicleStatusByName.get(vehicle) !== "运营中") {
+    if (!vehicle || getVehicleDisplayStatus(vehicle) !== "运营中") {
       alert(
         vehicle
-          ? `车辆「${vehicle}」当前不可用，不能新增予約。`
+          ? `车辆「${vehicle.plate || vehicle.name}」当前不可用，不能新增予約。`
           : "没有可用车辆，不能新增予約。",
       );
       return;
     }
 
     setEditingOrderId(null);
-    setForm(createEmptyDraft(vehicle, date));
+    setForm(createEmptyDraft(vehicle.name, date, vehicle.plate));
     setOffDateInput("");
     setCustomDriverMode(false);
     setCustomSourceMode(false);
@@ -2337,7 +2347,7 @@ export default function Home() {
 
   function openBatchOrderImport() {
     if (!requireSpecificRegionForNewData()) return;
-    const vehicle = availableVehicles[0];
+    const vehicle = availableVehicleRecords[0];
     if (!vehicle) {
       alert("没有可用车辆，不能批量新增预约。");
       return;
@@ -2345,7 +2355,7 @@ export default function Home() {
 
     setBatchOrderInput("");
     setBatchOrderDate(toDateKey(calendarCenterDate));
-    setBatchOrderVehicle(vehicle);
+    setBatchOrderVehicle(vehicle.id);
     setBatchOrderSource("");
     setBatchOrderCompany("");
     setShowBatchOrderForm(true);
@@ -2362,7 +2372,8 @@ export default function Home() {
       alert("一次最多导入 500 条预约，请分批导入。");
       return;
     }
-    if (!batchOrderDate || vehicleStatusByName.get(batchOrderVehicle) !== "运营中") {
+    const batchVehicle = availableVehicleRecords.find((vehicle) => vehicle.id === batchOrderVehicle);
+    if (!batchOrderDate || !batchVehicle) {
       alert("请选择有效的日期和运营中的车辆。");
       return;
     }
@@ -2370,7 +2381,7 @@ export default function Home() {
     setOrders((currentOrders) => [
       ...currentOrders,
       ...details.map((detail) => ({
-        ...createEmptyDraft(batchOrderVehicle, batchOrderDate),
+        ...createEmptyDraft(batchVehicle.name, batchOrderDate, batchVehicle.plate),
         id: createId(),
         customer: `${detail.pickup} → ${detail.destination}`,
         time: detail.time,
@@ -2881,28 +2892,20 @@ export default function Home() {
     }
 
     if (
-      vehicleRecords.some(
+      allVehicleRecords.some(
         (vehicle) =>
           vehicle.regionId === vehicleRegionId &&
           savedVehicle.plate && vehicle.plate === savedVehicle.plate &&
           vehicle.id !== editingVehicleId,
       )
     ) {
-      alert("車両番号已存在。");
-      return;
-    }
-
-    if (
-      allVehicleRecords.some(
+      const duplicate = allVehicleRecords.find(
         (vehicle) =>
           vehicle.regionId === vehicleRegionId &&
-          vehicle.name === savedVehicle.name &&
+          vehicle.plate === savedVehicle.plate &&
           vehicle.id !== editingVehicleId,
-      )
-    ) {
-      alert(
-        `同一地域已有车名「${savedVehicle.name}」的车辆。订单按车名关联车辆，请使用不同的车名（例如加上番号：${savedVehicle.name} ${savedVehicle.plate || "番号"}）。`,
       );
+      alert(`車両番号「${savedVehicle.plate}」已存在（车名：${duplicate?.name || "-"}），車両番号不能重复。`);
       return;
     }
 
@@ -2921,24 +2924,44 @@ export default function Home() {
       );
     }
 
-    const oldNameStillUsed = Boolean(editingVehicleName) && allVehicleRecords.some(
-      (vehicle) =>
-        vehicle.regionId === vehicleRegionId &&
-        vehicle.name === editingVehicleName &&
-        vehicle.id !== editingVehicleId,
-    );
-    if (editingVehicleName && editingVehicleName !== savedVehicle.name && !oldNameStillUsed) {
-      setOrders((current) =>
-        current.map((order) =>
-          order.regionId === vehicleRegionId && order.vehicle === editingVehicleName
-            ? { ...order, vehicle: savedVehicle.name }
-            : order,
-        ),
+    const previousVehicle = existingVehicle ??
+      (editingVehicleName ? { id: "", name: editingVehicleName, plate: "" } : undefined);
+    if (
+      previousVehicle &&
+      (previousVehicle.name !== savedVehicle.name || previousVehicle.plate !== savedVehicle.plate)
+    ) {
+      // Legacy references without a plate can only be moved when the old name was unambiguous.
+      const previousNameShared = allVehicleRecords.some(
+        (vehicle) =>
+          vehicle.regionId === vehicleRegionId &&
+          vehicle.name === previousVehicle.name &&
+          vehicle.id !== previousVehicle.id,
       );
-    }
-    if (editingVehicleName && editingVehicleName !== savedVehicle.name && oldNameStillUsed) {
-      alert(
-        `仍有其他车辆使用车名「${editingVehicleName}」，原有予約无法判断属于哪台车，已保留在原车名下。请在予約编辑中通过車両番号把属于本车的予約改到「${savedVehicle.name}」。`,
+      const belongsToVehicle = (name: string, plate: string) =>
+        plate
+          ? Boolean(previousVehicle.plate) && plate === previousVehicle.plate
+          : !previousNameShared && name === previousVehicle.name;
+      setOrders((current) =>
+        current.map((order) => {
+          if (order.regionId !== vehicleRegionId) return order;
+          let changed = false;
+          const financeByDate = Object.fromEntries(
+            Object.entries(order.financeByDate || {}).map(([date, finance]) => {
+              if (!finance.vehicle || !belongsToVehicle(finance.vehicle, finance.vehiclePlate || "")) {
+                return [date, finance];
+              }
+              changed = true;
+              return [date, { ...finance, vehicle: savedVehicle.name, vehiclePlate: savedVehicle.plate }];
+            }),
+          );
+          const ownsOrder = belongsToVehicle(order.vehicle, order.vehiclePlate || "");
+          if (!ownsOrder && !changed) return order;
+          return {
+            ...order,
+            ...(ownsOrder ? { vehicle: savedVehicle.name, vehiclePlate: savedVehicle.plate } : {}),
+            financeByDate,
+          };
+        }),
       );
     }
 
@@ -2946,23 +2969,24 @@ export default function Home() {
   }
 
   function deleteVehicle(vehicle: Vehicle) {
-    const linkedOrders = orders.filter(
-      (order) => order.regionId === vehicle.regionId &&
-        order.vehicle === vehicle.name && isUpcomingOrder(order),
-    ).length;
+    const isLinked = (order: Order) =>
+      isUpcomingOrder(order) &&
+      orderUsesVehicle(order, vehicle) &&
+      (Boolean(order.vehiclePlate) || allVehicleRecords.filter(
+        (record) => record.regionId === vehicle.regionId && record.name === vehicle.name,
+      ).length === 1);
+    const linkedOrders = orders.filter(isLinked).length;
     const linkedNotice = linkedOrders
       ? `将清空 ${linkedOrders} 笔未开始予約的車両字段；已开始或过去的予約保留原信息。`
       : "";
-    requestDelete(`确定删除車両「${vehicle.name}」吗？${linkedNotice}`, () => {
+    requestDelete(`确定删除車両「${vehicle.plate || vehicle.name}」吗？${linkedNotice}`, () => {
       setVehicleRecords((current) =>
         current.filter((record) => record.id !== vehicle.id),
       );
       setOrders((current) =>
         current.map((order) =>
-          order.regionId === vehicle.regionId &&
-          order.vehicle === vehicle.name &&
-          isUpcomingOrder(order)
-            ? { ...order, vehicle: "" }
+          isLinked(order)
+            ? { ...order, vehicle: "", vehiclePlate: "" }
             : order,
         ),
       );
@@ -3050,19 +3074,13 @@ export default function Home() {
         alert("車両所属必须填写所属会社列表中的名称，请检查批量内容。");
         return;
       }
-      if (
-        new Set(plates).size !== plates.length ||
-        plates.some((plate) => vehicleRecords.some((vehicle) => vehicle.plate === plate))
-      ) {
-        alert("車両番号不能重复，请检查批量内容。");
-        return;
-      }
-      const names = records.map((record) => record.name);
-      if (
-        new Set(names).size !== names.length ||
-        names.some((name) => vehicleRecords.some((vehicle) => vehicle.name === name))
-      ) {
-        alert("同一地域内車名不能重复（订单按车名关联车辆），请为同型号车辆加上区分，例如「阿尔法 4543」。");
+      const batchRegionId = getRegionForNewRecords();
+      const duplicatePlates = plates.filter((plate, index) =>
+        plates.indexOf(plate) !== index ||
+        allVehicleRecords.some((vehicle) => vehicle.regionId === batchRegionId && vehicle.plate === plate),
+      );
+      if (duplicatePlates.length > 0) {
+        alert(`車両番号不能重复：${[...new Set(duplicatePlates)].join("、")}`);
         return;
       }
       setVehicleRecords((current) => [
@@ -3150,6 +3168,7 @@ export default function Home() {
     setForm({
       regionId: order.regionId,
       vehicle: order.vehicle,
+      vehiclePlate: order.vehiclePlate || "",
       date: order.date,
       endDate: order.endDate || order.date,
       offDates: order.offDates || [],
@@ -3215,6 +3234,7 @@ export default function Home() {
               ...emptyOrderFinance,
               driver: order.driver,
               vehicle: order.vehicle,
+              vehiclePlate: order.vehiclePlate || "",
             },
           ),
         ]),
@@ -3246,7 +3266,8 @@ export default function Home() {
         key !== "driverWageMode" &&
         key !== "driverWagePercentage" &&
         key !== "driver" &&
-        key !== "vehicle",
+        key !== "vehicle" &&
+        key !== "vehiclePlate",
       )
         .every((key) => {
           const amount = finance[key];
@@ -3328,9 +3349,17 @@ export default function Home() {
       requireSpecificRegionForNewData();
       return;
     }
+    const formVehicle = resolveOrderVehicle(orderFormVehicles, { ...form, regionId: targetRegionId ?? undefined });
+    if (
+      !formVehicle &&
+      orderFormVehicles.filter((vehicle) => vehicle.name === form.vehicle).length > 1
+    ) {
+      alert(`车名「${form.vehicle}」有多台车辆，请选择具体的車両番号。`);
+      return;
+    }
     if (
       editingOrderId === null &&
-      vehicleStatusByName.get(form.vehicle) !== "运营中"
+      (!formVehicle || getVehicleDisplayStatus(formVehicle) !== "运营中")
     ) {
       alert(`车辆「${form.vehicle}」当前不可用，不能新增予約。`);
       return;
@@ -3355,6 +3384,7 @@ export default function Home() {
       : 0;
     const savedForm: OrderDraft = {
       ...form,
+      vehiclePlate: formVehicle ? formVehicle.plate : form.vehiclePlate,
       financeByDate: dateOffset
         ? shiftFinanceDates(form.financeByDate, dateOffset)
         : form.financeByDate,
@@ -3539,14 +3569,14 @@ export default function Home() {
           <button
             type="button"
             onClick={openBatchOrderImport}
-            disabled={activeRegionId === ALL_REGIONS_ID || availableVehicles.length === 0}
+            disabled={activeRegionId === ALL_REGIONS_ID || availableVehicleRecords.length === 0}
             className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-bold text-blue-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             批量导入
           </button>
           <button
-            onClick={() => openNewOrder(availableVehicles[0] ?? "", toDateKey(calendarCenterDate))}
-            disabled={activeRegionId === ALL_REGIONS_ID || availableVehicles.length === 0}
+            onClick={() => openNewOrder(availableVehicleRecords[0], toDateKey(calendarCenterDate))}
+            disabled={activeRegionId === ALL_REGIONS_ID || availableVehicleRecords.length === 0}
             className="rounded-lg bg-blue-600 px-5 py-2 font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             ＋ 新建订单
@@ -4193,10 +4223,10 @@ export default function Home() {
                   <select
                     value={vehicleFinanceVehicleFilter}
                     onChange={(event) => {
-                      const vehicleName = event.target.value;
-                      setVehicleFinanceVehicleFilter(vehicleName);
+                      const vehicleId = event.target.value;
+                      setVehicleFinanceVehicleFilter(vehicleId);
                       setVehicleMonthlyFinanceForm(
-                        getVehicleMonthlyFinanceForm(vehicleName, financeMonth),
+                        getVehicleMonthlyFinanceForm(vehicleId, financeMonth),
                       );
                       setVehicleMonthlyFinanceError("");
                     }}
@@ -4204,7 +4234,7 @@ export default function Home() {
                   >
                     <option value="">全部車両番号</option>
                     {vehicleRecords.map((vehicle) => (
-                      <option key={vehicle.id} value={vehicle.name}>
+                      <option key={vehicle.id} value={vehicle.id}>
                         {vehicle.plate || "未登记番号"}
                       </option>
                     ))}
@@ -4965,15 +4995,13 @@ export default function Home() {
 
           {filteredCalendarVehicleRecords.map((vehicleRecord) => {
             const vehicle = vehicleRecord.name;
-            const hasDuplicateName = (calendarVehicleNameCounts.get(
-              `${vehicleRecord.regionId}::${vehicle}`,
-            ) ?? 0) > 1;
+            const vehicleTarget = { name: vehicleRecord.name, plate: vehicleRecord.plate };
+            const isVehicleAvailable = getVehicleDisplayStatus(vehicleRecord) === "运营中";
             const isOutsourced = isOutsourcedVehicle(vehicle);
             const visibleOrders = orders
               .filter(
                 (order) =>
-                  order.vehicle === vehicle &&
-                  order.regionId === vehicleRecord.regionId &&
+                  orderUsesVehicle(order, vehicleRecord) &&
                   order.date <= dates[dates.length - 1].date &&
                   (order.endDate || order.date) >= dates[0].date,
               )
@@ -5038,7 +5066,7 @@ export default function Home() {
                       Math.floor((event.clientX - bounds.left - 135) / dayWidth),
                     ),
                   );
-                  setDragTargetKey(`${vehicle}::${dates[dateIndex].date}`);
+                  setDragTargetKey(`${vehicleRecord.id}::${dates[dateIndex].date}`);
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
@@ -5068,7 +5096,7 @@ export default function Home() {
                       ) {
                         moveSplitRangeToVehicle(
                           splitData.orderId,
-                          vehicle,
+                          vehicleTarget,
                           splitData.startDate,
                           splitData.endDate,
                         );
@@ -5080,7 +5108,7 @@ export default function Home() {
                   }
 
                   if (dragData) {
-                    moveOrderToCell(dragData, vehicle, dates[dateIndex].date);
+                    moveOrderToCell(dragData, vehicleTarget, dates[dateIndex].date);
                   }
                 }}
                 style={{
@@ -5112,14 +5140,6 @@ export default function Home() {
                         >
                           {vehicle}
                         </button>
-                        {hasDuplicateName && (
-                          <span
-                            className="mt-1 text-[11px] font-bold text-rose-600"
-                            title="同一地域内有同名车辆，订单无法区分。请在车辆管理中把车名改为唯一（例如加上番号）。"
-                          >
-                            ⚠ 车名重复
-                          </span>
-                        )}
                         <button
                           type="button"
                           onClick={() => copyCalendarVehicleField(notes, "備考")}
@@ -5168,9 +5188,9 @@ export default function Home() {
                         }
                         return;
                       }
-                      openNewOrder(vehicle, d.date);
+                      openNewOrder(vehicleRecord, d.date);
                     }}
-                    className={`min-h-[96px] border-b border-r p-2 transition-colors ${vehicleStatusByName.get(vehicle) === "运营中" ? "cursor-pointer" : "cursor-not-allowed bg-gray-50"} ${dragTargetKey === `${vehicle}::${d.date}` ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : ""}`}
+                    className={`min-h-[96px] border-b border-r p-2 transition-colors ${isVehicleAvailable ? "cursor-pointer" : "cursor-not-allowed bg-gray-50"} ${dragTargetKey === `${vehicleRecord.id}::${d.date}` ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : ""}`}
                   />
                 ))}
 
@@ -5926,9 +5946,9 @@ export default function Home() {
                   onChange={(event) => setBatchOrderVehicle(event.target.value)}
                   className="mt-1 w-full rounded border px-3 py-2"
                 >
-                  {availableVehicles.map((vehicle) => (
-                    <option key={vehicle} value={vehicle}>
-                      {vehicle}
+                  {availableVehicleRecords.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.plate ? `${vehicle.plate}（${vehicle.name}）` : vehicle.name}
                     </option>
                   ))}
                 </select>
@@ -6115,9 +6135,14 @@ export default function Home() {
                 <select
                   className="mt-1 w-full rounded border p-2"
                   value={form.vehicle}
-                  onChange={(e) =>
-                    setForm({ ...form, vehicle: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const sameName = orderFormVehicles.filter((vehicle) => vehicle.name === e.target.value);
+                    setForm({
+                      ...form,
+                      vehicle: e.target.value,
+                      vehiclePlate: sameName.length === 1 ? sameName[0].plate : "",
+                    });
+                  }}
                 >
                   {[...new Set([
                     ...orderFormAvailableVehicles,
@@ -6141,8 +6166,11 @@ export default function Home() {
               <OrderVehiclePlateSelect
                 vehicles={orderFormVehicles}
                 vehicleName={form.vehicle}
+                vehiclePlate={form.vehiclePlate}
                 getStatus={getVehicleDisplayStatus}
-                onSelect={(vehicle) => setForm((current) => ({ ...current, vehicle }))}
+                onSelect={(vehicle) =>
+                  setForm((current) => ({ ...current, vehicle: vehicle.name, vehiclePlate: vehicle.plate }))
+                }
               />
 
               {/* 運転士 */}
@@ -7197,7 +7225,7 @@ export default function Home() {
                         return {
                           date,
                           driver: finance.driver,
-                          vehicleNumber: getOrderVehicleNumber({ ...accountingPreviewOrder, vehicle: finance.vehicle }),
+                          vehicleNumber: getOrderVehicleNumber({ ...accountingPreviewOrder, vehicle: finance.vehicle, vehiclePlate: finance.vehiclePlate }),
                           offDate: accountingPreviewOrder.offDates.includes(date),
                           etcCompany: getOrderFinanceAmount(finance, "etcCompanyReport"),
                           etcTrip: getOrderFinanceAmount(finance, "etcTripReport"),
@@ -7350,13 +7378,15 @@ export default function Home() {
                           vehicle.regionId === accountingPreviewOrder.regionId,
                         ).slice().sort(compareVehicles)}
                         vehicleName={finance.vehicle}
+                        vehiclePlate={finance.vehiclePlate}
                         getStatus={getVehicleDisplayStatus}
                         onSelect={(vehicle) =>
                             setAccountingForm((current) => ({
                               ...current,
                               [date]: {
                                 ...(current[date] || emptyOrderFinance),
-                                vehicle,
+                                vehicle: vehicle.name,
+                                vehiclePlate: vehicle.plate,
                               },
                             }))
                         }

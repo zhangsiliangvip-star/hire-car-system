@@ -25,6 +25,7 @@ const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 const orderFinanceSchema = z.object({
   driver: z.string().max(200).default(""),
   vehicle: z.string().max(200).default(""),
+  vehiclePlate: z.string().max(100).default(""),
   etcCompanyReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
   etcTripReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
   fuelCost: z.number().int().min(0).max(99_999_999_999_999).default(0),
@@ -61,6 +62,7 @@ const orderSchema = z.object({
   id: idSchema,
   regionId: idSchema,
   vehicle: z.string().max(200),
+  vehiclePlate: z.string().max(100).default(""),
   date: dateSchema,
   endDate: dateSchema,
   offDates: z.array(dateSchema).max(366),
@@ -222,6 +224,7 @@ function toOrderFinance(value: unknown): OrderFinance {
     return {
       driver: "",
       vehicle: "",
+      vehiclePlate: "",
       etcCompanyReport: 0,
       etcTripReport: 0,
       fuelCost: 0,
@@ -245,6 +248,7 @@ function toOrderFinance(value: unknown): OrderFinance {
   return {
     driver: typeof entry.driver === "string" ? entry.driver.slice(0, 200) : "",
     vehicle: typeof entry.vehicle === "string" ? entry.vehicle.slice(0, 200) : "",
+    vehiclePlate: typeof entry.vehiclePlate === "string" ? entry.vehiclePlate.slice(0, 100) : "",
     etcCompanyReport: toFinanceAmount(entry.etcCompanyReport),
     etcTripReport: toFinanceAmount(entry.etcTripReport),
     fuelCost: toFinanceAmount(entry.fuelCost),
@@ -296,6 +300,7 @@ function toOrder(row: Database["public"]["Tables"]["orders"]["Row"]): Order {
     id: row.id,
     regionId: row.region_id,
     vehicle: row.vehicle,
+    vehiclePlate: row.vehicle_plate ?? "",
     date: row.date,
     endDate: row.end_date,
     offDates: row.off_dates,
@@ -429,6 +434,7 @@ function toOrderRow(order: Order): Database["public"]["Tables"]["orders"]["Inser
     id: order.id,
     region_id: order.regionId ?? "",
     vehicle: order.vehicle,
+    vehicle_plate: order.vehiclePlate ?? "",
     date: order.date,
     end_date: order.endDate,
     off_dates: order.offDates,

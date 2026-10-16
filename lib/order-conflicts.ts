@@ -2,13 +2,14 @@ export type ConflictCheckOrder = {
   id?: number | string;
   regionId?: string | null;
   vehicle: string;
+  vehiclePlate?: string | null;
   driver?: string | null;
   date: string;
   endDate?: string | null;
   offDates?: string[] | null;
   time: string;
   status: string;
-  financeByDate?: Record<string, { vehicle?: string | null; driver?: string | null } | undefined> | null;
+  financeByDate?: Record<string, { vehicle?: string | null; vehiclePlate?: string | null; driver?: string | null } | undefined> | null;
 };
 
 export type OrderConflictReason = "vehicle" | "driver";
@@ -44,16 +45,27 @@ function getDailyAssignments(order: ConflictCheckOrder) {
           (_, index) => new Date(start + index * 86_400_000).toISOString().slice(0, 10),
         );
 
-  const assignments = new Map<string, { vehicle: string; driver: string }>();
+  const assignments = new Map<string, { vehicle: string; plate: string; driver: string }>();
   for (const date of dates) {
     if (offDates.has(date)) continue;
     const finance = order.financeByDate?.[date];
+    const dayVehicle = normalizeName(finance?.vehicle);
     assignments.set(date, {
-      vehicle: normalizeName(finance?.vehicle) || normalizeName(order.vehicle),
+      vehicle: dayVehicle || normalizeName(order.vehicle),
+      plate: dayVehicle ? normalizeName(finance?.vehiclePlate) : normalizeName(order.vehiclePlate),
       driver: normalizeName(finance?.driver) || normalizeName(order.driver),
     });
   }
   return assignments;
+}
+
+/** Plates identify a vehicle when both sides have one; otherwise fall back to the name. */
+function isSameVehicle(
+  first: { vehicle: string; plate: string },
+  second: { vehicle: string; plate: string },
+) {
+  if (first.plate && second.plate) return first.plate === second.plate;
+  return Boolean(first.vehicle) && first.vehicle === second.vehicle;
 }
 
 function isMultiDay(order: ConflictCheckOrder) {
@@ -101,8 +113,8 @@ export function findOrderConflicts<T extends ConflictCheckOrder>(
     for (const [date, existing] of getDailyAssignments(order)) {
       const requested = draftDays.get(date);
       if (!requested) continue;
-      if (requested.vehicle && requested.vehicle === existing.vehicle) {
-        vehicles.add(existing.vehicle);
+      if (isSameVehicle(requested, existing)) {
+        vehicles.add(existing.plate || existing.vehicle);
       }
       if (requested.driver && requested.driver === existing.driver) {
         drivers.add(existing.driver);
