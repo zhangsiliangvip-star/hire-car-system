@@ -448,6 +448,8 @@ const emptyOrderFinance: OrderFinance = {
   driver: "",
   vehicle: "",
   vehiclePlate: "",
+  tripSummary: "",
+  dailyFare: 0,
   etcCompanyReport: 0,
   etcTripReport: 0,
   fuelCost: 0,
@@ -515,7 +517,7 @@ function formatYen(amount: number) {
 
 function getOrderFinanceAmount(
   order: Partial<OrderFinance>,
-  field: Exclude<keyof OrderFinance, "driver" | "vehicle" | "vehiclePlate">,
+  field: Exclude<keyof OrderFinance, "driver" | "vehicle" | "vehiclePlate" | "tripSummary">,
 ) {
   const amount = order[field];
   return typeof amount === "number" && Number.isFinite(amount) && amount >= 0
@@ -537,6 +539,8 @@ function normalizeOrderFinance(order: Partial<OrderFinance>): OrderFinance {
     driver: typeof order.driver === "string" ? order.driver : "",
     vehicle: typeof order.vehicle === "string" ? order.vehicle : "",
     vehiclePlate: typeof order.vehiclePlate === "string" ? order.vehiclePlate : "",
+    tripSummary: typeof order.tripSummary === "string" ? order.tripSummary : "",
+    dailyFare: getOrderFinanceAmount(order, "dailyFare"),
     etcCompanyReport: getOrderFinanceAmount(order, "etcCompanyReport"),
     etcTripReport: getOrderFinanceAmount(order, "etcTripReport"),
     fuelCost: getOrderFinanceAmount(order, "fuelCost"),
@@ -569,7 +573,7 @@ function getFinanceDayOrder(order: Order, finance: Partial<OrderFinance>): Order
 
 function calculateOrderFinance(
   order: Partial<OrderFinance>,
-  orderPrice = 0,
+  orderPrice = getOrderFinanceAmount(order, "dailyFare"),
 ): FinanceTotals {
   const requestAmount =
     orderPrice +
@@ -620,6 +624,39 @@ function getOrderDateKeys(order: Pick<Order, "date" | "endDate">): string[] {
   );
 }
 
+/** Accounting dialog rows are keyed by order and service date so a batch can be edited together. */
+function toAccountingKey(orderId: string, date: string) {
+  return `${orderId}|${date}`;
+}
+
+function parseAccountingKey(key: string) {
+  const separator = key.lastIndexOf("|");
+  return { orderId: key.slice(0, separator), date: key.slice(separator + 1) };
+}
+
+/**
+ * Batch-imported reservations are separate single-day orders on the same vehicle and day.
+ * Nothing persists the import batch itself, so the batch is recognised by that shape.
+ */
+function getAccountingBatchOrders(order: Order, candidates: readonly Order[]): Order[] {
+  const isSingleDay = (item: Order) => (item.endDate || item.date) === item.date;
+  if (!isSingleDay(order)) return [order];
+  const batch = candidates.filter((item) =>
+    item.id === order.id ||
+    (isSingleDay(item) &&
+      item.regionId === order.regionId &&
+      item.date === order.date &&
+      item.vehicle === order.vehicle &&
+      (item.vehiclePlate || "") === (order.vehiclePlate || "")),
+  );
+  return batch.length > 1
+    ? batch.slice().sort((first, second) =>
+        (first.time || "99:99").localeCompare(second.time || "99:99") ||
+        first.customer.localeCompare(second.customer),
+      )
+    : [order];
+}
+
 function shiftFinanceDates(
   financeByDate: Order["financeByDate"],
   dateOffset: number,
@@ -632,17 +669,25 @@ function shiftFinanceDates(
   );
 }
 
+function sumDailyFares(financeByDate: Order["financeByDate"]) {
+  return Object.values(financeByDate || {}).reduce(
+    (total, finance) => total + getOrderFinanceAmount(finance, "dailyFare"),
+    0,
+  );
+}
+
+function hasDailyFares(financeByDate: Order["financeByDate"]) {
+  return Object.values(financeByDate || {}).some(
+    (finance) => getOrderFinanceAmount(finance, "dailyFare") > 0,
+  );
+}
+
 function getOrderFinanceForOrder(order: Order, month?: string): FinanceTotals {
   const entries = Object.entries(order.financeByDate || {})
     .filter(([date]) => !month || date.startsWith(`${month}-`));
   return entries.reduce(
-    (current, [date, finance]) => {
-      const totals = calculateOrderFinance(
-        finance,
-        date === order.date && (!month || date.startsWith(`${month}-`))
-          ? order.orderPrice
-          : 0,
-      );
+    (current, [, finance]) => {
+      const totals = calculateOrderFinance(finance);
       return {
         requestAmount: current.requestAmount + totals.requestAmount,
         driverAdvances: current.driverAdvances + totals.driverAdvances,
@@ -665,11 +710,11 @@ function getOrderFinanceForOrder(order: Order, month?: string): FinanceTotals {
 }
 
 function summarizeFinanceEntries(
-  entries: readonly (Partial<OrderFinance> & { orderPrice?: number })[],
+  entries: readonly Partial<OrderFinance>[],
 ): FinanceTotals {
   return entries.reduce<FinanceTotals>(
     (current, order) => {
-      const totals = calculateOrderFinance(order, order.orderPrice || 0);
+      const totals = calculateOrderFinance(order);
       return {
         requestAmount: current.requestAmount + totals.requestAmount,
         driverAdvances: current.driverAdvances + totals.driverAdvances,
@@ -954,7 +999,10 @@ export default function Home() {
   const [orderDetailsMode, setOrderDetailsMode] = useState<"itinerary" | "vehicle">("itinerary");
   const [accountingPreviewOrder, setAccountingPreviewOrder] = useState<Order | null>(null);
   const [accountingForm, setAccountingForm] = useState<Record<string, OrderFinance>>({});
-  const [accountingOrderPriceInput, setAccountingOrderPriceInput] = useState("0");
+  const [accountingBatchOrders, setAccountingBatchOrders] = useState<Order[]>([]);
+  const [accountingOrderMeta, setAccountingOrderMeta] = useState<
+    Record<string, { orderSource: string; company: string }>
+  >({});
   const [accountingStatus, setAccountingStatus] = useState<Order["accountingStatus"]>("未完成");
   const [accountingInvoiceStatus, setAccountingInvoiceStatus] = useState<Order["invoiceStatus"]>("未完成");
   const [accountingInvoiceSentDate, setAccountingInvoiceSentDate] = useState("");
@@ -1533,10 +1581,7 @@ export default function Home() {
             finance.driver,
         )
         .map(([serviceDate, finance]) => {
-          const totals = calculateOrderFinance(
-            finance,
-            serviceDate === order.date ? order.orderPrice : 0,
-          );
+          const totals = calculateOrderFinance(finance);
           const overtimeFee = getDriverOvertimeFee(finance);
           const bonusWage = getOrderFinanceAmount(finance, "driverBonusWage");
           const baseWage = Math.max(
@@ -1637,10 +1682,7 @@ export default function Home() {
           (vehicleFinanceVehicleFilter === "" || dayVehicle?.id === vehicleFinanceVehicleFilter),
         )
         .map(({ serviceDate, finance, dayOrder, dayVehicle }) => {
-          const totals = calculateOrderFinance(
-            finance,
-            serviceDate === order.date ? order.orderPrice : 0,
-          );
+          const totals = calculateOrderFinance(finance);
           return {
             id: `${order.id}-${serviceDate}`,
             serviceDate,
@@ -2333,37 +2375,47 @@ export default function Home() {
         const hasBefore = order.date < startDate;
         const hasAfter = orderEndDate > endDate;
         const remainingOrders: Order[] = [];
+        const usesDailyFares = hasDailyFares(order.financeByDate);
+        const getPartPrice = (financeByDate: Order["financeByDate"], legacyPrice: number) =>
+          usesDailyFares ? sumDailyFares(financeByDate) : legacyPrice;
 
         if (hasBefore) {
+          const financeByDate = shiftFinanceDates(
+            order.financeByDate,
+            0,
+            (date) => date < startDate,
+          );
           remainingOrders.push({
             ...order,
             endDate: shiftDateKey(startDate, -1),
-            orderPrice: order.orderPrice,
+            orderPrice: getPartPrice(financeByDate, order.orderPrice),
             offDates: order.offDates.filter((offDate) => offDate < startDate),
-            financeByDate: shiftFinanceDates(
-              order.financeByDate,
-              0,
-              (date) => date < startDate,
-            ),
+            financeByDate,
           });
         }
 
         if (hasAfter) {
+          const financeByDate = shiftFinanceDates(
+            order.financeByDate,
+            0,
+            (date) => date > endDate,
+          );
           remainingOrders.push({
             ...order,
             id: hasBefore ? createId() : order.id,
             date: shiftDateKey(endDate, 1),
             endDate: orderEndDate,
-            orderPrice: hasBefore ? 0 : order.orderPrice,
+            orderPrice: getPartPrice(financeByDate, hasBefore ? 0 : order.orderPrice),
             offDates: order.offDates.filter((offDate) => offDate > endDate),
-            financeByDate: shiftFinanceDates(
-              order.financeByDate,
-              0,
-              (date) => date > endDate,
-            ),
+            financeByDate,
           });
         }
 
+        const movedFinanceByDate = shiftFinanceDates(
+          order.financeByDate,
+          0,
+          (date) => date >= startDate && date <= endDate,
+        );
         remainingOrders.push({
           ...order,
           id: createId(),
@@ -2371,13 +2423,9 @@ export default function Home() {
           vehiclePlate: target.plate,
           date: startDate,
           endDate,
-          orderPrice: hasBefore ? 0 : order.orderPrice,
+          orderPrice: getPartPrice(movedFinanceByDate, hasBefore ? 0 : order.orderPrice),
           offDates: movedOffDates,
-          financeByDate: shiftFinanceDates(
-            order.financeByDate,
-            0,
-            (date) => date >= startDate && date <= endDate,
-          ),
+          financeByDate: movedFinanceByDate,
         });
 
         return remainingOrders;
@@ -3304,33 +3352,63 @@ export default function Home() {
   }
 
   function openAccounting(order: Order) {
-    const dates = [
-      ...new Set([
-        ...getOrderDateKeys(order),
-        ...Object.keys(order.financeByDate || {}),
-      ]),
-    ].sort();
-    if (dates.length === 0 || dates.length > 3660) {
-      alert("单笔订单财务明细最多支持 3660 个日历日。");
-      return;
-    }
-    setAccountingPreviewOrder(order);
-    setAccountingForm(
-      Object.fromEntries(
+    const batchOrders = getAccountingBatchOrders(order, allOrders);
+    const form: Record<string, OrderFinance> = {};
+    for (const batchOrder of batchOrders) {
+      const dates = [
+        ...new Set([
+          ...getOrderDateKeys(batchOrder),
+          ...Object.keys(batchOrder.financeByDate || {}),
+        ]),
+      ].sort();
+      if (dates.length === 0 || dates.length > 3660) {
+        alert("单笔订单财务明细最多支持 3660 个日历日。");
+        return;
+      }
+      const orderForm = Object.fromEntries(
         dates.map((date) => [
           date,
           normalizeOrderFinance(
-            order.financeByDate?.[date] || {
+            batchOrder.financeByDate?.[date] || {
               ...emptyOrderFinance,
-              driver: order.driver,
-              vehicle: order.vehicle,
-              vehiclePlate: order.vehiclePlate || "",
+              driver: batchOrder.driver,
+              vehicle: batchOrder.vehicle,
+              vehiclePlate: batchOrder.vehiclePlate || "",
             },
           ),
         ]),
+      );
+      // Legacy orders only stored a whole-order price; keep it by assigning it to the first day.
+      if (batchOrder.orderPrice > 0 && !hasDailyFares(orderForm)) {
+        const firstDate = orderForm[batchOrder.date] ? batchOrder.date : dates[0];
+        orderForm[firstDate] = { ...orderForm[firstDate], dailyFare: batchOrder.orderPrice };
+      }
+      for (const [date, finance] of Object.entries(orderForm)) {
+        form[toAccountingKey(batchOrder.id, date)] = finance;
+      }
+    }
+    // Batch orders default to the clicked order's driver/source/company; only blanks are filled.
+    const defaultDriver =
+      form[toAccountingKey(order.id, order.date)]?.driver || order.driver || "";
+    if (batchOrders.length > 1 && defaultDriver) {
+      for (const [key, finance] of Object.entries(form)) {
+        if (!finance.driver.trim()) form[key] = { ...finance, driver: defaultDriver };
+      }
+    }
+    setAccountingPreviewOrder(order);
+    setAccountingBatchOrders(batchOrders);
+    setAccountingOrderMeta(
+      Object.fromEntries(
+        batchOrders.map((batchOrder) => [
+          batchOrder.id,
+          {
+            orderSource: batchOrder.orderSource || order.orderSource || "",
+            company: batchOrder.company || order.company || "",
+          },
+        ]),
       ),
     );
-    setAccountingOrderPriceInput(String(order.orderPrice || 0));
+    setAccountingForm(form);
     setAccountingStatus(order.accountingStatus || "未完成");
     setAccountingInvoiceStatus(order.invoiceStatus);
     setAccountingInvoiceSentDate(order.invoiceSentDate);
@@ -3343,12 +3421,26 @@ export default function Home() {
   function saveAccounting() {
     if (!accountingPreviewOrder) return;
 
-    const orderPrice = Number(accountingOrderPriceInput);
-    const validOrderPrice =
-      Number.isSafeInteger(orderPrice) &&
-      orderPrice >= 0 &&
-      orderPrice <= 99_999_999_999_999;
-    const validFinance = Object.entries(accountingForm).every(([date, finance]) => {
+    const financeByOrder = new Map<string, Order["financeByDate"]>(
+      accountingBatchOrders.map((batchOrder) => [batchOrder.id, {}]),
+    );
+    for (const [key, finance] of Object.entries(accountingForm)) {
+      const { orderId, date } = parseAccountingKey(key);
+      const orderFinance = financeByOrder.get(orderId);
+      if (!orderFinance) continue;
+      orderFinance[date] = {
+        ...finance,
+        tripSummary: finance.tripSummary.trim(),
+        driverOvertimeFee: getDriverOvertimeFee(finance),
+      };
+    }
+    const validOrderPrice = [...financeByOrder.values()].every((financeByDate) => {
+      const orderPrice = sumDailyFares(financeByDate);
+      return Number.isSafeInteger(orderPrice) &&
+        orderPrice >= 0 &&
+        orderPrice <= 99_999_999_999_999;
+    });
+    const validFinance = Object.values(accountingForm).every((finance) => {
       const validAmounts = (Object.keys(emptyOrderFinance) as (keyof OrderFinance)[])
       .filter((key) =>
         key !== "fuelConsumption" &&
@@ -3357,7 +3449,8 @@ export default function Home() {
         key !== "driverWagePercentage" &&
         key !== "driver" &&
         key !== "vehicle" &&
-        key !== "vehiclePlate",
+        key !== "vehiclePlate" &&
+        key !== "tripSummary",
       )
         .every((key) => {
           const amount = finance[key];
@@ -3378,32 +3471,30 @@ export default function Home() {
         Number(driverOvertimeHours.toFixed(2)) === driverOvertimeHours &&
         Number.isSafeInteger(getDriverOvertimeFee(finance)) &&
         getDriverOvertimeFee(finance) <= 99_999_999_999_999 &&
-        calculateOrderFinance(
-          finance,
-          date === accountingPreviewOrder.date ? orderPrice : 0,
-        ).driverWages <= 99_999_999_999_999;
+        finance.tripSummary.length <= 1000 &&
+        calculateOrderFinance(finance).driverWages <= 99_999_999_999_999;
     });
     if (!validOrderPrice || !validFinance) {
-      alert("日元金额请输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超时时间最多填写两位小数，超时计算金额不得超出限额。");
+      alert("日元金额请输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超时时间最多填写两位小数，超时计算金额不得超出限额，行程简概最多 1000 字。");
       return;
     }
 
     const orderId = accountingPreviewOrder.id;
-    const financeByDate = Object.fromEntries(
-      Object.entries(accountingForm).map(([date, finance]) => [
-        date,
-        {
-          ...finance,
-          driverOvertimeFee: getDriverOvertimeFee(finance),
-        },
-      ]),
-    );
     setOrders((currentOrders) =>
-      currentOrders.map((order) =>
-        order.id === orderId
+      currentOrders.map((order) => {
+        const financeByDate = financeByOrder.get(order.id);
+        if (!financeByDate) return order;
+        const meta = accountingOrderMeta[order.id];
+        const updated: Order = {
+          ...order,
+          orderSource: meta ? meta.orderSource.trim() : order.orderSource,
+          company: meta ? meta.company.trim() : order.company,
+          orderPrice: sumDailyFares(financeByDate),
+          financeByDate,
+        };
+        return order.id === orderId
           ? {
-              ...order,
-              orderPrice,
+              ...updated,
               accountingStatus,
               invoiceStatus: accountingInvoiceStatus,
               invoiceSentDate: accountingInvoiceSentDate,
@@ -3411,10 +3502,9 @@ export default function Home() {
               depositDate: accountingDepositDate,
               accountingAssignee: accountingAssignee.trim(),
               financeNote: accountingFinanceNote.trim(),
-              financeByDate,
             }
-          : order,
-      ),
+          : updated;
+      }),
     );
     setAccountingPreviewOrder(null);
   }
@@ -3582,16 +3672,75 @@ export default function Home() {
   }
 
   const accountingTotals = accountingPreviewOrder
-    ? summarizeFinanceEntries(
-        Object.entries(accountingForm).map(([date, finance]) => ({
-          ...finance,
-          orderPrice:
-            date === accountingPreviewOrder.date
-              ? Number(accountingOrderPriceInput) || 0
-              : 0,
-        })),
-      )
+    ? summarizeFinanceEntries(Object.values(accountingForm))
     : null;
+  const accountingOrderPrice = sumDailyFares(accountingForm);
+  const primaryAccountingForm: Record<string, OrderFinance> = accountingPreviewOrder
+    ? Object.fromEntries(
+        Object.entries(accountingForm).flatMap(([key, finance]) => {
+          const { orderId, date } = parseAccountingKey(key);
+          return orderId === accountingPreviewOrder.id ? [[date, finance] as const] : [];
+        }),
+      )
+    : {};
+  const primaryAccountingOrderPrice = sumDailyFares(primaryAccountingForm);
+  const isAccountingBatch = accountingBatchOrders.length > 1;
+  const accountingSourceOptions = accountingPreviewOrder
+    ? allOrderSourceRecords
+        .filter((source) => source.regionId === accountingPreviewOrder.regionId)
+        .map((source) => source.companyName)
+    : [];
+  const accountingCompanyOptions = accountingPreviewOrder
+    ? allCompanyRecords
+        .filter((company) => company.regionId === accountingPreviewOrder.regionId)
+        .map((company) => company.name)
+    : [];
+  function updateAccountingFinance(key: string, patch: Partial<OrderFinance>) {
+    setAccountingForm((current) => ({
+      ...current,
+      [key]: { ...(current[key] || emptyOrderFinance), ...patch },
+    }));
+  }
+  const accountingMixedValue = "__mixed__";
+  const accountingBatchDriverOptions = accountingPreviewOrder
+    ? [...new Set(allDriverRecords
+        .filter((driver) => driver.regionId === accountingPreviewOrder.regionId)
+        .map((driver) => driver.name))]
+        .sort((first, second) => first.localeCompare(second, "ja"))
+    : [];
+  const getCommonValue = (values: string[]) =>
+    values.length > 0 && values.every((value) => value === values[0]) ? values[0] : null;
+  const accountingBatchCommon = {
+    driver: getCommonValue(Object.values(accountingForm).map((finance) => finance.driver)),
+    orderSource: getCommonValue(Object.values(accountingOrderMeta).map((meta) => meta.orderSource)),
+    company: getCommonValue(Object.values(accountingOrderMeta).map((meta) => meta.company)),
+  };
+  function applyAccountingBatchValue(field: "driver" | "orderSource" | "company", value: string) {
+    if (value === accountingMixedValue) return;
+    if (field === "driver") {
+      setAccountingForm((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([entryKey, finance]) => [entryKey, { ...finance, driver: value }]),
+        ),
+      );
+      return;
+    }
+    setAccountingOrderMeta((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([entryOrderId, meta]) => [entryOrderId, { ...meta, [field]: value }]),
+      ),
+    );
+  }
+  function updateAccountingOrderMeta(
+    orderId: string,
+    field: "orderSource" | "company",
+    value: string,
+  ) {
+    setAccountingOrderMeta((current) => ({
+      ...current,
+      [orderId]: { ...(current[orderId] ?? { orderSource: "", company: "" }), [field]: value },
+    }));
+  }
   const canViewVehicleAndBalanceReports =
       currentProfile.role === "admin";
 
@@ -5143,8 +5292,22 @@ export default function Home() {
               laneEndDates[laneIndex] = order.endDate || order.date;
               orderLanes.set(order.id, laneIndex);
             }
+            const getTripSummary = (order: Order, date: string) =>
+              (order.offDates || []).includes(date)
+                ? ""
+                : order.financeByDate?.[date]?.tripSummary?.trim() || "";
+            const orderHasTripSummaries = (order: Order) =>
+              Object.keys(order.financeByDate || {}).some((date) =>
+                date >= dates[0].date &&
+                date <= dates[dates.length - 1].date &&
+                getTripSummary(order, date) !== "",
+              );
             // Every order sits in the date cells' grid row, stacked by lane.
-            const orderCardHeight = 56;
+            const baseOrderCardHeight = 56;
+            const tripSummaryOrderCardHeight = 72;
+            const orderCardHeight = visibleOrders.some(orderHasTripSummaries)
+              ? tripSummaryOrderCardHeight
+              : baseOrderCardHeight;
             const orderCardGap = 4;
             const singleDayCellHeights = new Map(
               dates.map((day) => {
@@ -5406,6 +5569,7 @@ export default function Home() {
                       driver.name === order.driver && isDriverLicenseExpired(driver),
                   );
                   const sourceColor = orderSourceColorByRegion.get(`${order.regionId}:${order.orderSource}`);
+                  const showTripSummaries = orderHasTripSummaries(order);
 
                   return (
                     <div
@@ -5520,7 +5684,7 @@ export default function Home() {
                             left: `${(infoSegmentStart / barDates.length) * 100}%`,
                             width: `${((infoSegmentEnd - infoSegmentStart) / barDates.length) * 100}%`,
                           }}
-                          className={`absolute inset-y-0 z-10 flex flex-col items-center justify-center gap-0 px-1 ${isSelectingSplit ? "pointer-events-none pb-5" : ""}`}
+                          className={`absolute inset-y-0 z-10 flex flex-col items-center justify-center gap-0 px-1 ${isSelectingSplit ? "pointer-events-none pb-5" : showTripSummaries ? "pb-4" : ""}`}
                         >
                           <div className="flex w-full items-center justify-center gap-2">
                             {order.time && (
@@ -5549,6 +5713,29 @@ export default function Home() {
                               </div>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {showTripSummaries && !isSelectingSplit && (
+                        <div
+                          className="pointer-events-none absolute inset-x-0 bottom-0.5 z-20 grid"
+                          style={{ gridTemplateColumns: `repeat(${barDates.length}, minmax(0, 1fr))` }}
+                        >
+                          {barDates.map((day) => {
+                            const tripSummary = getTripSummary(order, day.date);
+                            return (
+                              <div key={day.date} className="min-w-0 px-1">
+                                {tripSummary && (
+                                  <span
+                                    className="pointer-events-auto block truncate rounded bg-white/70 px-1 text-[10px] leading-[14px] text-slate-800"
+                                    title={tripSummary}
+                                  >
+                                    {tripSummary}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -6305,12 +6492,12 @@ export default function Home() {
                 >
                   <option value="仮予約">仮予約</option>
                   <option value="予約確定">予約確定</option>
-                  <option value="運行中">運行中</option>
-                  <option value="完了">完了</option>
+                  {(form.status === "運行中" || form.status === "完了") && (
+                    <option value={form.status}>{form.status}（已停用，仅保留原记录）</option>
+                  )}
                   <option value="キャンセル">キャンセル</option>
                 </select>
               </label>
-
               {/* 车両 */}
               <label className="block text-sm font-medium">
                 車両
@@ -7347,26 +7534,37 @@ export default function Home() {
                 type="button"
                 className="ml-3 rounded border border-blue-700 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
                 onClick={async () => {
+                  const primaryMeta = accountingOrderMeta[accountingPreviewOrder.id];
+                  const sourceName = (primaryMeta?.orderSource ?? accountingPreviewOrder.orderSource).trim();
+                  const companyName = (primaryMeta?.company ?? accountingPreviewOrder.company).trim();
                   const source = orderSourceRecords.find((item) =>
-                    item.regionId === accountingPreviewOrder.regionId && item.companyName === accountingPreviewOrder.orderSource);
+                    item.regionId === accountingPreviewOrder.regionId && item.companyName === sourceName);
                   const company = companyRecords.find((item) =>
-                    item.regionId === accountingPreviewOrder.regionId && item.name === accountingPreviewOrder.company);
+                    item.regionId === accountingPreviewOrder.regionId && item.name === companyName);
                   if (!source || !company) {
-                    alert("请先为订单设置同分区的来源和所属会社，并保存订单。");
+                    alert("请先为订单设置同分区的来源和所属会社。");
                     return;
                   }
                   if (!company.bankAccount || !/^T[0-9]{13}$/.test(company.taxRegistrationNumber) || !company.phone || !company.rollCallAddress) {
                     alert("请先在所属会社登记振込口座、有效T番号、电话和营业所地址。");
                     return;
                   }
-                  const price = Number(accountingOrderPriceInput);
+                  const price = primaryAccountingOrderPrice;
                   if (!Number.isSafeInteger(price) || price < 0) {
                     alert("请求书订单价格必须为非负日元整数。");
                     return;
                   }
                   const today = new Date();
                   const sum = (key: "etcTripReport" | "driverAdvanceTripReport" | "companyAdvanceTripReport") =>
-                    Object.values(accountingForm).reduce((total, finance) => total + getOrderFinanceAmount(finance, key), 0);
+                    Object.values(primaryAccountingForm).reduce((total, finance) => total + getOrderFinanceAmount(finance, key), 0);
+                  const invoiceDays = Object.entries(primaryAccountingForm)
+                    .sort(([first], [second]) => first.localeCompare(second))
+                    .filter(([, finance]) => finance.dailyFare > 0 || finance.tripSummary.trim())
+                    .map(([date, finance]) => ({
+                      date,
+                      summary: finance.tripSummary.trim(),
+                      fare: getOrderFinanceAmount(finance, "dailyFare"),
+                    }));
                   try {
                     const response = await fetch("/api/invoices/number", {
                       method: "POST",
@@ -7395,6 +7593,7 @@ export default function Home() {
                       taxRegistrationNumber: company.taxRegistrationNumber,
                       sealImage: company.sealImage,
                       orderPrice: price,
+                      days: invoiceDays,
                       etcTrip: sum("etcTripReport"),
                       driverAdvanceTrip: sum("driverAdvanceTripReport"),
                       companyAdvanceTrip: sum("companyAdvanceTripReport"),
@@ -7415,8 +7614,8 @@ export default function Home() {
                       name: accountingPreviewOrder.customer,
                       period: `${accountingPreviewOrder.date} ～ ${accountingPreviewOrder.endDate || accountingPreviewOrder.date}`,
                       note: accountingFinanceNote,
-                      rows: Object.entries(accountingForm).sort(([first], [second]) => first.localeCompare(second)).map(([date, finance]) => {
-                        const totals = calculateOrderFinance(finance, date === accountingPreviewOrder.date ? Number(accountingOrderPriceInput) || 0 : 0);
+                      rows: Object.entries(primaryAccountingForm).sort(([first], [second]) => first.localeCompare(second)).map(([date, finance]) => {
+                        const totals = calculateOrderFinance(finance);
                         return {
                           date,
                           driver: finance.driver,
@@ -7468,40 +7667,92 @@ export default function Home() {
               </p>
               <p>
                 <span className="text-gray-500">来源：</span>
-                {accountingPreviewOrder.orderSource || "未填写"}
+                {accountingOrderMeta[accountingPreviewOrder.id]?.orderSource || "未填写"}
               </p>
               <p>
                 <span className="text-gray-500">所属会社：</span>
-                {accountingPreviewOrder.company || "未设置"}
+                {accountingOrderMeta[accountingPreviewOrder.id]?.company || "未设置"}
               </p>
             </div>
-            <label className="mt-5 block max-w-sm text-sm font-semibold">
-              订单价格（整笔订单总额，JPY）
-              <input
-                type="number"
-                min="0"
-                max="99999999999999"
-                step="1"
-                inputMode="numeric"
-                className="mt-1 w-full rounded border p-2"
-                value={accountingOrderPriceInput === "0" ? "" : accountingOrderPriceInput}
-                onChange={(event) =>
-                  setAccountingOrderPriceInput(event.target.value)
-                }
-              />
-            </label>
+            {isAccountingBatch && (
+              <div className="mt-5 rounded border border-indigo-200 bg-indigo-50 p-4 text-sm">
+                <p className="font-semibold text-indigo-900">
+                  同日批量订单：共 {accountingBatchOrders.length} 单（同一天、同一车辆的单日订单）
+                </p>
+                <p className="mt-1 text-xs text-indigo-800">
+                  批量统一设置：在这里选择一次，本批全部订单同步；下方各订单仍可单独修改，只影响该订单。
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  {([
+                    ["driver", "司机（全部统一）", accountingBatchDriverOptions, accountingBatchCommon.driver, "未安排司机"],
+                    ["orderSource", "订单来源（全部统一）", accountingSourceOptions, accountingBatchCommon.orderSource, "未填写"],
+                    ["company", "订单所属（全部统一）", accountingCompanyOptions, accountingBatchCommon.company, "未设置"],
+                  ] as const).map(([field, label, options, common, emptyLabel]) => (
+                    <label key={field} className="block font-medium text-indigo-900">
+                      {label}
+                      <select
+                        className="mt-1 w-full rounded border bg-white p-2 text-gray-900"
+                        value={common ?? accountingMixedValue}
+                        onChange={(event) => applyAccountingBatchValue(field, event.target.value)}
+                      >
+                        {common === null && (
+                          <option value={accountingMixedValue} disabled>
+                            （各单不同）
+                          </option>
+                        )}
+                        <option value="">{emptyLabel}</option>
+                        {common && !options.includes(common) && (
+                          <option value={common}>{common}（现有记录）</option>
+                        )}
+                        {options.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-indigo-800">
+                  核算状态、请求书、入金和备注仅保存到当前点击的订单；請求書和费用表导出也仅针对当前订单。
+                </p>
+              </div>
+            )}
+            <div className="mt-5 flex flex-wrap gap-4">
+              <div className="w-full max-w-sm text-sm font-semibold">
+                订单价格（每日当日车费合计，JPY）
+                <output
+                  aria-live="polite"
+                  className="mt-1 block w-full rounded border bg-gray-100 p-2 text-gray-800"
+                >
+                  {formatYen(primaryAccountingOrderPrice)}
+                </output>
+              </div>
+              {isAccountingBatch && (
+                <div className="w-full max-w-sm text-sm font-semibold">
+                  本批订单价格合计（JPY）
+                  <output
+                    aria-live="polite"
+                    className="mt-1 block w-full rounded border bg-gray-100 p-2 text-gray-800"
+                  >
+                    {formatYen(accountingOrderPrice)}
+                  </output>
+                </div>
+              )}
+            </div>
             <div className="mt-5 space-y-4">
-              {Object.entries(accountingForm).map(([date, finance]) => {
-                const isOffDate = accountingPreviewOrder.offDates.includes(date);
+              {Object.entries(accountingForm).map(([financeKey, finance]) => {
+                const { orderId: financeOrderId, date } = parseAccountingKey(financeKey);
+                const financeOrder =
+                  accountingBatchOrders.find((batchOrder) => batchOrder.id === financeOrderId) ??
+                  accountingPreviewOrder;
+                const financeOrderMeta = accountingOrderMeta[financeOrder.id] ?? {
+                  orderSource: financeOrder.orderSource || "",
+                  company: financeOrder.company || "",
+                };
+                const isOffDate = financeOrder.offDates.includes(date);
                 const isOutsideOrderDates =
-                  date < accountingPreviewOrder.date ||
-                  date > (accountingPreviewOrder.endDate || accountingPreviewOrder.date);
-                const dailyTotals = calculateOrderFinance(
-                  finance,
-                  date === accountingPreviewOrder.date
-                    ? Number(accountingOrderPriceInput) || 0
-                    : 0,
-                );
+                  date < financeOrder.date ||
+                  date > (financeOrder.endDate || financeOrder.date);
+                const dailyTotals = calculateOrderFinance(finance);
                 const dailyEtcTotal =
                   getOrderFinanceAmount(finance, "etcCompanyReport") +
                   getOrderFinanceAmount(finance, "etcTripReport");
@@ -7509,15 +7760,23 @@ export default function Home() {
                 const dailyFuelPrice = dailyTotals.fuelConsumption > 0
                   ? dailyFuelCost / dailyTotals.fuelConsumption
                   : null;
-                const isMultiDayOrder =
-                  (accountingPreviewOrder.endDate || accountingPreviewOrder.date) >
-                  accountingPreviewOrder.date;
 
                 return (
-                  <section key={date} className="rounded-lg border bg-white p-4">
+                  <section
+                    key={financeKey}
+                    className={`rounded-lg border bg-white p-4 ${isAccountingBatch && financeOrder.id === accountingPreviewOrder.id ? "border-blue-500 ring-1 ring-blue-300" : ""}`}
+                  >
                     <div className="mb-4 grid grid-cols-1 gap-2 border-b pb-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <h3 className="font-semibold">{formatOrderDate(date)}</h3>
+                        {isAccountingBatch && financeOrder.time && (
+                          <span className="font-semibold text-gray-700">{financeOrder.time}</span>
+                        )}
+                        {isAccountingBatch && financeOrder.id === accountingPreviewOrder.id && (
+                          <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">
+                            当前订单
+                          </span>
+                        )}
                         {isOutsideOrderDates && (
                           <span className="ml-2 rounded bg-amber-100 px-2 py-1 text-xs text-amber-800">
                             订单日期外
@@ -7529,15 +7788,13 @@ export default function Home() {
                           </span>
                         )}
                       </div>
-                      {date === accountingPreviewOrder.date && (
+                      {date === financeOrder.date && (
                         <span className="min-w-0 text-center text-lg font-bold text-gray-900">
-                          {accountingPreviewOrder.customer || "未填写"}
+                          {financeOrder.customer || "未填写"}
                         </span>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 md:justify-end">
-                        {!isMultiDayOrder && (
-                          <span>当日请求 {formatYen(dailyTotals.requestAmount)}</span>
-                        )}
+                        <span>当日请求 {formatYen(dailyTotals.requestAmount)}</span>
                         <span>ETC总额 {formatYen(dailyEtcTotal)}</span>
                         <span>燃油费 {formatYen(dailyFuelCost)}</span>
                         <span>燃油消耗 {dailyTotals.fuelConsumption.toLocaleString("ja-JP")} L</span>
@@ -7546,25 +7803,111 @@ export default function Home() {
                             ? "—"
                             : `${dailyFuelPrice.toLocaleString("ja-JP", { maximumFractionDigits: 2 })} JPY/L`}
                         </span>
-                        {!isMultiDayOrder && (
-                          <span>利润 {formatYen(dailyTotals.profit)}</span>
-                        )}
+                        <span>利润 {formatYen(dailyTotals.profit)}</span>
                       </div>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
+                      {isAccountingBatch && (
+                        <div className="md:col-span-2 grid gap-3 sm:grid-cols-2">
+                          <label className="block text-sm font-medium">
+                            订单来源
+                            <select
+                              className="mt-1 w-full rounded border p-2"
+                              value={financeOrderMeta.orderSource}
+                              onChange={(event) =>
+                                updateAccountingOrderMeta(financeOrder.id, "orderSource", event.target.value)
+                              }
+                            >
+                              <option value="">未填写</option>
+                              {accountingSourceOptions.map((source) => (
+                                <option key={source} value={source}>{source}</option>
+                              ))}
+                              {financeOrderMeta.orderSource &&
+                                !accountingSourceOptions.includes(financeOrderMeta.orderSource) && (
+                                  <option value={financeOrderMeta.orderSource}>
+                                    {financeOrderMeta.orderSource}（未登记）
+                                  </option>
+                                )}
+                            </select>
+                          </label>
+                          <label className="block text-sm font-medium">
+                            订单所属
+                            <select
+                              className="mt-1 w-full rounded border p-2"
+                              value={financeOrderMeta.company}
+                              onChange={(event) =>
+                                updateAccountingOrderMeta(financeOrder.id, "company", event.target.value)
+                              }
+                            >
+                              <option value="">未设置</option>
+                              {accountingCompanyOptions.map((company) => (
+                                <option key={company} value={company}>{company}</option>
+                              ))}
+                              {financeOrderMeta.company &&
+                                !accountingCompanyOptions.includes(financeOrderMeta.company) && (
+                                  <option value={financeOrderMeta.company}>
+                                    {financeOrderMeta.company}（未登记）
+                                  </option>
+                                )}
+                            </select>
+                          </label>
+                        </div>
+                      )}
+                      <div className="md:col-span-2 grid gap-3 rounded border border-blue-200 bg-blue-50/40 p-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
+                        <label className="block text-sm font-medium">
+                          行程简概
+                          <textarea
+                            rows={2}
+                            maxLength={1000}
+                            placeholder="例：成田空港 → 都内ホテル"
+                            className="mt-1 w-full resize-y rounded border bg-white p-2"
+                            value={finance.tripSummary}
+                            onChange={(event) =>
+                              setAccountingForm((current) => ({
+                                ...current,
+                                [financeKey]: {
+                                  ...(current[financeKey] || emptyOrderFinance),
+                                  tripSummary: event.target.value,
+                                },
+                              }))
+                            }
+                          />
+                        </label>
+                        <label className="block text-sm font-medium">
+                          当日车费
+                          <div className="relative mt-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="99999999999999"
+                              step="1"
+                              inputMode="numeric"
+                              className="w-full rounded border bg-white p-2 pr-12"
+                              value={finance.dailyFare || ""}
+                              onChange={(event) =>
+                                setAccountingForm((current) => ({
+                                  ...current,
+                                  [financeKey]: {
+                                    ...(current[financeKey] || emptyOrderFinance),
+                                    dailyFare:
+                                      event.target.value === ""
+                                        ? 0
+                                        : Number(event.target.value),
+                                  },
+                                }))
+                              }
+                            />
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">
+                              JPY
+                            </span>
+                          </div>
+                        </label>
+                      </div>
                       <FinanceDriverSelect
                           drivers={allDriverRecords}
                           regionId={accountingPreviewOrder.regionId}
                           value={finance.driver}
-                          onChange={(driver) =>
-                            setAccountingForm((current) => ({
-                              ...current,
-                              [date]: {
-                                ...(current[date] || emptyOrderFinance),
-                                driver,
-                              },
-                            }))
-                          }
+                          onChange={(driver) => updateAccountingFinance(financeKey, { driver })}
                       />
                       <OrderVehiclePlateSelect
                         financeMode
@@ -7578,8 +7921,8 @@ export default function Home() {
                         onSelect={(vehicle) =>
                             setAccountingForm((current) => ({
                               ...current,
-                              [date]: {
-                                ...(current[date] || emptyOrderFinance),
+                              [financeKey]: {
+                                ...(current[financeKey] || emptyOrderFinance),
                                 vehicle: vehicle.name,
                                 vehiclePlate: vehicle.plate,
                               },
@@ -7610,8 +7953,8 @@ export default function Home() {
                                     onChange={(event) =>
                                       setAccountingForm((current) => ({
                                         ...current,
-                                        [date]: {
-                                          ...(current[date] || emptyOrderFinance),
+                                        [financeKey]: {
+                                          ...(current[financeKey] || emptyOrderFinance),
                                           [field.key]:
                                             event.target.value === ""
                                               ? 0
@@ -7640,8 +7983,8 @@ export default function Home() {
                               onChange={(event) =>
                                 setAccountingForm((current) => ({
                                   ...current,
-                                  [date]: {
-                                    ...(current[date] || emptyOrderFinance),
+                                  [financeKey]: {
+                                    ...(current[financeKey] || emptyOrderFinance),
                                     driverWageMode:
                                       event.target.value === "percentage"
                                         ? "percentage"
@@ -7664,8 +8007,8 @@ export default function Home() {
                                   onChange={(event) =>
                                     setAccountingForm((current) => ({
                                       ...current,
-                                      [date]: {
-                                        ...(current[date] || emptyOrderFinance),
+                                      [financeKey]: {
+                                        ...(current[financeKey] || emptyOrderFinance),
                                         driverWagePercentage:
                                           event.target.value === "70"
                                             ? 70
@@ -7716,8 +8059,8 @@ export default function Home() {
                                   onChange={(event) =>
                                     setAccountingForm((current) => ({
                                       ...current,
-                                      [date]: {
-                                        ...(current[date] || emptyOrderFinance),
+                                      [financeKey]: {
+                                        ...(current[financeKey] || emptyOrderFinance),
                                         driverWage:
                                           event.target.value === ""
                                             ? 0
@@ -7746,8 +8089,8 @@ export default function Home() {
                                 onChange={(event) =>
                                   setAccountingForm((current) => ({
                                     ...current,
-                                    [date]: {
-                                      ...(current[date] || emptyOrderFinance),
+                                    [financeKey]: {
+                                      ...(current[financeKey] || emptyOrderFinance),
                                       driverBonusWage:
                                         event.target.value === ""
                                           ? 0

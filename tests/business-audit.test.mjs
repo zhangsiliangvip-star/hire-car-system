@@ -416,7 +416,7 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.ok(!source.includes("gridRow: isSingleDayOrder ? 1 : orderLane + 1"));
   assert.ok(source.includes("const laneOffset = orderLane * (orderCardHeight + orderCardGap) + orderCardGap;"));
-  assert.ok(source.includes("const orderCardHeight = 56;"));
+  assert.ok(source.includes("const baseOrderCardHeight = 56;"));
   assert.doesNotMatch(source, /maxDailyOrderCount|orderCardHeights/);
   const layout = source.slice(source.indexOf("            const orderLanes ="), source.indexOf("\n            return (", source.indexOf("            const orderLanes =")));
   const evaluate = (visibleOrders) => {
@@ -446,6 +446,16 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
     { id: "second", date: "2026-10-02", endDate: "2026-10-02" },
   ]).offsets, [4, 4]);
   assert.deepEqual(evaluate([]).heights, ["96px", "96px"]);
+  const withSummary = evaluate([
+    { id: "trip", date: "2026-10-01", endDate: "2026-10-02", offDates: [],
+      financeByDate: { "2026-10-02": { tripSummary: "成田 → 東京" } } },
+  ]);
+  assert.equal(withSummary.cardHeight, 72);
+  assert.deepEqual(withSummary.heights, ["120px", "120px"]);
+  assert.equal(evaluate([
+    { id: "off", date: "2026-10-01", endDate: "2026-10-02", offDates: ["2026-10-02"],
+      financeByDate: { "2026-10-02": { tripSummary: "休運" } } },
+  ]).cardHeight, 56);
   assert.ok(source.includes("openNewOrder(vehicleRecord, d.date);"));
 });
 
@@ -845,7 +855,9 @@ test("invoice always keeps order line and prints exactly the nonzero trip charge
     fees.forEach((fee, index) => { data[fee] = mask & (1 << index) ? 110 * (index + 1) : 0; });
     const html = buildInvoicePrintHtml(data);
     const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/)[1];
-    assert.equal((body.match(/<tr>/g) ?? []).length, 1 + fees.filter((fee) => data[fee] > 0).length);
+    const hasTripReport = fees.some((fee) => data[fee] > 0);
+    assert.equal((body.match(/<tr[ >]/g) ?? []).length, 1 + (hasTripReport ? 1 : 0));
+    assert.equal(body.includes("旅報費用（全日程合計）"), hasTripReport);
     assert.ok(body.includes("&lt;Order&gt;"));
     labels.forEach((label, index) => assert.equal(body.includes(label), data[fees[index]] > 0));
     const total = data.orderPrice + fees.reduce((sum, fee) => sum + data[fee], 0);
@@ -856,6 +868,35 @@ test("invoice always keeps order line and prints exactly the nonzero trip charge
   const zero = buildInvoicePrintHtml({ ...base, orderPrice: 0 });
   assert.ok(zero.match(/<tbody>([\s\S]*?)<\/tbody>/)[1].includes('class="number">¥0'));
   assert.throws(() => buildInvoicePrintHtml({ ...base, etcTrip: -1 }));
+});
+
+test("invoice lists each day's trip summary and fare before trip-report charges", () => {
+  const { buildInvoicePrintHtml } = load("lib\\invoice-print.ts", {
+    "@/lib/print-a4": { printA4Html() {} },
+    "@/lib/company-seal": { isCompanySealDataUrl: (value) => value === "" },
+  });
+  const base = {
+    number: "INV-000002", issuedDate: "2026-10-21", startDate: "2026-10-20", endDate: "2026-10-21",
+    customer: "Tour <A>", recipient: "Recipient", contact: "", recipientAddress: "",
+    company: "Company", phone: "", address: "", bankAccount: "", taxRegistrationNumber: "",
+    orderPrice: 50000, etcTrip: 1100, driverAdvanceTrip: 2200, companyAdvanceTrip: 0,
+    days: [
+      { date: "2026-10-20", summary: "成田空港 → <Hotel>", fare: 30000 },
+      { date: "2026-10-21", summary: "", fare: 20000 },
+    ],
+  };
+  const html = buildInvoicePrintHtml(base);
+  const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/)[1];
+  const rows = body.match(/<tr[^>]*>[\s\S]*?<\/tr>/g);
+  assert.equal(rows.length, 3);
+  assert.ok(rows[0].includes("10/20（火）") && rows[0].includes("成田空港 → &lt;Hotel&gt;") && rows[0].includes("¥30,000"));
+  assert.ok(rows[1].includes("10/21（水）") && rows[1].includes("運行料金") && rows[1].includes("¥20,000"));
+  assert.ok(rows[2].includes("旅報費用（全日程合計）") && rows[2].includes("ETC料金 ¥1,100／運転士立替金 ¥2,200") && rows[2].includes("¥3,300"));
+  assert.ok(!rows[2].includes("会社立替金"));
+  assert.ok(html.includes("件名：Tour &lt;A&gt;"));
+  assert.ok(html.includes("<strong>¥53,300</strong>"));
+  assert.throws(() => buildInvoicePrintHtml({ ...base, orderPrice: 49999 }), /不一致/);
+  assert.throws(() => buildInvoicePrintHtml({ ...base, days: [{ date: "2026-10-20", summary: "", fare: -1 }] }));
 });
 
 test("inline operation markers remain in reservation editor and details but not the list", () => {

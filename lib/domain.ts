@@ -27,6 +27,8 @@ export type OrderFinance = {
   driver: string;
   vehicle: string;
   vehiclePlate: string;
+  tripSummary: string;
+  dailyFare: number;
   etcCompanyReport: number;
   etcTripReport: number;
   fuelCost: number;

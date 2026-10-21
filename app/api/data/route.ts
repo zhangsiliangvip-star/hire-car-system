@@ -26,6 +26,8 @@ const orderFinanceSchema = z.object({
   driver: z.string().max(200).default(""),
   vehicle: z.string().max(200).default(""),
   vehiclePlate: z.string().max(100).default(""),
+  tripSummary: z.string().max(1000).default(""),
+  dailyFare: z.number().int().min(0).max(99_999_999_999_999).default(0),
   etcCompanyReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
   etcTripReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
   fuelCost: z.number().int().min(0).max(99_999_999_999_999).default(0),
@@ -226,6 +228,8 @@ function toOrderFinance(value: unknown): OrderFinance {
       driver: "",
       vehicle: "",
       vehiclePlate: "",
+      tripSummary: "",
+      dailyFare: 0,
       etcCompanyReport: 0,
       etcTripReport: 0,
       fuelCost: 0,
@@ -250,6 +254,8 @@ function toOrderFinance(value: unknown): OrderFinance {
     driver: typeof entry.driver === "string" ? entry.driver.slice(0, 200) : "",
     vehicle: typeof entry.vehicle === "string" ? entry.vehicle.slice(0, 200) : "",
     vehiclePlate: typeof entry.vehiclePlate === "string" ? entry.vehiclePlate.slice(0, 100) : "",
+    tripSummary: typeof entry.tripSummary === "string" ? entry.tripSummary.slice(0, 1000) : "",
+    dailyFare: toFinanceAmount(entry.dailyFare),
     etcCompanyReport: toFinanceAmount(entry.etcCompanyReport),
     etcTripReport: toFinanceAmount(entry.etcTripReport),
     fuelCost: toFinanceAmount(entry.fuelCost),
@@ -295,7 +301,28 @@ function toFinanceByDate(value: unknown): OrderFinanceByDate {
   );
 }
 
+/**
+ * Orders saved before per-day fares existed kept the whole price on the first service day;
+ * expose that same amount as the first day's fare so totals stay unchanged.
+ */
+function withLegacyDailyFare(
+  financeByDate: OrderFinanceByDate,
+  startDate: string,
+  orderPrice: number,
+): OrderFinanceByDate {
+  const firstDay = financeByDate[startDate];
+  if (
+    orderPrice <= 0 ||
+    !firstDay ||
+    Object.values(financeByDate).some((finance) => finance.dailyFare > 0)
+  ) {
+    return financeByDate;
+  }
+  return { ...financeByDate, [startDate]: { ...firstDay, dailyFare: orderPrice } };
+}
+
 function toOrder(row: Database["public"]["Tables"]["orders"]["Row"]): Order {
+  const orderPrice = toFinanceAmount(row.order_price);
   return {
     lastOperation: toLastOperation(row.last_operation),
     id: row.id,
@@ -316,7 +343,7 @@ function toOrder(row: Database["public"]["Tables"]["orders"]["Row"]): Order {
     orderSource: row.order_source,
     company: row.company,
     salesRep: row.sales_rep,
-    orderPrice: toFinanceAmount(row.order_price),
+    orderPrice,
     accountingStatus: row.accounting_status,
     invoiceStatus: row.invoice_status,
     invoiceSentDate: row.invoice_sent_date || "",
@@ -324,7 +351,7 @@ function toOrder(row: Database["public"]["Tables"]["orders"]["Row"]): Order {
     depositDate: row.deposit_date || "",
     accountingAssignee: row.accounting_assignee,
     financeNote: row.finance_note,
-    financeByDate: toFinanceByDate(row.finance_by_date),
+    financeByDate: withLegacyDailyFare(toFinanceByDate(row.finance_by_date), row.date, orderPrice),
   };
 }
 

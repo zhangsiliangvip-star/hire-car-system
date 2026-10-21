@@ -1,6 +1,12 @@
 import { printA4Html } from "@/lib/print-a4";
 import { isCompanySealDataUrl } from "@/lib/company-seal";
 
+type InvoiceDay = {
+  date: string;
+  summary: string;
+  fare: number;
+};
+
 type InvoiceData = {
   number: string;
   issuedDate: string;
@@ -17,10 +23,22 @@ type InvoiceData = {
   taxRegistrationNumber: string;
   sealImage?: string;
   orderPrice: number;
+  /** Per-day trip lines; when present their fares must add up to orderPrice. */
+  days?: InvoiceDay[];
   etcTrip: number;
   driverAdvanceTrip: number;
   companyAdvanceTrip: number;
 };
+
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+function formatInvoiceDay(date: string) {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime())) {
+    throw new Error("请求书日期格式不正确。");
+  }
+  return `${date.slice(5, 7)}/${date.slice(8, 10)}（${WEEKDAYS[parsed.getUTCDay()]}）`;
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -36,14 +54,29 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   }
   const total = amounts.reduce((sum, value) => sum + value, 0);
   if (!Number.isSafeInteger(total)) throw new Error("请求书合计超出金额范围。");
+  const days = data.days ?? [];
+  if (days.some((day) => !Number.isSafeInteger(day.fare) || day.fare < 0)) {
+    throw new Error("请求书当日车费必须是非负日元整数。");
+  }
+  if (days.length > 0 && days.reduce((sum, day) => sum + day.fare, 0) !== data.orderPrice) {
+    throw new Error("每日车费合计与订单价格不一致，请保存后重新导出。");
+  }
   const tax = Number(BigInt(total) * BigInt(10) / BigInt(110));
   const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
-  const items = [
-    [`${data.customer} ／ 運行料金`, data.orderPrice],
+  const fareRows = days.length > 0
+    ? days.map((day) =>
+        `<tr class="day"><td><span class="day-date">${formatInvoiceDay(day.date)}</span>${escapeHtml(day.summary || "運行料金")}</td><td>10%</td><td class="number">${yen(day.fare)}</td></tr>`,
+      ).join("")
+    : `<tr><td>${escapeHtml(`${data.customer} ／ 運行料金`)}</td><td>10%</td><td class="number">${yen(data.orderPrice)}</td></tr>`;
+  const tripReportParts = ([
     ["ETC料金", data.etcTrip],
     ["運転士立替金", data.driverAdvanceTrip],
     ["会社立替金", data.companyAdvanceTrip],
-  ] as const;
+  ] as const).filter(([, amount]) => amount > 0);
+  const tripReportTotal = data.etcTrip + data.driverAdvanceTrip + data.companyAdvanceTrip;
+  const tripReportRow = tripReportTotal > 0
+    ? `<tr class="trip-report"><td>旅報費用（全日程合計）<span class="breakdown">${tripReportParts.map(([label, amount]) => `${label} ${yen(amount)}`).join("／")}</span></td><td>10%</td><td class="number">${yen(tripReportTotal)}</td></tr>`
+    : "";
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>請求書</title><style>
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
@@ -67,6 +100,10 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   th, td { border: 1px solid #aeb9c3; padding: 14px 8px; overflow-wrap: anywhere; }
   th { background: #edf1f5; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.day td { padding: 8px; white-space: pre-wrap; }
+  .day-date { display: inline-block; min-width: 5.5em; margin-right: 8px; font-weight: bold; }
+  .subject { margin: 0 0 10px; }
+  .breakdown { display: block; margin-top: 4px; font-size: 10px; color: #4a5a6a; }
   .tax { margin-left: auto; width: 60%; margin-top: 14px; }
   .tax td { padding: 8px; }
   .bank { border: 1px solid #aeb9c3; padding: 14px; margin-top: 24px; }
@@ -80,9 +117,10 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   <br>登録番号：${escapeHtml(data.taxRegistrationNumber)}</div></div>
   <div class="total"><span>ご請求金額（税込）</span><strong>${yen(total)}</strong></div>
   <p class="period">取引年月日（運行期間）：${escapeHtml(data.startDate)} ～ ${escapeHtml(data.endDate)}</p>
+  ${days.length > 0 ? `<p class="subject">件名：${escapeHtml(data.customer)}</p>` : ""}
   <table><colgroup><col style="width:65%"><col style="width:10%"><col style="width:25%"></colgroup>
   <thead><tr><th>請求内容</th><th>税率</th><th>金額（税込）</th></tr></thead>
-  <tbody>${items.filter(([, amount], index) => index === 0 || amount > 0).map(([label, amount]) => `<tr><td>${escapeHtml(label)}</td><td>10%</td><td class="number">${yen(amount)}</td></tr>`).join("")}</tbody></table>
+  <tbody>${fareRows}${tripReportRow}</tbody></table>
   <table class="tax"><tbody><tr><td>10%対象額（税込）</td><td class="number">${yen(total)}</td></tr>
   <tr><td>うち消費税額（10%）</td><td class="number">${yen(tax)}</td></tr>
   <tr><td>合計（税込）</td><td class="number">${yen(total)}</td></tr></tbody></table>
