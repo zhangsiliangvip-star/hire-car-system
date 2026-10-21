@@ -151,6 +151,7 @@ const orderSourceSchema = z.object({
   id: idSchema,
   regionId: idSchema,
   companyName: z.string().min(1).max(200),
+  shortName: z.string().max(50).optional(),
   contactName: z.string().max(200),
   contactInfo: z.string().max(500),
   address: z.string().max(500),
@@ -432,6 +433,7 @@ function toOrderSource(
     id: row.id,
     regionId: row.region_id,
     companyName: row.company_name,
+    shortName: row.short_name ?? "",
     contactName: row.contact_name,
     contactInfo: row.contact_info,
     address: row.address,
@@ -559,6 +561,7 @@ function toOrderSourceRow(
     id: source.id,
     region_id: source.regionId ?? "",
     company_name: source.companyName,
+    short_name: source.shortName ?? "",
     contact_name: source.contactName,
     contact_info: source.contactInfo,
     address: source.address,
@@ -645,10 +648,25 @@ async function applyMutation(
     }
   } else if (mutation.collection === "orderSources") {
     if (mutation.upsert.length) {
-      const { error } = await supabase
-        .from("order_sources")
-        .upsert(mutation.upsert.map(toOrderSourceRow));
-      if (error) throw error;
+      const rows = mutation.upsert.map(toOrderSourceRow);
+      const { error } = await supabase.from("order_sources").upsert(rows);
+      if (error) {
+        // Until the short_name migration is applied, save everything else and keep existing data intact.
+        const shortNameColumnMissing =
+          error.code === "PGRST204" && error.message.includes("short_name");
+        if (!shortNameColumnMissing) throw error;
+        if (rows.some((row) => row.short_name)) {
+          throw new Error("数据库尚未添加来源简称字段，请先执行 order_source_short_name 迁移后再保存简称。");
+        }
+        const { error: fallbackError } = await supabase
+          .from("order_sources")
+          .upsert(rows.map((row) => {
+            const legacyRow = { ...row };
+            delete legacyRow.short_name;
+            return legacyRow;
+          }));
+        if (fallbackError) throw fallbackError;
+      }
     }
     if (mutation.deleteIds.length) {
       const { error } = await supabase

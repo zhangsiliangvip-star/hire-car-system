@@ -453,9 +453,24 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
   assert.equal(withSummary.cardHeight, 72);
   assert.deepEqual(withSummary.heights, ["120px", "120px"]);
   assert.equal(evaluate([
+    { id: "single", date: "2026-10-01", endDate: "2026-10-01", offDates: [],
+      financeByDate: { "2026-10-01": { tripSummary: "09:00 成田 → 東京" } } },
+  ]).cardHeight, 56);
+  assert.equal(evaluate([
     { id: "off", date: "2026-10-01", endDate: "2026-10-02", offDates: ["2026-10-02"],
       financeByDate: { "2026-10-02": { tripSummary: "休運" } } },
   ]).cardHeight, 56);
+  const sortSource = source.slice(source.indexOf("const visibleOrders = orders"), source.indexOf("            const orderLanes ="));
+  const sorted = vm.runInNewContext(`(${ts.transpileModule(
+    `(list) => list${sortSource.slice(sortSource.indexOf(".sort("))}`.replace(/;\s*$/, ""),
+    { compilerOptions: { target: ts.ScriptTarget.ES2020 } },
+  ).outputText.trim().replace(/;$/, "")})`)([
+    { id: "late", date: "2026-10-01", time: "18:00" },
+    { id: "none", date: "2026-10-01", time: "" },
+    { id: "early", date: "2026-10-01", time: "06:30" },
+    { id: "prev", date: "2026-09-30", time: "23:00" },
+  ]).map((order) => order.id);
+  assert.deepEqual(sorted, ["prev", "early", "late", "none"]);
   assert.ok(source.includes("openNewOrder(vehicleRecord, d.date);"));
 });
 
@@ -1272,4 +1287,27 @@ test("history UI renders filters, operator, Japan time and escaped before/after 
   assert.ok(html.includes("&lt;script&gt;"));
   assert.ok(html.indexOf("東京") < html.indexOf("大阪"));
   assert.ok(html.indexOf("大阪") < html.indexOf("北海道"));
+});
+
+test("order source dialog ranks sources by non-cancelled order count within region", () => {
+  const { rankSourcesByUsage } = load("lib\\source-selection.ts");
+  const other = "60000000-0000-4000-8000-000000000002";
+  const sources = [
+    { id: "a", regionId: region, companyName: "Alpha Travel Co", shortName: "AT", color: "#000000" },
+    { id: "b", regionId: region, companyName: "Beta", shortName: "", color: "#000000" },
+    { id: "c", regionId: region, companyName: "Cherry", shortName: "", color: "#000000" },
+  ];
+  const orders = [
+    { regionId: region, orderSource: "Beta", status: "予約確定" },
+    { regionId: region, orderSource: "Beta", status: "仮予約" },
+    { regionId: region, orderSource: "Alpha Travel Co", status: "予約確定" },
+    { regionId: region, orderSource: "Alpha Travel Co", status: "キャンセル" },
+    { regionId: other, orderSource: "Cherry", status: "予約確定" },
+    { regionId: other, orderSource: "Cherry", status: "予約確定" },
+  ];
+  const ranked = rankSourcesByUsage(sources, orders);
+  assert.deepEqual(ranked.map((source) => [source.id, source.orderCount]), [["b", 2], ["a", 1], ["c", 0]]);
+  const page = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.ok(page.includes("<SourceSelectionDialog"));
+  assert.ok(!page.includes("customSourceMode"));
 });

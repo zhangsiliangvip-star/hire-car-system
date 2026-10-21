@@ -108,6 +108,7 @@ export type Database = {
         id: string;
         region_id: string;
         company_name: string;
+        short_name?: string;
         contact_name: string;
         contact_info: string;
         address: string;

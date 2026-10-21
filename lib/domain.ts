@@ -138,6 +138,7 @@ export type OrderSource = AuditedRecord & {
   id: string;
   regionId?: string;
   companyName: string;
+  shortName?: string;
   contactName: string;
   contactInfo: string;
   address: string;

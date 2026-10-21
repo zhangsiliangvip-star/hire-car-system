@@ -47,8 +47,10 @@ import { printVehicleFinance, printVehicleSummary } from "@/lib/vehicle-finance-
 import { summarizeVehicles, totalVehicleSummaries, type VehicleMonthlySummary } from "@/lib/vehicle-finance-summary";
 import { printCompanyWages, printDriverWages } from "@/lib/driver-wage-print";
 import { DriverSelectionDialog } from "@/components/driver-selection-dialog";
+import { SourceSelectionDialog } from "@/components/source-selection-dialog";
 import { OrderDateFilterDialog } from "@/components/order-date-filter-dialog";
 import { rankDriversByRecentService } from "@/lib/driver-selection";
+import { rankSourcesByUsage } from "@/lib/source-selection";
 import Image from "next/image";
 import { CompanySealUpload } from "@/components/company-seal-upload";
 import { isCompanySealDataUrl } from "@/lib/company-seal";
@@ -238,7 +240,6 @@ function SourceColorPicker({
   );
 }
 
-const CUSTOM_SOURCE = "__custom_source__";
 const UNSOURCED_ORDER = "__unsourced_order__";
 
 function toDateKey(date: Date) {
@@ -607,6 +608,14 @@ function calculateOrderFinance(
     fuelConsumption: getOrderFinanceAmount(order, "fuelConsumption"),
     profit: requestAmount - companyExpenses - driverAdvances - driverWages,
   };
+}
+
+function isRentalOrderSource(source: string) {
+  return /租车|租車|レンタカー|レンタル/i.test(source || "");
+}
+
+function isOrderArranged(order: Pick<Order, "driver" | "orderSource">) {
+  return Boolean(order.driver) || isRentalOrderSource(order.orderSource);
 }
 
 function getOrderDateKeys(order: Pick<Order, "date" | "endDate">): string[] {
@@ -1031,6 +1040,7 @@ export default function Home() {
   const [editingSourceName, setEditingSourceName] = useState<string | null>(null);
   const [sourceForm, setSourceForm] = useState<OrderSourceDraft>({
     companyName: "",
+    shortName: "",
     contactName: "",
     contactInfo: "",
     address: "",
@@ -1098,7 +1108,7 @@ export default function Home() {
   const [offDateInput, setOffDateInput] = useState("");
   const [customDriverMode, setCustomDriverMode] = useState(false);
   const [driverSelectionTarget, setDriverSelectionTarget] = useState<string | null>(null);
-  const [customSourceMode, setCustomSourceMode] = useState(false);
+  const [sourceSelectionOpen, setSourceSelectionOpen] = useState<"form" | "batch" | null>(null);
   const [customCompanyMode, setCustomCompanyMode] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -1268,9 +1278,11 @@ export default function Home() {
     getVersionVehicleMonthlyFinanceRecords,
     getVersionBalanceExpenseItems,
   ]);
-  const orderSources = orderSourceRecords.map((source) => source.companyName);
   const orderSourceColorByRegion = new Map(
     orderSourceRecords.map((source) => [`${source.regionId}:${source.companyName}`, source.color]),
+  );
+  const orderSourceShortNameByRegion = new Map(
+    orderSourceRecords.map((source) => [`${source.regionId}:${source.companyName}`, source.shortName?.trim() || ""]),
   );
   const unregisteredSourceNames = Array.from(
     new Set(orders.map((order) => order.orderSource).filter(Boolean)),
@@ -1281,6 +1293,7 @@ export default function Home() {
       id: `unregistered-source-${index}`,
       regionId: activeRegionId === ALL_REGIONS_ID ? undefined : activeRegionId,
       companyName: name,
+      shortName: "",
       contactName: "",
       contactInfo: "",
       address: "",
@@ -2478,7 +2491,6 @@ export default function Home() {
     setForm(createEmptyDraft(vehicle.name, date, vehicle.plate));
     setOffDateInput("");
     setCustomDriverMode(false);
-    setCustomSourceMode(false);
     setCustomCompanyMode(false);
     setShowForm(true);
   }
@@ -2527,6 +2539,15 @@ export default function Home() {
         destination: detail.destination,
         orderSource: batchOrderSource.trim(),
         company: batchOrderCompany.trim(),
+        financeByDate: {
+          [batchOrderDate]: {
+            ...emptyOrderFinance,
+            driver: "",
+            vehicle: batchVehicle.name,
+            vehiclePlate: batchVehicle.plate || "",
+            tripSummary: `${detail.time} ${detail.pickup} → ${detail.destination}`.slice(0, 1000),
+          },
+        },
       })),
     ]);
     setShowBatchOrderForm(false);
@@ -2647,6 +2668,7 @@ export default function Home() {
     setEditingSourceName(null);
     setSourceForm({
       companyName: "",
+      shortName: "",
       contactName: "",
       contactInfo: "",
       address: "",
@@ -2660,6 +2682,7 @@ export default function Home() {
     setEditingSourceName(source.companyName);
     setSourceForm({
       companyName: source.companyName,
+      shortName: source.shortName || "",
       contactName: source.contactName,
       contactInfo: source.contactInfo,
       address: source.address,
@@ -2676,6 +2699,7 @@ export default function Home() {
     if (!sourceRegionId) return;
     const savedSource: OrderSourceDraft = {
       companyName: sourceForm.companyName.trim(),
+      shortName: (sourceForm.shortName || "").trim(),
       contactName: sourceForm.contactName.trim(),
       contactInfo: sourceForm.contactInfo.trim(),
       address: sourceForm.address.trim(),
@@ -2747,6 +2771,7 @@ export default function Home() {
           id: createId(),
           regionId: source.regionId,
           companyName: source.companyName,
+          shortName: source.shortName || "",
           contactName: source.contactName,
           contactInfo: source.contactInfo,
           address: source.address,
@@ -3338,11 +3363,6 @@ export default function Home() {
         !driverRecords.some((driver) => driver.name === order.driver),
     );
 
-    setCustomSourceMode(
-      Boolean(order.orderSource) &&
-        !orderSources.includes(order.orderSource),
-    );
-
     setCustomCompanyMode(
       Boolean(order.company) &&
         !companies.includes(order.company),
@@ -3517,7 +3537,6 @@ export default function Home() {
     setPendingOrderConflicts([]);
     setOffDateInput("");
     setCustomDriverMode(false);
-    setCustomSourceMode(false);
     setCustomCompanyMode(false);
   }
 
@@ -5280,7 +5299,10 @@ export default function Home() {
                   order.date <= dates[dates.length - 1].date &&
                   (order.endDate || order.date) >= dates[0].date,
               )
-              .sort((first, second) => first.date.localeCompare(second.date));
+              .sort((first, second) =>
+                first.date.localeCompare(second.date) ||
+                (first.time || "99:99").localeCompare(second.time || "99:99"),
+              );
             const orderLanes = new Map<string, number>();
             const laneEndDates: string[] = [];
 
@@ -5296,7 +5318,10 @@ export default function Home() {
               (order.offDates || []).includes(date)
                 ? ""
                 : order.financeByDate?.[date]?.tripSummary?.trim() || "";
+            // Single-day orders never show trip summaries on the calendar.
             const orderHasTripSummaries = (order: Order) =>
+              Boolean(order.endDate) &&
+              order.endDate !== order.date &&
               Object.keys(order.financeByDate || {}).some((date) =>
                 date >= dates[0].date &&
                 date <= dates[dates.length - 1].date &&
@@ -5703,7 +5728,7 @@ export default function Home() {
                                 className="min-w-0 truncate"
                                 title={order.orderSource || "未填写"}
                               >
-                                {order.orderSource || "未填写"}
+                                {orderSourceShortNameByRegion.get(`${order.regionId}:${order.orderSource}`) || order.orderSource || "未填写"}
                               </div>
                               <div
                                 className={`min-w-0 truncate ${orderDriverExpired ? "rounded bg-white px-1 font-semibold text-red-600" : ""}`}
@@ -5856,9 +5881,9 @@ export default function Home() {
                           <td className="px-4 py-3">{order.time}</td>
                           <td className="px-4 py-3">
                             <span
-                              className={`rounded border px-2 py-1 text-xs ${order.driver ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}
+                              className={`rounded border px-2 py-1 text-xs ${isOrderArranged(order) ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}
                             >
-                              {order.driver ? "完成" : "未完成"}
+                              {isOrderArranged(order) ? "完成" : "未完成"}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -6144,6 +6169,7 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">来源</th>
+                      <th className="px-4 py-3 font-semibold">简称</th>
                       <th className="px-4 py-3 font-semibold">担当</th>
                       <th className="px-4 py-3 font-semibold">連絡先</th>
                       <th className="px-4 py-3 font-semibold">地址</th>
@@ -6160,6 +6186,7 @@ export default function Home() {
                             onSelect={(color) => updateSourceColor(source, color)}
                           />
                         </td>
+                        <td className="px-4 py-3">{source.shortName || "-"}</td>
                         <td className="px-4 py-3">{source.contactName || "-"}</td>
                         <td className="px-4 py-3">{source.contactInfo || "-"}</td>
                         <td className="px-4 py-3">{source.address || "-"}</td>
@@ -6322,22 +6349,17 @@ export default function Home() {
                   ))}
                 </select>
               </label>
-              <label className="block text-sm font-medium">
+              <div className="block text-sm font-medium">
                 来源
-                <input
-                  type="text"
-                  list="batch-order-sources"
-                  value={batchOrderSource}
-                  onChange={(event) => setBatchOrderSource(event.target.value)}
-                  placeholder="未填写"
-                  className="mt-1 w-full rounded border px-3 py-2"
-                />
-                <datalist id="batch-order-sources">
-                  {orderSources.map((source) => (
-                    <option key={source} value={source} />
-                  ))}
-                </datalist>
-              </label>
+                <button type="button" aria-haspopup="dialog"
+                  onClick={() => setSourceSelectionOpen("batch")}
+                  title={batchOrderSource || undefined}
+                  className="mt-1 w-full rounded border px-3 py-2 text-left hover:bg-blue-50">
+                  {(batchOrderSource
+                    ? orderSourceShortNameByRegion.get(`${getRegionForNewRecords()}:${batchOrderSource}`) || batchOrderSource
+                    : "未填写来源")} · 点击选择
+                </button>
+              </div>
               <label className="block text-sm font-medium">
                 所属公司
                 <input
@@ -6426,56 +6448,17 @@ export default function Home() {
               </label>
 
               {/* 来源 */}
-              <label className="block text-sm font-medium">
+              <div className="block text-sm font-medium">
                 来源
-                <select
-                  className="mt-1 w-full rounded border p-2"
-                  value={
-                    customSourceMode
-                      ? CUSTOM_SOURCE
-                      : form.orderSource
-                  }
-                  onChange={(e) => {
-                    const value = e.target.value;
-
-                    if (value === CUSTOM_SOURCE) {
-                      setCustomSourceMode(true);
-                      setForm({ ...form, orderSource: "" });
-                    } else {
-                      setCustomSourceMode(false);
-                      setForm({ ...form, orderSource: value });
-                    }
-                  }}
-                >
-                  {orderSources.map((source) => (
-                    <option key={source} value={source}>
-                      {source}
-                    </option>
-                  ))}
-                  <option value={CUSTOM_SOURCE}>
-                    ＋ 手动输入新来源
-                  </option>
-                </select>
-              </label>
-
-              {customSourceMode && (
-                <label className="block text-sm font-medium">
-                  新来源
-                  <input
-                    type="text"
-                    autoFocus
-                    className="mt-1 w-full rounded border p-2"
-                    value={form.orderSource}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        orderSource: e.target.value,
-                      })
-                    }
-                    placeholder="请输入新的来源"
-                  />
-                </label>
-              )}
+                <button type="button" aria-haspopup="dialog"
+                  onClick={() => setSourceSelectionOpen("form")}
+                  title={form.orderSource || undefined}
+                  className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50">
+                  {(form.orderSource
+                    ? orderSourceShortNameByRegion.get(`${form.regionId || getRegionForNewRecords()}:${form.orderSource}`) || form.orderSource
+                    : "未填写来源")} · 点击选择
+                </button>
+              </div>
 
               {/* 予約状態 */}
               <label className="block text-sm font-medium">
@@ -7214,6 +7197,18 @@ export default function Home() {
                 />
               </label>
               <label className="block text-sm font-medium">
+                简称（显示在カレンダー卡片上，留空则显示全称）
+                <input
+                  type="text"
+                  maxLength={50}
+                  className="mt-1 w-full rounded border p-2"
+                  value={sourceForm.shortName || ""}
+                  onChange={(event) =>
+                    setSourceForm({ ...sourceForm, shortName: event.target.value })
+                  }
+                />
+              </label>
+              <label className="block text-sm font-medium">
                 来源颜色
                 <span className="mt-1 flex items-center gap-3">
                   <input
@@ -7427,6 +7422,28 @@ export default function Home() {
             </div>
           </section>
         </div>
+      )}
+
+      {sourceSelectionOpen && (
+        <SourceSelectionDialog
+          sources={rankSourcesByUsage(
+            orderSourceRecords.filter((source) =>
+              source.regionId === (sourceSelectionOpen === "form"
+                ? form.regionId || getRegionForNewRecords()
+                : getRegionForNewRecords())),
+            orders,
+          )}
+          selected={sourceSelectionOpen === "form" ? form.orderSource : batchOrderSource}
+          onClose={() => setSourceSelectionOpen(null)}
+          onSelect={(name) => {
+            if (sourceSelectionOpen === "form") {
+              setForm((current) => ({ ...current, orderSource: name }));
+            } else {
+              setBatchOrderSource(name);
+            }
+            setSourceSelectionOpen(null);
+          }}
+        />
       )}
 
       {driverSelectionTarget && (
