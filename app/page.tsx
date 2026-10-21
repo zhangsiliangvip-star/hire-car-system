@@ -98,14 +98,18 @@ function parseNonNegativeInteger(value: string) {
 
 
 function getDistinctSourceColor(index: number) {
-  const hue = (index % 16) * 22.5;
+  const hue = (index % 12) * 30;
   const variants = [
-    { saturation: 0.82, lightness: 0.43 },
-    { saturation: 0.72, lightness: 0.58 },
-    { saturation: 0.92, lightness: 0.66 },
-    { saturation: 0.62, lightness: 0.34 },
+    { saturation: 0.95, lightness: 0.38 },
+    { saturation: 0.95, lightness: 0.5 },
+    { saturation: 0.95, lightness: 0.62 },
+    { saturation: 0.95, lightness: 0.74 },
+    { saturation: 0.72, lightness: 0.36 },
+    { saturation: 0.72, lightness: 0.48 },
+    { saturation: 0.72, lightness: 0.6 },
+    { saturation: 0.72, lightness: 0.72 },
   ];
-  const { saturation, lightness } = variants[Math.floor(index / 16)];
+  const { saturation, lightness } = variants[Math.floor(index / 12)];
   const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
   const hueSection = hue / 60;
   const secondary = chroma * (1 - Math.abs((hueSection % 2) - 1));
@@ -141,7 +145,7 @@ function getSourceTextColor(color: string) {
     : "#ffffff";
 }
 
-const sourceColorOptions = Array.from({ length: 64 }, (_, index) =>
+const sourceColorOptions = Array.from({ length: 96 }, (_, index) =>
   getDistinctSourceColor(index),
 );
 
@@ -162,8 +166,8 @@ function SourceColorPicker({
   function togglePalette() {
     if (!isOpen && pickerRef.current) {
       const bounds = pickerRef.current.getBoundingClientRect();
-      const paletteWidth = 188;
-      const paletteHeight = 188;
+      const paletteWidth = 284;
+      const paletteHeight = 228;
       setPalettePosition({
         left: Math.max(
           8,
@@ -200,23 +204,28 @@ function SourceColorPicker({
   }, [isOpen]);
 
   return (
-    <span ref={pickerRef} className="inline-flex items-center gap-2">
+    <span ref={pickerRef} className="inline-flex items-center gap-4">
       <button
         type="button"
         aria-label={`选择${sourceName}的颜色`}
         aria-expanded={isOpen}
         onClick={togglePalette}
-        className="h-5 w-5 rounded-full border border-black/10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        style={{ backgroundColor: color || "#94a3b8" }}
-      />
-      {sourceName}
+        className="inline-flex h-8 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+      >
+        <span
+          aria-hidden="true"
+          className="h-4 w-4 rounded-full border border-black/20 shadow-inner"
+          style={{ backgroundColor: color || "#94a3b8" }}
+        />
+        选颜色
+      </button>
       {isOpen &&
         createPortal(
           <div
             ref={paletteRef}
             role="group"
-            aria-label="固定颜色选项"
-            className="fixed z-[100] grid w-[188px] grid-cols-8 gap-0.5 rounded-lg border bg-white p-1.5 shadow-lg"
+            aria-label="来源颜色选项"
+            className="fixed z-[100] grid w-[284px] grid-cols-12 gap-1 rounded-lg border bg-white p-2 shadow-lg"
             style={{ left: palettePosition.left, top: palettePosition.top }}
           >
             {sourceColorOptions.map((option) => (
@@ -229,10 +238,20 @@ function SourceColorPicker({
                   onSelect(option);
                   setIsOpen(false);
                 }}
-                className={`h-5 w-5 rounded-full border border-black/10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${color.toLowerCase() === option ? "ring-2 ring-blue-600 ring-offset-2" : ""}`}
+                className={`h-4 w-4 rounded-full border border-black/10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${color.toLowerCase() === option ? "ring-2 ring-blue-600 ring-offset-2" : ""}`}
                 style={{ backgroundColor: option }}
               />
             ))}
+            <label className="relative col-span-12 mt-1 flex h-8 cursor-pointer items-center justify-center rounded border border-dashed border-slate-300 text-xs font-medium text-slate-700 hover:border-blue-500 hover:bg-blue-50">
+              自定义颜色
+              <input
+                type="color"
+                aria-label={`自定义${sourceName}的颜色`}
+                value={/^#[0-9a-f]{6}$/i.test(color) ? color : "#94a3b8"}
+                onChange={(event) => onSelect(event.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
           </div>,
           document.body,
         )}
@@ -984,8 +1003,11 @@ export default function Home() {
   const [batchOrderInput, setBatchOrderInput] = useState("");
   const [batchOrderDate, setBatchOrderDate] = useState("");
   const [batchOrderVehicle, setBatchOrderVehicle] = useState("");
+  const [batchOrderStatus, setBatchOrderStatus] = useState<OrderStatus>("仮予約");
+  const [batchOrderDriver, setBatchOrderDriver] = useState("");
   const [batchOrderSource, setBatchOrderSource] = useState("");
   const [batchOrderCompany, setBatchOrderCompany] = useState("");
+  const [batchOrderCustomCompanyMode, setBatchOrderCustomCompanyMode] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{
     message: string;
     action: (password: string) => void | Promise<void>;
@@ -1010,7 +1032,7 @@ export default function Home() {
   const [accountingForm, setAccountingForm] = useState<Record<string, OrderFinance>>({});
   const [accountingBatchOrders, setAccountingBatchOrders] = useState<Order[]>([]);
   const [accountingOrderMeta, setAccountingOrderMeta] = useState<
-    Record<string, { orderSource: string; company: string }>
+    Record<string, { orderSource: string; company: string; status: Order["status"] }>
   >({});
   const [accountingStatus, setAccountingStatus] = useState<Order["accountingStatus"]>("未完成");
   const [accountingInvoiceStatus, setAccountingInvoiceStatus] = useState<Order["invoiceStatus"]>("未完成");
@@ -1108,7 +1130,9 @@ export default function Home() {
   const [offDateInput, setOffDateInput] = useState("");
   const [customDriverMode, setCustomDriverMode] = useState(false);
   const [driverSelectionTarget, setDriverSelectionTarget] = useState<string | null>(null);
-  const [sourceSelectionOpen, setSourceSelectionOpen] = useState<"form" | "batch" | null>(null);
+  const [sourceSelectionOpen, setSourceSelectionOpen] = useState<
+    "form" | "batch" | "accounting-batch" | "order-filter" | "finance-filter" | `accounting-order:${string}` | null
+  >(null);
   const [customCompanyMode, setCustomCompanyMode] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -1300,6 +1324,13 @@ export default function Home() {
       color: "",
     })),
   ];
+  const getSourceDisplayName = (name: string, regionId?: string) => {
+    const matchingSources = sourceRows.filter((source) => source.companyName === name);
+    const source = (regionId
+      ? matchingSources.find((item) => item.regionId === regionId)
+      : undefined) || matchingSources[0];
+    return source?.shortName?.trim() || name;
+  };
   const companies = companyRecords.map((company) => company.name);
   const unregisteredCompanyNames = Array.from(
     new Set(orders.map((order) => order.company).filter(Boolean)),
@@ -1964,17 +1995,27 @@ export default function Home() {
     }
   }
   const todayDateKey = toDateKey(new Date());
-  const driverSelectionOrder = driverSelectionTarget && driverSelectionTarget !== "form"
+  const driverSelectionOrder = driverSelectionTarget &&
+    !["form", "batch", "accounting-batch", "driver-finance-filter"].includes(driverSelectionTarget) &&
+    !driverSelectionTarget.startsWith("accounting-finance:")
     ? orders.find((order) => order.id === driverSelectionTarget)
     : undefined;
   const driverSelectionRegionId = driverSelectionTarget === "form"
     ? form.regionId || getRegionForNewRecords()
-    : driverSelectionOrder?.regionId;
-  const driverSelectionCandidates = driverSelectionTarget ? rankDriversByRecentService(
-    driverRecords.filter((driver) => driver.regionId === driverSelectionRegionId),
-    orders,
-    todayDateKey,
-  ) : [];
+    : driverSelectionTarget === "batch"
+      ? getRegionForNewRecords()
+      : driverSelectionTarget === "accounting-batch" ||
+          driverSelectionTarget?.startsWith("accounting-finance:")
+        ? accountingPreviewOrder?.regionId
+        : driverSelectionOrder?.regionId;
+  const driverSelectionCandidates = driverSelectionTarget === "driver-finance-filter"
+    ? driverFinanceDrivers.map((name) => ({ id: name, name, serviceDays: 0 }))
+    : driverSelectionTarget !== null ? rankDriversByRecentService(
+        driverRecords.filter((driver) => driver.regionId === driverSelectionRegionId),
+        orders,
+        todayDateKey,
+      )
+      : [];
   const isUpcomingOrder = (order: Order) => order.date > todayDateKey;
 
   function requestDelete(
@@ -2506,8 +2547,11 @@ export default function Home() {
     setBatchOrderInput("");
     setBatchOrderDate(toDateKey(calendarCenterDate));
     setBatchOrderVehicle(vehicle.id);
+    setBatchOrderStatus("仮予約");
+    setBatchOrderDriver("");
     setBatchOrderSource("");
     setBatchOrderCompany("");
+    setBatchOrderCustomCompanyMode(false);
     setShowBatchOrderForm(true);
   }
 
@@ -2537,12 +2581,14 @@ export default function Home() {
         time: detail.time,
         pickup: detail.pickup,
         destination: detail.destination,
+        status: batchOrderStatus,
+        driver: batchOrderDriver.trim(),
         orderSource: batchOrderSource.trim(),
         company: batchOrderCompany.trim(),
         financeByDate: {
           [batchOrderDate]: {
             ...emptyOrderFinance,
-            driver: "",
+            driver: batchOrderDriver.trim(),
             vehicle: batchVehicle.name,
             vehiclePlate: batchVehicle.plate || "",
             tripSummary: `${detail.time} ${detail.pickup} → ${detail.destination}`.slice(0, 1000),
@@ -2552,8 +2598,10 @@ export default function Home() {
     ]);
     setShowBatchOrderForm(false);
     setBatchOrderInput("");
+    setBatchOrderDriver("");
     setBatchOrderSource("");
     setBatchOrderCompany("");
+    setBatchOrderCustomCompanyMode(false);
   }
 
   function openNewDriver() {
@@ -3424,6 +3472,7 @@ export default function Home() {
           {
             orderSource: batchOrder.orderSource || order.orderSource || "",
             company: batchOrder.company || order.company || "",
+            status: batchOrder.status,
           },
         ]),
       ),
@@ -3509,6 +3558,7 @@ export default function Home() {
           ...order,
           orderSource: meta ? meta.orderSource.trim() : order.orderSource,
           company: meta ? meta.company.trim() : order.company,
+          status: meta?.status ?? order.status,
           orderPrice: sumDailyFares(financeByDate),
           financeByDate,
         };
@@ -3727,19 +3777,41 @@ export default function Home() {
         .map((driver) => driver.name))]
         .sort((first, second) => first.localeCompare(second, "ja"))
     : [];
+  const accountingBatchStatusOptions: Order["status"][] = [
+    "仮予約",
+    "予約確定",
+    "キャンセル",
+  ];
   const getCommonValue = (values: string[]) =>
     values.length > 0 && values.every((value) => value === values[0]) ? values[0] : null;
   const accountingBatchCommon = {
     driver: getCommonValue(Object.values(accountingForm).map((finance) => finance.driver)),
     orderSource: getCommonValue(Object.values(accountingOrderMeta).map((meta) => meta.orderSource)),
     company: getCommonValue(Object.values(accountingOrderMeta).map((meta) => meta.company)),
+    status: getCommonValue(Object.values(accountingOrderMeta).map((meta) => meta.status)),
   };
-  function applyAccountingBatchValue(field: "driver" | "orderSource" | "company", value: string) {
+  function applyAccountingBatchValue(
+    field: "driver" | "orderSource" | "company" | "status",
+    value: string,
+  ) {
     if (value === accountingMixedValue) return;
     if (field === "driver") {
       setAccountingForm((current) =>
         Object.fromEntries(
           Object.entries(current).map(([entryKey, finance]) => [entryKey, { ...finance, driver: value }]),
+        ),
+      );
+      return;
+    }
+    if (field === "status") {
+      const status = accountingBatchStatusOptions.find((option) => option === value);
+      if (!status) return;
+      setAccountingOrderMeta((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([entryOrderId, meta]) => [
+            entryOrderId,
+            { ...meta, status },
+          ]),
         ),
       );
       return;
@@ -4129,19 +4201,19 @@ export default function Home() {
                 <>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
                     来源
-                    <select
-                      value={financeSourceFilter}
-                      onChange={(event) => setFinanceSourceFilter(event.target.value)}
+                    <button
+                      type="button"
+                      onClick={() => setSourceSelectionOpen("finance-filter")}
+                      title={financeSourceFilter || undefined}
                       className="rounded border bg-white px-3 py-2 text-sm text-gray-900"
                     >
-                      <option value="">全部来源</option>
-                      <option value={UNSOURCED_ORDER}>未填写</option>
-                      {sourceRows.map((source) => (
-                        <option key={source.id} value={source.companyName}>
-                          {source.companyName}
-                        </option>
-                      ))}
-                    </select>
+                      {financeSourceFilter === ""
+                        ? "全部来源"
+                        : financeSourceFilter === UNSOURCED_ORDER
+                          ? "未填写"
+                          : getSourceDisplayName(financeSourceFilter, activeRegionId === ALL_REGIONS_ID ? undefined : activeRegionId)}
+                      {" · 点击选择"}
+                    </button>
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
                     所属会社
@@ -4358,18 +4430,13 @@ export default function Home() {
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
                     運転士
-                    <select
-                      value={selectedDriverFinanceDriver}
-                      onChange={(event) => setDriverFinanceDriverFilter(event.target.value)}
+                    <button
+                      type="button"
+                      onClick={() => setDriverSelectionTarget("driver-finance-filter")}
                       className="rounded border bg-white px-3 py-2 text-sm text-gray-900"
                     >
-                      <option value="">全部運転士</option>
-                      {driverFinanceDrivers.map((driver) => (
-                        <option key={driver} value={driver}>
-                          {driver}
-                        </option>
-                      ))}
-                    </select>
+                      {selectedDriverFinanceDriver || "全部運転士"} · 点击选择
+                    </button>
                   </label>
                 </>
               }
@@ -5329,7 +5396,7 @@ export default function Home() {
               );
             // Every order sits in the date cells' grid row, stacked by lane.
             const baseOrderCardHeight = 56;
-            const tripSummaryOrderCardHeight = 72;
+            const tripSummaryOrderCardHeight = baseOrderCardHeight;
             const orderCardHeight = visibleOrders.some(orderHasTripSummaries)
               ? tripSummaryOrderCardHeight
               : baseOrderCardHeight;
@@ -5752,7 +5819,7 @@ export default function Home() {
                               <div key={day.date} className="min-w-0 px-1">
                                 {tripSummary && (
                                   <span
-                                    className="pointer-events-auto block truncate rounded bg-white/70 px-1 text-[10px] leading-[14px] text-slate-800"
+                                    className="pointer-events-auto block truncate rounded bg-white/70 px-1 text-xs leading-4 text-slate-800"
                                     title={tripSummary}
                                   >
                                     {tripSummary}
@@ -5775,8 +5842,8 @@ export default function Home() {
           )}
 
           {activeView === "orders" && (
-            <div className="p-4 md:p-6">
-              <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="p-3 md:p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold">予約管理</h2>
                 <div className="flex flex-wrap items-center gap-3">
                   <label htmlFor="order-month" className="text-sm font-medium text-gray-600">
@@ -5814,23 +5881,23 @@ export default function Home() {
                       onClose={() => setShowOrderDateFilter(false)}
                     />
                   )}
-                  <label htmlFor="order-source-filter" className="text-sm font-medium text-gray-600">
+                  <span className="text-sm font-medium text-gray-600">
                     来源
-                  </label>
-                  <select
-                    id="order-source-filter"
-                    value={orderSourceFilter}
-                    onChange={(event) => setOrderSourceFilter(event.target.value)}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="筛选订单来源"
+                    onClick={() => setSourceSelectionOpen("order-filter")}
+                    title={orderSourceFilter || undefined}
                     className="rounded border bg-white px-3 py-2 text-sm"
                   >
-                    <option value="">全部来源</option>
-                    <option value={UNSOURCED_ORDER}>未填写</option>
-                    {sourceRows.map((source) => (
-                      <option key={source.id} value={source.companyName}>
-                        {source.companyName}
-                      </option>
-                    ))}
-                  </select>
+                    {orderSourceFilter === ""
+                      ? "全部来源"
+                      : orderSourceFilter === UNSOURCED_ORDER
+                        ? "未填写"
+                        : getSourceDisplayName(orderSourceFilter, activeRegionId === ALL_REGIONS_ID ? undefined : activeRegionId)}
+                    {" · 点击选择"}
+                  </button>
                   <label htmlFor="order-company-filter" className="text-sm font-medium text-gray-600">
                     所属会社
                   </label>
@@ -5889,10 +5956,7 @@ export default function Home() {
                           <td className="px-4 py-3">
                             <button
                               type="button"
-                              onClick={() => {
-                                setOrderDetailsMode("itinerary");
-                                setSelectedOrderDetails(order);
-                              }}
+                              onClick={() => openEditOrder(order)}
                               className="font-medium text-blue-700 hover:underline"
                             >
                               {order.customer}
@@ -6165,33 +6229,44 @@ export default function Home() {
                 </div>
               </div>
               <div className="overflow-x-auto border bg-white">
-                <table className="w-full min-w-[1050px] text-left text-sm">
+                <table className="w-full min-w-[1100px] table-fixed text-left text-sm">
+                  <colgroup>
+                    <col className="w-[12%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[30%]" />
+                    <col className="w-[8%]" />
+                  </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
-                      <th className="px-4 py-3 font-semibold">来源</th>
-                      <th className="px-4 py-3 font-semibold">简称</th>
-                      <th className="px-4 py-3 font-semibold">担当</th>
-                      <th className="px-4 py-3 font-semibold">連絡先</th>
-                      <th className="px-4 py-3 font-semibold">地址</th>
-                      <th className="px-4 py-3 font-semibold">操作</th>
+                      <th className="px-3 py-2 font-semibold">颜色</th>
+                      <th className="px-3 py-2 font-semibold">会社全称</th>
+                      <th className="px-3 py-2 font-semibold">简称</th>
+                      <th className="px-3 py-2 font-semibold">担当</th>
+                      <th className="px-3 py-2 font-semibold">連絡先</th>
+                      <th className="px-3 py-2 font-semibold">地址</th>
+                      <th className="px-3 py-2 font-semibold">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sourceRows.map((source) => (
                       <tr key={source.id} className="border-t">
-                        <td className="whitespace-nowrap px-4 py-3 font-medium">
+                        <td className="whitespace-nowrap px-3 py-2 font-medium">
                           <SourceColorPicker
                             color={source.color || "#94a3b8"}
                             sourceName={source.companyName}
                             onSelect={(color) => updateSourceColor(source, color)}
                           />
                         </td>
-                        <td className="px-4 py-3">{source.shortName || "-"}</td>
-                        <td className="px-4 py-3">{source.contactName || "-"}</td>
-                        <td className="px-4 py-3">{source.contactInfo || "-"}</td>
-                        <td className="px-4 py-3">{source.address || "-"}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-3">
+                        <td className="truncate px-3 py-2 font-medium" title={source.companyName}>{source.companyName}</td>
+                        <td className="truncate px-3 py-2" title={source.shortName || undefined}>{source.shortName || "-"}</td>
+                        <td className="truncate px-3 py-2" title={source.contactName || undefined}>{source.contactName || "-"}</td>
+                        <td className="truncate px-3 py-2" title={source.contactInfo || undefined}>{source.contactInfo || "-"}</td>
+                        <td className="break-words px-3 py-2">{source.address || "-"}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex gap-2">
                             <button
                               type="button"
                               onClick={() => openEditSource(source)}
@@ -6322,7 +6397,7 @@ export default function Home() {
               </button>
             </div>
             <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              系统会从每条信息中识别“配車時間、上车地点、下车地点”；以下来源和所属公司将应用于本批所有订单。
+              系统会从每条信息中识别“配車時間、上车地点、下车地点”；以下状态、司机、来源和所属公司将应用于本批所有订单。
             </p>
             <div className="space-y-4">
               <label className="block text-sm font-medium">
@@ -6349,6 +6424,29 @@ export default function Home() {
                   ))}
                 </select>
               </label>
+              <label className="block text-sm font-medium">
+                预约状态
+                <select
+                  value={batchOrderStatus}
+                  onChange={(event) => setBatchOrderStatus(event.target.value as OrderStatus)}
+                  className="mt-1 w-full rounded border px-3 py-2"
+                >
+                  <option value="仮予約">仮予約</option>
+                  <option value="予約確定">予約確定</option>
+                  <option value="キャンセル">キャンセル</option>
+                </select>
+              </label>
+              <div className="block text-sm font-medium">
+                司机
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setDriverSelectionTarget("batch")}
+                  className="mt-1 w-full rounded border px-3 py-2 text-left hover:bg-blue-50"
+                >
+                  {batchOrderDriver || "未安排司机"} · 点击选任
+                </button>
+              </div>
               <div className="block text-sm font-medium">
                 来源
                 <button type="button" aria-haspopup="dialog"
@@ -6362,19 +6460,34 @@ export default function Home() {
               </div>
               <label className="block text-sm font-medium">
                 所属公司
-                <input
-                  type="text"
-                  list="batch-order-companies"
-                  value={batchOrderCompany}
-                  onChange={(event) => setBatchOrderCompany(event.target.value)}
-                  placeholder="未填写"
+                <select
+                  value={batchOrderCustomCompanyMode ? "__custom_company__" : batchOrderCompany}
+                  onChange={(event) => {
+                    if (event.target.value === "__custom_company__") {
+                      setBatchOrderCustomCompanyMode(true);
+                      setBatchOrderCompany("");
+                    } else {
+                      setBatchOrderCustomCompanyMode(false);
+                      setBatchOrderCompany(event.target.value);
+                    }
+                  }}
                   className="mt-1 w-full rounded border px-3 py-2"
-                />
-                <datalist id="batch-order-companies">
+                >
+                  <option value="">请选择所属公司</option>
                   {companies.map((company) => (
-                    <option key={company} value={company} />
+                    <option key={company} value={company}>{company}</option>
                   ))}
-                </datalist>
+                  <option value="__custom_company__">＋ 手动输入新公司</option>
+                </select>
+                {batchOrderCustomCompanyMode && (
+                  <input
+                    type="text"
+                    value={batchOrderCompany}
+                    onChange={(event) => setBatchOrderCompany(event.target.value)}
+                    placeholder="请输入所属公司"
+                    className="mt-2 w-full rounded border px-3 py-2"
+                  />
+                )}
               </label>
               <label className="block text-sm font-medium">
                 预约信息
@@ -6476,7 +6589,7 @@ export default function Home() {
                   <option value="仮予約">仮予約</option>
                   <option value="予約確定">予約確定</option>
                   {(form.status === "運行中" || form.status === "完了") && (
-                    <option value={form.status}>{form.status}（已停用，仅保留原记录）</option>
+                    <option value={form.status} disabled>历史状态（已停用，保留原记录）</option>
                   )}
                   <option value="キャンセル">キャンセル</option>
                 </select>
@@ -7427,19 +7540,65 @@ export default function Home() {
       {sourceSelectionOpen && (
         <SourceSelectionDialog
           sources={rankSourcesByUsage(
-            orderSourceRecords.filter((source) =>
-              source.regionId === (sourceSelectionOpen === "form"
+            sourceRows.filter((source) => {
+              if (sourceSelectionOpen === "order-filter" || sourceSelectionOpen === "finance-filter") {
+                return activeRegionId === ALL_REGIONS_ID || source.regionId === activeRegionId;
+              }
+              const accountingOrderId = sourceSelectionOpen.startsWith("accounting-order:")
+                ? sourceSelectionOpen.slice("accounting-order:".length)
+                : null;
+              const sourceRegionId = sourceSelectionOpen === "form"
                 ? form.regionId || getRegionForNewRecords()
-                : getRegionForNewRecords())),
+                : accountingOrderId
+                  ? accountingBatchOrders.find((order) => order.id === accountingOrderId)?.regionId
+                  : accountingPreviewOrder?.regionId || getRegionForNewRecords();
+              return source.regionId === sourceRegionId;
+            }),
             orders,
           )}
-          selected={sourceSelectionOpen === "form" ? form.orderSource : batchOrderSource}
+          selected={
+            sourceSelectionOpen === "form"
+              ? form.orderSource
+              : sourceSelectionOpen === "batch"
+                ? batchOrderSource
+                : sourceSelectionOpen === "accounting-batch"
+                  ? accountingBatchCommon.orderSource || ""
+                  : sourceSelectionOpen === "order-filter"
+                    ? orderSourceFilter
+                    : sourceSelectionOpen === "finance-filter"
+                      ? financeSourceFilter
+                      : accountingOrderMeta[sourceSelectionOpen.slice("accounting-order:".length)]?.orderSource || ""
+          }
+          allLabel={
+            sourceSelectionOpen === "order-filter" || sourceSelectionOpen === "finance-filter"
+              ? "全部来源"
+              : undefined
+          }
+          unassignedValue={
+            sourceSelectionOpen === "order-filter" || sourceSelectionOpen === "finance-filter"
+              ? UNSOURCED_ORDER
+              : undefined
+          }
+          unassignedLabel={
+            sourceSelectionOpen === "order-filter" || sourceSelectionOpen === "finance-filter"
+              ? "未填写"
+              : undefined
+          }
           onClose={() => setSourceSelectionOpen(null)}
           onSelect={(name) => {
             if (sourceSelectionOpen === "form") {
               setForm((current) => ({ ...current, orderSource: name }));
-            } else {
+            } else if (sourceSelectionOpen === "batch") {
               setBatchOrderSource(name);
+            } else if (sourceSelectionOpen === "accounting-batch") {
+              applyAccountingBatchValue("orderSource", name);
+            } else if (sourceSelectionOpen === "order-filter") {
+              setOrderSourceFilter(name);
+            } else if (sourceSelectionOpen === "finance-filter") {
+              setFinanceSourceFilter(name);
+            } else if (sourceSelectionOpen.startsWith("accounting-order:")) {
+              const orderId = sourceSelectionOpen.slice("accounting-order:".length);
+              updateAccountingOrderMeta(orderId, "orderSource", name);
             }
             setSourceSelectionOpen(null);
           }}
@@ -7449,12 +7608,36 @@ export default function Home() {
       {driverSelectionTarget && (
         <DriverSelectionDialog
           drivers={driverSelectionCandidates}
-          selected={driverSelectionTarget === "form" ? form.driver : driverSelectionOrder?.driver || ""}
+          selected={driverSelectionTarget === "form"
+            ? form.driver
+            : driverSelectionTarget === "batch"
+              ? batchOrderDriver
+              : driverSelectionTarget === "accounting-batch"
+                ? accountingBatchCommon.driver || ""
+                : driverSelectionTarget === "driver-finance-filter"
+                  ? selectedDriverFinanceDriver
+                  : driverSelectionTarget.startsWith("accounting-finance:")
+                    ? accountingForm[driverSelectionTarget.slice("accounting-finance:".length)]?.driver || ""
+                    : driverSelectionOrder?.driver || ""}
+          allowManual={driverSelectionTarget !== "driver-finance-filter"}
+          emptyLabel={driverSelectionTarget === "driver-finance-filter" ? "全部司机" : "未安排司机"}
+          showServiceDays={driverSelectionTarget !== "driver-finance-filter"}
           onClose={() => setDriverSelectionTarget(null)}
           onSelect={(name, manual) => {
             if (driverSelectionTarget === "form") {
               setCustomDriverMode(manual);
               setForm((current) => ({ ...current, driver: name }));
+            } else if (driverSelectionTarget === "batch") {
+              setBatchOrderDriver(name);
+            } else if (driverSelectionTarget === "accounting-batch") {
+              applyAccountingBatchValue("driver", name);
+            } else if (driverSelectionTarget === "driver-finance-filter") {
+              setDriverFinanceDriverFilter(name);
+            } else if (driverSelectionTarget.startsWith("accounting-finance:")) {
+              updateAccountingFinance(
+                driverSelectionTarget.slice("accounting-finance:".length),
+                { driver: name },
+              );
             } else if (driverSelectionOrder) {
               setOrders((current) => current.map((order) =>
                 order.id === driverSelectionOrder.id ? { ...order, driver: name } : order));
@@ -7699,32 +7882,58 @@ export default function Home() {
                 <p className="mt-1 text-xs text-indigo-800">
                   批量统一设置：在这里选择一次，本批全部订单同步；下方各订单仍可单独修改，只影响该订单。
                 </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {([
                     ["driver", "司机（全部统一）", accountingBatchDriverOptions, accountingBatchCommon.driver, "未安排司机"],
                     ["orderSource", "订单来源（全部统一）", accountingSourceOptions, accountingBatchCommon.orderSource, "未填写"],
                     ["company", "订单所属（全部统一）", accountingCompanyOptions, accountingBatchCommon.company, "未设置"],
+                    ["status", "订单状态（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "请选择订单状态"],
                   ] as const).map(([field, label, options, common, emptyLabel]) => (
-                    <label key={field} className="block font-medium text-indigo-900">
+                    <label key={field} className="block min-w-0 font-medium text-indigo-900">
                       {label}
-                      <select
-                        className="mt-1 w-full rounded border bg-white p-2 text-gray-900"
-                        value={common ?? accountingMixedValue}
-                        onChange={(event) => applyAccountingBatchValue(field, event.target.value)}
-                      >
-                        {common === null && (
-                          <option value={accountingMixedValue} disabled>
-                            （各单不同）
-                          </option>
-                        )}
-                        <option value="">{emptyLabel}</option>
-                        {common && !options.includes(common) && (
-                          <option value={common}>{common}（现有记录）</option>
-                        )}
-                        {options.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
+                      {field === "orderSource" ? (
+                        <button
+                          type="button"
+                          onClick={() => setSourceSelectionOpen("accounting-batch")}
+                          title={common || emptyLabel}
+                          className="mt-1 block h-10 w-full min-w-0 truncate whitespace-nowrap rounded border bg-white px-2 text-left leading-9 text-gray-900"
+                        >
+                          {common === null
+                            ? "（各单不同） · 点击选择"
+                            : `${common ? getSourceDisplayName(common, accountingPreviewOrder?.regionId) : emptyLabel} · 点击选择`}
+                        </button>
+                      ) : field === "driver" ? (
+                        <button
+                          type="button"
+                          onClick={() => setDriverSelectionTarget("accounting-batch")}
+                          title={common || emptyLabel}
+                          className="mt-1 block h-10 w-full min-w-0 truncate whitespace-nowrap rounded border bg-white px-2 text-left leading-9 text-gray-900"
+                        >
+                          {common === null ? "（各单不同） · 点击选任" : `${common || emptyLabel} · 点击选任`}
+                        </button>
+                      ) : (
+                        <select
+                          className="mt-1 h-10 w-full rounded border bg-white px-2 text-gray-900"
+                          value={common ?? accountingMixedValue}
+                          onChange={(event) => applyAccountingBatchValue(field, event.target.value)}
+                        >
+                          {common === null && (
+                            <option value={accountingMixedValue} disabled>
+                              （各单不同）
+                            </option>
+                          )}
+                          {(common === "運行中" || common === "完了") && (
+                            <option value={common} disabled>历史状态（已停用，保留原记录）</option>
+                          )}
+                          {field !== "status" && <option value="">{emptyLabel}</option>}
+                          {common && field !== "status" && !options.includes(common) && (
+                            <option value={common}>{common}（现有记录）</option>
+                          )}
+                          {options.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -7764,6 +7973,7 @@ export default function Home() {
                 const financeOrderMeta = accountingOrderMeta[financeOrder.id] ?? {
                   orderSource: financeOrder.orderSource || "",
                   company: financeOrder.company || "",
+                  status: financeOrder.status,
                 };
                 const isOffDate = financeOrder.offDates.includes(date);
                 const isOutsideOrderDates =
@@ -7828,24 +8038,16 @@ export default function Home() {
                         <div className="md:col-span-2 grid gap-3 sm:grid-cols-2">
                           <label className="block text-sm font-medium">
                             订单来源
-                            <select
-                              className="mt-1 w-full rounded border p-2"
-                              value={financeOrderMeta.orderSource}
-                              onChange={(event) =>
-                                updateAccountingOrderMeta(financeOrder.id, "orderSource", event.target.value)
-                              }
+                            <button
+                              type="button"
+                              onClick={() => setSourceSelectionOpen(`accounting-order:${financeOrder.id}`)}
+                              title={financeOrderMeta.orderSource || undefined}
+                              className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50"
                             >
-                              <option value="">未填写</option>
-                              {accountingSourceOptions.map((source) => (
-                                <option key={source} value={source}>{source}</option>
-                              ))}
-                              {financeOrderMeta.orderSource &&
-                                !accountingSourceOptions.includes(financeOrderMeta.orderSource) && (
-                                  <option value={financeOrderMeta.orderSource}>
-                                    {financeOrderMeta.orderSource}（未登记）
-                                  </option>
-                                )}
-                            </select>
+                              {financeOrderMeta.orderSource
+                                ? getSourceDisplayName(financeOrderMeta.orderSource, financeOrder.regionId)
+                                : "未填写"} · 点击选择
+                            </button>
                           </label>
                           <label className="block text-sm font-medium">
                             订单所属
@@ -7921,10 +8123,12 @@ export default function Home() {
                         </label>
                       </div>
                       <FinanceDriverSelect
-                          drivers={allDriverRecords}
-                          regionId={accountingPreviewOrder.regionId}
-                          value={finance.driver}
-                          onChange={(driver) => updateAccountingFinance(financeKey, { driver })}
+                        drivers={allDriverRecords}
+                        orders={orders}
+                        regionId={accountingPreviewOrder.regionId}
+                        today={todayDateKey}
+                        value={finance.driver}
+                        onChange={(driver) => updateAccountingFinance(financeKey, { driver })}
                       />
                       <OrderVehiclePlateSelect
                         financeMode

@@ -8,13 +8,24 @@ type Props = {
   selected: string;
   onSelect: (name: string) => void;
   onClose: () => void;
+  allLabel?: string;
+  unassignedValue?: string;
+  unassignedLabel?: string;
 };
 
 export function getSourceDisplayName(source: { companyName: string; shortName?: string }) {
   return source.shortName?.trim() || source.companyName;
 }
 
-export function SourceSelectionDialog({ sources, selected, onSelect, onClose }: Props) {
+export function SourceSelectionDialog({
+  sources,
+  selected,
+  onSelect,
+  onClose,
+  allLabel,
+  unassignedValue,
+  unassignedLabel,
+}: Props) {
   const [search, setSearch] = useState("");
   const [manualName, setManualName] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
@@ -83,7 +94,16 @@ export function SourceSelectionDialog({ sources, selected, onSelect, onClose }: 
             className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">选择</button>
         </div>
         <div className="mt-5 flex justify-between gap-3">
-          <button type="button" onClick={() => onSelect("")} className="rounded border px-4 py-2">不填写来源</button>
+          {allLabel ? (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onSelect("")} className="rounded border px-4 py-2">{allLabel}</button>
+              {unassignedLabel && unassignedValue && (
+                <button type="button" onClick={() => onSelect(unassignedValue)} className="rounded border px-4 py-2">{unassignedLabel}</button>
+              )}
+            </div>
+          ) : (
+            <button type="button" onClick={() => onSelect("")} className="rounded border px-4 py-2">不填写来源</button>
+          )}
           <button type="button" onClick={onClose} className="rounded border px-4 py-2">取消</button>
         </div>
       </section>

@@ -1,16 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { rankDriversByRecentService } from "@/lib/driver-selection";
 
 type Props = {
-  drivers: ReturnType<typeof rankDriversByRecentService>;
+  drivers: { id: string; name: string; serviceDays: number }[];
   selected: string;
   onSelect: (name: string, manual: boolean) => void;
   onClose: () => void;
+  allowManual?: boolean;
+  emptyLabel?: string;
+  showServiceDays?: boolean;
 };
 
-export function DriverSelectionDialog({ drivers, selected, onSelect, onClose }: Props) {
+export function DriverSelectionDialog({
+  drivers,
+  selected,
+  onSelect,
+  onClose,
+  allowManual = true,
+  emptyLabel = "未安排司机",
+  showServiceDays = true,
+}: Props) {
   const [search, setSearch] = useState("");
   const [manualName, setManualName] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
@@ -50,8 +60,12 @@ export function DriverSelectionDialog({ drivers, selected, onSelect, onClose }: 
           <h2 id="driver-selection-title" className="text-xl font-bold">司机选任</h2>
           <button type="button" onClick={onClose} aria-label="关闭司机选任" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
-        <p className="mb-4 text-sm text-gray-500">最近30天服务日数由高到低排列，常出勤司机在左上角；同一天多单计1天，同日数按姓名排序。</p>
-        <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务记录中的司机；排除休运日、取消订单及未来日期，不作为考勤证明。</p>
+        {showServiceDays && (
+          <>
+            <p className="mb-4 text-sm text-gray-500">最近30天服务日数由高到低排列，常出勤司机在左上角；同一天多单计1天，同日数按姓名排序。</p>
+            <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务记录中的司机；排除休运日、取消订单及未来日期，不作为考勤证明。</p>
+          </>
+        )}
         <input aria-label="搜索司机" placeholder="搜索司机姓名" value={search}
           onChange={(event) => setSearch(event.target.value)} className="mb-4 w-full rounded border p-3" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -60,19 +74,23 @@ export function DriverSelectionDialog({ drivers, selected, onSelect, onClose }: 
               onClick={() => onSelect(driver.name, false)}
               className={`min-h-20 break-words rounded-lg border p-3 text-left hover:border-blue-500 hover:bg-blue-50 ${selected === driver.name ? "border-blue-600 bg-blue-50" : "border-gray-200"}`}>
               <span className="block font-semibold">{driver.name}</span>
-              <span className="mt-1 block text-xs text-gray-500">最近30天 · {driver.serviceDays}天</span>
+              {showServiceDays && (
+                <span className="mt-1 block text-xs text-gray-500">最近30天 · {driver.serviceDays}天</span>
+              )}
             </button>
           ))}
         </div>
-        {matches.length === 0 && <p className="py-5 text-center text-sm text-gray-500">暂无匹配司机，可在下方手动输入。</p>}
-        <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
-          <input aria-label="手动输入司机姓名" placeholder="手动输入新司机" maxLength={120} value={manualName}
-            onChange={(event) => setManualName(event.target.value)} className="min-w-0 flex-1 rounded border p-2" />
-          <button type="button" disabled={!manualName.trim()} onClick={() => onSelect(manualName.trim(), true)}
-            className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">选任</button>
-        </div>
+        {matches.length === 0 && <p className="py-5 text-center text-sm text-gray-500">{allowManual ? "暂无匹配司机，可在下方手动输入。" : "暂无匹配司机。"}</p>}
+        {allowManual && (
+          <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
+            <input aria-label="手动输入司机姓名" placeholder="手动输入新司机" maxLength={120} value={manualName}
+              onChange={(event) => setManualName(event.target.value)} className="min-w-0 flex-1 rounded border p-2" />
+            <button type="button" disabled={!manualName.trim()} onClick={() => onSelect(manualName.trim(), true)}
+              className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">选任</button>
+          </div>
+        )}
         <div className="mt-5 flex justify-between gap-3">
-          <button type="button" onClick={() => onSelect("", false)} className="rounded border px-4 py-2">未安排司机</button>
+          <button type="button" onClick={() => onSelect("", false)} className="rounded border px-4 py-2">{emptyLabel}</button>
           <button type="button" onClick={onClose} className="rounded border px-4 py-2">取消</button>
         </div>
       </section>

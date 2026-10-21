@@ -1,39 +1,55 @@
 "use client";
 
-import type { Driver } from "@/lib/domain";
+import { useState } from "react";
+import type { Driver, Order } from "@/lib/domain";
+import { rankDriversByRecentService } from "@/lib/driver-selection";
+import { DriverSelectionDialog } from "@/components/driver-selection-dialog";
 
 export function FinanceDriverSelect({
   drivers,
+  orders,
   regionId,
+  today,
   value,
   onChange,
 }: {
   drivers: Driver[];
+  orders: Order[];
   regionId: string | undefined;
+  today: string;
   value: string;
   onChange: (name: string) => void;
 }) {
-  const names = [...new Set(drivers
-    .filter((driver) => Boolean(regionId) && driver.regionId === regionId)
-    .map((driver) => driver.name))]
-    .sort((first, second) => first.localeCompare(second, "ja"));
+  const [isOpen, setIsOpen] = useState(false);
+  const candidates = rankDriversByRecentService(
+    drivers.filter((driver) => Boolean(regionId) && driver.regionId === regionId),
+    orders,
+    today,
+  );
 
   return (
     <div>
-      <label className="block text-sm font-medium">
+      <div className="block text-sm font-medium">
         当日司机
-        <select className="mt-1 w-full rounded border p-2" value={value}
-          onChange={(event) => onChange(event.target.value)}>
-          <option value="">未安排司机</option>
-          {value && !names.includes(value) && <option value={value}>{value}（现有记录）</option>}
-          {names.map((name) => <option key={name} value={name}>{name}</option>)}
-        </select>
-      </label>
-      <label className="mt-2 block text-xs text-gray-600">
-        手动输入司机姓名
-        <input type="text" className="mt-1 w-full rounded border p-2 text-sm"
-          value={value} onChange={(event) => onChange(event.target.value)} />
-      </label>
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50"
+        >
+          {value || "未安排司机"} · 点击选任
+        </button>
+      </div>
+      {isOpen && (
+        <DriverSelectionDialog
+          drivers={candidates}
+          selected={value}
+          onSelect={(name) => {
+            onChange(name);
+            setIsOpen(false);
+          }}
+          onClose={() => setIsOpen(false)}
+        />
+      )}
     </div>
   );
 }
