@@ -51,6 +51,8 @@ export type OrderFinanceByDate = Record<string, OrderFinance>;
 export type Order = AuditedRecord & {
   id: string;
   regionId?: string;
+  importBatchId?: string | null;
+  importBatchIndex?: number | null;
   vehicle: string;
   vehiclePlate: string;
   date: string;

@@ -32,6 +32,8 @@ export type Database = {
       orders: AuditedTable<{
         id: string;
         region_id: string;
+        import_batch_id: string | null;
+        import_batch_index: number | null;
         vehicle: string;
         vehicle_plate: string;
         date: string;

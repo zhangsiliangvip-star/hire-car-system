@@ -32,6 +32,190 @@ const region = "60000000-0000-4000-8000-000000000001";
 const operation = { actorId: id, actorName: "Test Operator", at: "2026-10-15T18:00:00Z" };
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+test("reservation batches collapse strictly by persisted import ID and preserve original first line", () => {
+  const { groupReservationOrders } = load("lib\\order-batches.ts");
+  const base = {
+    regionId: region, date: "2026-10-22", endDate: "2026-10-22",
+    vehicle: "Alphard", vehiclePlate: "1234", time: "09:00",
+  };
+  const orders = [
+    { ...base, id: "a-second", importBatchId: "a", importBatchIndex: 1, time: "06:00" },
+    { ...base, id: "legacy" },
+    { ...base, id: "b", importBatchId: "b", importBatchIndex: 0 },
+    { ...base, id: "a-first", importBatchId: "a", importBatchIndex: 0 },
+    { ...base, id: "other-region", regionId: "other", importBatchId: "a", importBatchIndex: 0 },
+    { ...base, id: "manual" },
+  ];
+  const before = JSON.stringify(orders);
+  const rows = plain(groupReservationOrders(orders));
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows.find((row) => row.order.id === "a-first"), { order: orders[3], count: 2 });
+  assert.ok(rows.some((row) => row.order.id === "b" && row.count === 1));
+  assert.ok(rows.some((row) => row.order.id === "other-region" && row.count === 1));
+  assert.ok(rows.some((row) => row.order.id === "legacy"));
+  assert.ok(rows.some((row) => row.order.id === "manual"));
+  assert.equal(JSON.stringify(orders), before);
+  const filtered = groupReservationOrders(orders.filter((order) => order.id !== "a-first"));
+  assert.ok(filtered.some((row) => row.order.id === "a-second" && row.count === 1));
+  assert.deepEqual(plain(groupReservationOrders([])), []);
+  const chronological = groupReservationOrders([
+    { ...base, id: "later", date: "2026-10-23" },
+    { ...base, id: "afternoon", time: "14:00" },
+    { ...base, id: "morning", time: "08:00" },
+  ]);
+  assert.deepEqual(plain(chronological.map((row) => row.order.id)), ["morning", "afternoon", "later"]);
+});
+
+test("batch imports save one ID per import, line positions and retain membership when editing", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const start = source.indexOf("  function importBatchOrders()");
+  const importFunction = source.slice(start, source.indexOf("  function openNewDriver()", start));
+  let sequence = 0;
+  let orders = [];
+  const context = {
+    requireSpecificRegionForNewData: () => true,
+    parseImportedOrderDetails: () => [
+      { time: "09:00", pickup: "A", destination: "B" },
+      { time: "06:00", pickup: "C", destination: "D" },
+    ],
+    createEmptyDraft: () => ({}), createId: () => `generated-${++sequence}`,
+    availableVehicleRecords: [{ id: "car", name: "Alphard", plate: "1234" }],
+    batchOrderVehicle: "car", batchOrderDate: "2026-10-22", batchOrderInput: "",
+    batchOrderStatus: "仮予約", batchOrderDriver: "", batchOrderSource: "", batchOrderCompany: "",
+    emptyOrderFinance: {},
+    setOrders: (action) => { orders = action(orders); },
+  };
+  for (const name of ["setShowBatchOrderForm", "setBatchOrderInput", "setBatchOrderDriver",
+    "setBatchOrderSource", "setBatchOrderCompany", "setBatchOrderCustomCompanyMode"]) {
+    context[name] = () => {};
+  }
+  vm.runInNewContext(`${importFunction}\nimportBatchOrders(); importBatchOrders();`, context);
+  assert.equal(orders.length, 4);
+  assert.equal(orders[0].importBatchId, orders[1].importBatchId);
+  assert.equal(orders[2].importBatchId, orders[3].importBatchId);
+  assert.notEqual(orders[0].importBatchId, orders[2].importBatchId);
+  assert.deepEqual(plain(orders.map((order) => order.importBatchIndex)), [0, 1, 0, 1]);
+  const editing = source.slice(source.indexOf("  function openEditOrder("), source.indexOf("  function openAccounting("));
+  assert.match(editing, /importBatchId: order\.importBatchId/);
+  assert.match(editing, /importBatchIndex: order\.importBatchIndex/);
+});
+
+test("reservation table renders only the first imported order with the exact total badge", () => {
+  const { groupReservationOrders } = load("lib\\order-batches.ts");
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const start = source.indexOf("{groupReservationOrders(monthlyOrders)");
+  const jsx = source.slice(start, source.indexOf("{monthlyOrders.length === 0", start));
+  const script = ts.transpileModule(`function renderRows() { return <tbody>${jsx}</tbody>; }`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    fileName: "batch-table.tsx",
+  }).outputText;
+  const base = {
+    date: "2026-10-22", time: "09:00", status: "仮予約",
+    importBatchId: "batch", regionId: region, customer: "First route",
+  };
+  const context = {
+    exports: {}, require: nodeRequire, groupReservationOrders, result: null,
+    monthlyOrders: [
+      { ...base, id: "second", customer: "Hidden route", importBatchIndex: 1 },
+      { ...base, id: "first", importBatchIndex: 0 },
+    ],
+    formatOrderDate: (date) => date, isOrderArranged: () => false, statusStyles: {},
+  };
+  vm.runInNewContext(`${script}\nresult = renderRows();`, context);
+  const markup = renderToStaticMarkup(context.result);
+  assert.equal((markup.match(/<tr /g) || []).length, 1);
+  assert.match(markup, /First route/);
+  assert.match(markup, /合计2单/);
+  assert.doesNotMatch(markup, /Hidden route|aria-expanded|展开/);
+});
+
+test("accounting uses exact new import batches but preserves historical same-day grouping", () => {
+  const { getAccountingBatchOrders } = load("lib\\order-batches.ts");
+  const base = {
+    regionId: region, date: "2026-10-22", endDate: "2026-10-22",
+    vehicle: "Alphard", vehiclePlate: "1234", time: "09:00", customer: "",
+  };
+  const first = { ...base, id: "first", importBatchId: "batch", importBatchIndex: 0 };
+  const second = { ...base, id: "second", importBatchId: "batch", importBatchIndex: 1, date: "2026-10-23" };
+  const legacy = { ...base, id: "legacy" };
+  const candidates = [
+    second, first, legacy, { ...base, id: "legacy2" },
+    { ...first, id: "different-batch", importBatchId: "other" },
+    { ...first, id: "different-region", regionId: "other" },
+    { ...base, id: "different-plate", vehiclePlate: "5678" },
+    { ...base, id: "multi-day", endDate: "2026-10-24" },
+  ];
+  const ids = (order) => plain(getAccountingBatchOrders(order, candidates).map((item) => item.id));
+  assert.deepEqual(ids(first), ["first", "second"]);
+  assert.deepEqual(ids(legacy), ["legacy", "legacy2"]);
+  assert.deepEqual(ids(candidates[7]), ["multi-day"]);
+});
+
+test("orders API validates and round-trips persistent batch metadata", async () => {
+  let stored = null;
+  let failure = null;
+  const query = {
+    select: () => query, order: () => query,
+    upsert: async (rows) => {
+      if (!failure) stored = rows[0];
+      return { error: failure };
+    },
+    in: async () => ({ data: [{ id, last_operation: operation }], error: null }),
+  };
+  const route = load("app\\api\\data\\route.ts", {
+    "@/lib/supabase/authorization": {
+      getAuthenticatedProfile: async () => ({
+        profile: { role: "user", regionId: region },
+        supabase: { from: (table) => {
+          const tableQuery = { ...query, range: () => table === "orders" ? [stored] : [] };
+          tableQuery.select = () => tableQuery;
+          tableQuery.order = () => tableQuery;
+          return tableQuery;
+        } },
+      }),
+    },
+    "@/lib/api-response": { jsonResponse: (data, init) => ({ data, status: init?.status ?? 200 }) },
+    "@/lib/supabase/pagination": { readAllPages: async (fetch) => fetch(0, 999) },
+    "@/lib/delete-password": {},
+    "@/lib/company-seal": { isCompanySealDataUrl: () => true, MAX_SEAL_DATA_LENGTH: 350000 },
+    "@/lib/audit": audit,
+  });
+  const order = {
+    id, regionId: region, vehicle: "Alphard", vehiclePlate: "1234",
+    importBatchId: "80000000-0000-4000-8000-000000000001", importBatchIndex: 0,
+    date: "2026-10-22", endDate: "2026-10-22", offDates: [],
+    customer: "First", phone: "", pickup: "", destination: "", time: "09:00",
+    status: "仮予約", notes: "", driver: "", orderSource: "", company: "", salesRep: "",
+    invoiceStatus: "未完成", invoiceSentDate: "",
+  };
+  const post = (entry) => route.POST({ json: async () => ({
+    collection: "orders", upsert: [entry], deleteIds: [], deletePassword: "",
+  }) });
+  assert.equal((await post(order)).status, 200);
+  assert.equal(stored.import_batch_id, order.importBatchId);
+  assert.equal(stored.import_batch_index, 0);
+  const response = await route.GET();
+  assert.equal(response.status, 200);
+  assert.equal(response.data.orders[0].importBatchId, order.importBatchId);
+  assert.equal(response.data.orders[0].importBatchIndex, 0);
+  for (const invalid of [
+    { importBatchId: "invalid" }, { importBatchIndex: -1 }, { importBatchIndex: 500 },
+    { importBatchIndex: 1.5 }, { importBatchId: null }, { importBatchIndex: null },
+  ]) {
+    assert.equal((await post({ ...order, ...invalid })).status, 400);
+  }
+  const legacy = { ...order };
+  delete legacy.importBatchId;
+  delete legacy.importBatchIndex;
+  assert.equal((await post(legacy)).status, 200);
+  assert.equal(stored.import_batch_id, null);
+  assert.equal(stored.import_batch_index, null);
+  failure = { code: "PGRST204", message: "Could not find the import_batch_id column" };
+  const missingMigration = await post(order);
+  assert.equal(missingMigration.status, 500);
+  assert.match(missingMigration.data.error, /20261102000000_order_import_batches.sql/);
+});
+
 test("vehicle statistics filter displays plates instead of vehicle names", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const start = source.indexOf("value={vehicleFinanceVehicleFilter}", source.indexOf("导出车辆财务表（A4）"));

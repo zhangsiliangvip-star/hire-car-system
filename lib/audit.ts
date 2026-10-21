@@ -66,6 +66,7 @@ export const collectionAuditTable = {
 
 const fieldLabels: Record<string, string> = {
   kind: "收支分类（income收入／expense支出）",
+  import_batch_id: "导入批次编号", import_batch_index: "批次内顺序",
   id: "记录编号", region_id: "地域编号", vehicle: "車両", vehicle_plate: "予約車両番号", driver: "運転士",
   date: "服务开始日", end_date: "服务结束日", off_dates: "休运日",
   customer: "订单名称", phone: "电话", pickup: "上车地点", destination: "目的地",

@@ -63,6 +63,8 @@ const financeByDateSchema = z.record(dateSchema, orderFinanceSchema)
 const orderSchema = z.object({
   id: idSchema,
   regionId: idSchema,
+  importBatchId: idSchema.nullish(),
+  importBatchIndex: z.number().int().min(0).max(499).nullish(),
   vehicle: z.string().max(200),
   vehiclePlate: z.string().max(100).default(""),
   date: dateSchema,
@@ -88,7 +90,10 @@ const orderSchema = z.object({
   accountingAssignee: z.string().max(200).default(""),
   financeNote: z.string().max(5000).default(""),
   financeByDate: financeByDateSchema.default({}),
-}).strict();
+}).strict().refine(
+  (order) => Boolean(order.importBatchId) === (order.importBatchIndex != null),
+  { message: "Import batch ID and index must be provided together." },
+);
 const driverSchema = z.object({
   id: idSchema,
   regionId: idSchema,
@@ -328,6 +333,8 @@ function toOrder(row: Database["public"]["Tables"]["orders"]["Row"]): Order {
     lastOperation: toLastOperation(row.last_operation),
     id: row.id,
     regionId: row.region_id,
+    importBatchId: row.import_batch_id ?? null,
+    importBatchIndex: row.import_batch_index ?? null,
     vehicle: row.vehicle,
     vehiclePlate: row.vehicle_plate ?? "",
     date: row.date,
@@ -464,6 +471,8 @@ function toOrderRow(order: Order): Database["public"]["Tables"]["orders"]["Inser
   return {
     id: order.id,
     region_id: order.regionId ?? "",
+    import_batch_id: order.importBatchId ?? null,
+    import_batch_index: order.importBatchIndex ?? null,
     vehicle: order.vehicle,
     vehicle_plate: order.vehiclePlate ?? "",
     date: order.date,
@@ -866,6 +875,17 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: true, saved });
   } catch (error) {
     console.error("Failed to persist dashboard data.", error);
+    if (
+      typeof error === "object" && error !== null &&
+      "code" in error && error.code === "PGRST204" &&
+      "message" in error && typeof error.message === "string" &&
+      /import_batch_(id|index)/.test(error.message)
+    ) {
+      return jsonResponse(
+        { error: "数据库尚未添加导入批次字段，请先执行 20261102000000_order_import_batches.sql 迁移后再保存订单。" },
+        { status: 500 },
+      );
+    }
     return jsonResponse(
       { error: "保存失败，数据尚未确认写入，请检查网络和数据库权限。" },
       { status: 500 },

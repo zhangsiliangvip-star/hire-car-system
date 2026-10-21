@@ -72,6 +72,7 @@ import { OrderVehiclePlateSelect } from "@/components/order-vehicle-plate-select
 import { FinanceDriverSelect } from "@/components/finance-driver-select";
 import { getAccountingAssigneeName } from "@/lib/accounting-assignee";
 import { findOrderConflicts, type OrderConflict } from "@/lib/order-conflicts";
+import { getAccountingBatchOrders, groupReservationOrders } from "@/lib/order-batches";
 
 const DEFAULT_VEHICLE_NAME = "Alphard 01";
 const ALL_REGIONS_ID = "__all_regions__";
@@ -660,29 +661,6 @@ function toAccountingKey(orderId: string, date: string) {
 function parseAccountingKey(key: string) {
   const separator = key.lastIndexOf("|");
   return { orderId: key.slice(0, separator), date: key.slice(separator + 1) };
-}
-
-/**
- * Batch-imported reservations are separate single-day orders on the same vehicle and day.
- * Nothing persists the import batch itself, so the batch is recognised by that shape.
- */
-function getAccountingBatchOrders(order: Order, candidates: readonly Order[]): Order[] {
-  const isSingleDay = (item: Order) => (item.endDate || item.date) === item.date;
-  if (!isSingleDay(order)) return [order];
-  const batch = candidates.filter((item) =>
-    item.id === order.id ||
-    (isSingleDay(item) &&
-      item.regionId === order.regionId &&
-      item.date === order.date &&
-      item.vehicle === order.vehicle &&
-      (item.vehiclePlate || "") === (order.vehiclePlate || "")),
-  );
-  return batch.length > 1
-    ? batch.slice().sort((first, second) =>
-        (first.time || "99:99").localeCompare(second.time || "99:99") ||
-        first.customer.localeCompare(second.customer),
-      )
-    : [order];
 }
 
 function shiftFinanceDates(
@@ -2572,11 +2550,14 @@ export default function Home() {
       return;
     }
 
+    const importBatchId = createId();
     setOrders((currentOrders) => [
       ...currentOrders,
-      ...details.map((detail) => ({
+      ...details.map((detail, importBatchIndex) => ({
         ...createEmptyDraft(batchVehicle.name, batchOrderDate, batchVehicle.plate),
         id: createId(),
+        importBatchId,
+        importBatchIndex,
         customer: `${detail.pickup} → ${detail.destination}`,
         time: detail.time,
         pickup: detail.pickup,
@@ -3378,6 +3359,8 @@ export default function Home() {
 
     setForm({
       regionId: order.regionId,
+      importBatchId: order.importBatchId,
+      importBatchIndex: order.importBatchIndex,
       vehicle: order.vehicle,
       vehiclePlate: order.vehiclePlate || "",
       date: order.date,
@@ -5935,11 +5918,8 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...monthlyOrders]
-                      .sort((first, second) =>
-                        `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
-                      )
-                      .map((order) => (
+                    {groupReservationOrders(monthlyOrders)
+                      .map(({ order, count }) => (
                         <tr key={order.id} className="border-t hover:bg-gray-50">
                           <td className="whitespace-nowrap px-4 py-3">
                             {formatOrderDate(order.date)}
@@ -5961,6 +5941,11 @@ export default function Home() {
                             >
                               {order.customer}
                             </button>
+                            {order.importBatchId && (
+                              <span className="ml-2 whitespace-nowrap rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                                合计{count}单
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <button
@@ -7877,7 +7862,9 @@ export default function Home() {
             {isAccountingBatch && (
               <div className="mt-5 rounded border border-indigo-200 bg-indigo-50 p-4 text-sm">
                 <p className="font-semibold text-indigo-900">
-                  同日批量订单：共 {accountingBatchOrders.length} 单（同一天、同一车辆的单日订单）
+                  {accountingBatchOrders[0]?.importBatchId
+                    ? `导入批次：合计${accountingBatchOrders.length}单`
+                    : `同日批量订单：共 ${accountingBatchOrders.length} 单（同一天、同一车辆的单日订单）`}
                 </p>
                 <p className="mt-1 text-xs text-indigo-800">
                   批量统一设置：在这里选择一次，本批全部订单同步；下方各订单仍可单独修改，只影响该订单。
