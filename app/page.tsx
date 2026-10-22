@@ -76,11 +76,26 @@ import { getAccountingBatchOrders, groupReservationOrders } from "@/lib/order-ba
 
 const DEFAULT_VEHICLE_NAME = "Alphard 01";
 const ALL_REGIONS_ID = "__all_regions__";
+const UNASSIGNED_ORDER_VEHICLE = "__unassigned_vehicle__";
+const UNASSIGNED_ORDER_DRIVER = "__unassigned_driver__";
 const DATA_SYNC_INTERVAL_MS = 10_000;
 const TOKYO_REGION_ID = "60000000-0000-4000-8000-000000000001";
 const LOGIN_ACCOUNT_POSITIONS = ["役员", "操作", "会计"] as const;
 
 const fuelTypes = ["レギュラー", "ディーゼル"];
+
+function preventNumberInputWheelChange(event: WheelEvent) {
+  const input = event.target;
+  if (
+    input instanceof HTMLInputElement &&
+    input.type === "number" &&
+    !input.readOnly &&
+    !input.disabled
+  ) {
+    input.blur();
+  }
+}
+
 type VehicleMonthlyFinanceForm = {
   parkingFee: string;
   insuranceFee: string;
@@ -808,6 +823,10 @@ function FinanceSummaryPanel({
 
 export default function Home() {
   const router = useRouter();
+  useEffect(() => {
+    document.addEventListener("wheel", preventNumberInputWheelChange, true);
+    return () => document.removeEventListener("wheel", preventNumberInputWheelChange, true);
+  }, []);
   const [calendarCenterDate, setCalendarCenterDate] = useState(() => getCenteredTodayDate());
   const [calendarVehicleFilter, setCalendarVehicleFilter] =
     useState<CalendarVehicleFilter>("all");
@@ -1022,6 +1041,8 @@ export default function Home() {
   const [activeView, setActiveView] = useState<ActiveView>("calendar");
   const [orderMonth, setOrderMonth] = useState(getCurrentMonthKey);
   const [orderDateFilter, setOrderDateFilter] = useState("");
+  const [orderVehicleFilter, setOrderVehicleFilter] = useState("");
+  const [orderDriverFilter, setOrderDriverFilter] = useState("");
   const [showOrderDateFilter, setShowOrderDateFilter] = useState(false);
   const [financeMonth, setFinanceMonth] = useState(getCurrentMonthKey);
   const [balanceMonth, setBalanceMonth] = useState(getCurrentMonthKey);
@@ -1430,14 +1451,35 @@ export default function Home() {
   const selectedOrderDriver = selectedOrderDetails
     ? driverRecords.find((driver) => driver.name === selectedOrderDetails.driver)
     : undefined;
-  const monthlyOrders = orders.filter(
+  const ordersInSelectedMonth = orders.filter(
     (order) =>
       order.date <= `${orderMonth}-31` &&
-      (order.endDate || order.date) >= `${orderMonth}-01` &&
+      (order.endDate || order.date) >= `${orderMonth}-01`,
+  );
+  const orderVehicleFilterOptions = Array.from(
+    new Set(
+      ordersInSelectedMonth
+        .map((order) => resolveOrderVehicle(vehicleRecords, order)?.plate || order.vehiclePlate)
+        .filter(Boolean),
+    ),
+  ).sort((first, second) => first.localeCompare(second, "ja", { numeric: true }));
+  const orderDriverFilterOptions = Array.from(
+    new Set(ordersInSelectedMonth.map((order) => order.driver).filter(Boolean)),
+  ).sort((first, second) => first.localeCompare(second, "ja"));
+  const monthlyOrders = ordersInSelectedMonth.filter(
+    (order) =>
       (!orderDateFilter ||
         (order.date <= orderDateFilter &&
           (order.endDate || order.date) >= orderDateFilter &&
           !order.offDates.includes(orderDateFilter))) &&
+      (orderVehicleFilter === "" ||
+        (orderVehicleFilter === UNASSIGNED_ORDER_VEHICLE
+          ? !(resolveOrderVehicle(vehicleRecords, order)?.plate || order.vehiclePlate)
+          : (resolveOrderVehicle(vehicleRecords, order)?.plate || order.vehiclePlate) === orderVehicleFilter)) &&
+      (orderDriverFilter === "" ||
+        (orderDriverFilter === UNASSIGNED_ORDER_DRIVER
+          ? !order.driver
+          : order.driver === orderDriverFilter)) &&
       (orderSourceFilter === "" ||
         (orderSourceFilter === UNSOURCED_ORDER
           ? !order.orderSource
@@ -5864,6 +5906,40 @@ export default function Home() {
                       onClose={() => setShowOrderDateFilter(false)}
                     />
                   )}
+                  <label htmlFor="order-vehicle-filter" className="text-sm font-medium text-gray-600">
+                    車両番号
+                  </label>
+                  <select
+                    id="order-vehicle-filter"
+                    value={orderVehicleFilter}
+                    onChange={(event) => setOrderVehicleFilter(event.target.value)}
+                    className="rounded border bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">全部車両番号</option>
+                    {orderVehicleFilterOptions.map((plate) => (
+                      <option key={plate} value={plate}>
+                        {plate}
+                      </option>
+                    ))}
+                    <option value={UNASSIGNED_ORDER_VEHICLE}>未安排車両番号</option>
+                  </select>
+                  <label htmlFor="order-driver-filter" className="text-sm font-medium text-gray-600">
+                    運転士
+                  </label>
+                  <select
+                    id="order-driver-filter"
+                    value={orderDriverFilter}
+                    onChange={(event) => setOrderDriverFilter(event.target.value)}
+                    className="rounded border bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">全部運転士</option>
+                    {orderDriverFilterOptions.map((driver) => (
+                      <option key={driver} value={driver}>
+                        {driver}
+                      </option>
+                    ))}
+                    <option value={UNASSIGNED_ORDER_DRIVER}>未安排運転士</option>
+                  </select>
                   <span className="text-sm font-medium text-gray-600">
                     来源
                   </span>
@@ -6805,6 +6881,7 @@ export default function Home() {
                     }
                   }}
                 >
+                  <option value="" disabled>请选择所属会社</option>
                   {companies.map((company) => (
                     <option key={company} value={company}>{company}</option>
                   ))}
