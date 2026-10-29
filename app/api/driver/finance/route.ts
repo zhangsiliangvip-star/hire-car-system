@@ -59,11 +59,11 @@ export async function POST(request: Request) {
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     const text = await request.text();
-    if (text.length > 65536) return jsonResponse({ error: "明细过多。" }, { status: 413 });
+    if (text.length > 65536) return jsonResponse({ error: "明細过多。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = financeSubmissionSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "请检查明细、金额和超時小時数。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "请检查明細、金额和超時小時数。" }, { status: 400 });
     const item = parsed.data;
     const { data, error } = item.historical
       ? await identity.supabase.rpc("submit_driver_historical_finance", {

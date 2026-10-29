@@ -101,7 +101,7 @@ export default function DriverFinance() {
     };
   }, [month, revision]);
 
-  function canLeave() { return !dirty || window.confirm("切换会放弃尚未提交的明细，是否继续？"); }
+  function canLeave() { return !dirty || window.confirm("切换会放弃尚未提交的明細，是否继续？"); }
   function changeDate(next: string) {
     if (!next || next === date || !canLeave()) return;
     const nextMonth = next.slice(0, 7);
@@ -115,7 +115,7 @@ export default function DriverFinance() {
     pending.current = null;
   }
   function choose(id: string) {
-    if (id === selected || (orderDirty && !window.confirm("切换訂単会放弃该訂単尚未提交的明细，是否继续？"))) return;
+    if (id === selected || (orderDirty && !window.confirm("切换訂単会放弃该訂単尚未提交的明細，是否继续？"))) return;
     const item = data?.trips.find(item => item.assignmentId === id);
     setSelected(id); setExpenses(item?.claims.flatMap(claim => claim.expenses) || []);
     setHours(item ? String(item.claims.find(claim => claim.category === "overtime")?.overtimeHours ?? item.existingOvertimeHours) : "");
@@ -129,9 +129,9 @@ export default function DriverFinance() {
     if (!files?.length || lock.current || (!isFuel && !trip)) return;
     const selectedFiles = Array.from(files);
     const expense = expenses.find(item => item.id === id);
-    if (!isFuel && (!expense || !trip)) { setError("请先選択訂単和費用明细。"); return; }
+    if (!isFuel && (!expense || !trip)) { setError("请先選択訂単和費用明細。"); return; }
     const receiptCount = isFuel ? fuelReceipts.length : expense?.receipts.length || 0;
-    if (receiptCount + selectedFiles.length > 5) { setError("每条明细最多5张票据。"); return; }
+    if (receiptCount + selectedFiles.length > 5) { setError("每条明細最多5张票据。"); return; }
     const pathPrefix = isFuel ? date : trip && expense ? `${trip.assignmentId}/${expense.type}` : "";
     if (!pathPrefix) { setError("无法确定票据所属訂単。"); return; }
     if (selectedFiles.some(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5242880)) {
@@ -209,7 +209,7 @@ export default function DriverFinance() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = financeSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请填写每条費用明细及正整数金额；超時为0–999小時，最多两位小数。"); return; }
+    if (!parsed.success) { setError("请填写每条費用明細及正整数金额；超時为0–999小時，最多两位小数。"); return; }
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -268,7 +268,7 @@ export default function DriverFinance() {
         <div className="driver-row"><span>超時工資</span><strong>{yen(wages!.overtime)}</strong></div>
         {data.manualItems.map((item, index) => <div className="driver-row" key={`manual-${index}`}><span>{item.name}</span><strong>{yen(item.amount)}</strong></div>)}
         <div className="driver-row"><span>后台已记司机立替</span><strong>{yen(wages!.advances)}</strong></div>
-        <details><summary>按日工資及立替明细</summary>{data.wages.map((row, index) =>
+        <details><summary>按日工資及立替明細</summary>{data.wages.map((row, index) =>
           <div className="driver-row" key={`${row.date}-${index}`}><span>{row.date}</span><strong>{yen(row.base + row.bonus + row.overtime + row.advances)}</strong></div>)}</details>
         <div className="driver-row"><span>应発金额</span><strong>{yen(wages!.base + wages!.bonus + wages!.overtime + wages!.advances +
           data.manualItems.reduce((sum, item) => sum + item.amount, 0))}</strong></div>
@@ -289,11 +289,11 @@ export default function DriverFinance() {
         <fieldset disabled={busy || readOnly} className="finance-fields">
           <button className="driver-link" type="button" onClick={() => setExpenses(items => [...items,
             { id: createDriverRequestId(), type: category, detail: "", amount: 0, receipts: [] }])}
-            disabled={expenses.filter(item => item.type === category).length >= 50 || busy || readOnly}>＋添加{financeCategoryLabels[category]}明细</button>
+            disabled={expenses.filter(item => item.type === category).length >= 50 || busy || readOnly}>＋添加{financeCategoryLabels[category]}明細</button>
           {expenses.filter(item => item.type === category).map((item, index) => <div className="finance-expense" key={item.id}>
             <h3>{index + 1}. {item.type === "company" ? "社報" : "旅報"}</h3>
             <div className="finance-expense-row">
-            <label className="driver-field">明细<input maxLength={200} value={item.detail} onChange={event => edit(item.id, { detail: event.target.value })} /></label>
+            <label className="driver-field">明細<input maxLength={200} value={item.detail} onChange={event => edit(item.id, { detail: event.target.value })} /></label>
             <label className="driver-field">金额（JPY）<input type="number" min="1" max="99999999999999" step="1" inputMode="numeric"
               onWheel={event => event.currentTarget.blur()}
               value={item.amount || ""} onChange={event => edit(item.id, { amount: Number(event.target.value) })} /></label>
@@ -306,7 +306,7 @@ export default function DriverFinance() {
               onClick={() => { edit(item.id, { receipts: item.receipts.filter(value => value !== path) }); setReceipt(""); }}>
               移除票据 {receiptIndex + 1}　
             </button>)}
-            {!readOnly && <button className="driver-link" type="button" onClick={() => setExpenses(items => items.filter(value => value.id !== item.id))}>删除此明细</button>}
+            {!readOnly && <button className="driver-link" type="button" onClick={() => setExpenses(items => items.filter(value => value.id !== item.id))}>删除此明細</button>}
           </div>)}
         </fieldset>
         {expenses.filter(item => item.type === category).flatMap(item => item.receipts).map((path, index) =>

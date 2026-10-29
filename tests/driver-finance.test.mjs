@@ -366,18 +366,18 @@ test("fuel remains daily when changing orders and does not enter advance/payable
 });
 test("expense detail and amount share a compact left-to-right row", () => {
   const { html } = renderFinance();
-  assert.match(html, /class="finance-expense-row"><label[^>]*>明细<input[^>]*><\/label><label[^>]*>金额（JPY）<input[^>]*><\/label><\/div>/);
+  assert.match(html, /class="finance-expense-row"><label[^>]*>明細<input[^>]*><\/label><label[^>]*>金额（JPY）<input[^>]*><\/label><\/div>/);
 });
 test("advance categories render as separate simultaneous cards with their own entry controls", () => {
   const h = renderFinance();
   for (const label of ["社報立替", "旅報立替"]) {
     const card = h.html.split(`aria-label="${label}"`)[1].split("</section>")[0];
     assert.ok(card.includes(`<h2>${label}</h2>`));
-    assert.ok(card.includes(`＋添加${label}明细`));
+    assert.ok(card.includes(`＋添加${label}明細`));
     assert.ok(card.includes(`保存${label}并提交`));
   }
   assert.equal(h.buttons.some(button => ["社報立替", "旅報立替"].includes(button.children)), false);
-  h.buttons.find(button => Array.isArray(button.children) && button.children.join("") === "＋添加旅報立替明细").onClick();
+  h.buttons.find(button => Array.isArray(button.children) && button.children.join("") === "＋添加旅報立替明細").onClick();
   assert.equal(h.states[4][1].type, "trip");
   h.render();
   assert.equal(h.inputs.filter(input => input.type === "file").length, 3);

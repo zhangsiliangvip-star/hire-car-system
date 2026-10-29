@@ -895,7 +895,7 @@ function FinanceSummaryPanel({
         </div>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        按每日财务明细日期按月汇总，包含取消訂単及休运日；金额单位为日元（JPY）。
+        按每日财务明細日期按月汇总，包含取消訂単及休运日；金额单位为日元（JPY）。
         訂単总利润 = 请求金额 - 会社总支出 - 司机总立替 - 司机总工資。
       </p>
       {children}
@@ -2375,7 +2375,7 @@ export default function Home() {
       if (!description && supply.amount.trim() === "") continue;
       if (!description || amount === null) {
         setVehicleMonthlyFinanceError(
-          "请为每条备品明细填写名称和非负整数金额。",
+          "请为每条备品明細填写名称和非负整数金额。",
         );
         return;
       }
@@ -4020,7 +4020,7 @@ export default function Home() {
         ]),
       ].sort();
       if (dates.length === 0 || dates.length > 3660) {
-        alert("单笔訂単财务明细最多支持 3660 个日历日。");
+        alert("单笔訂単财务明細最多支持 3660 个日历日。");
         return;
       }
       const orderForm = Object.fromEntries(
@@ -5659,7 +5659,7 @@ export default function Home() {
                     </div>
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between">
-                        <h4 className="text-sm font-semibold">备品費用明细</h4>
+                        <h4 className="text-sm font-semibold">备品費用明細</h4>
                         <button
                           type="button"
                           onClick={() =>
@@ -5962,7 +5962,7 @@ export default function Home() {
                     title="A4 PDF 导出"
                     className="rounded border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
                   >
-                    外注司机出金明细
+                    外注司机出金明細
                   </button>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
                     月份
@@ -6041,7 +6041,7 @@ export default function Home() {
                     ))}
                   </dl>
                   <p className="mt-2 text-xs text-emerald-800">
-                    外注司机出金对账明细，仅供核对，不重复计入收支平衡；月份沿用訂単首个服务月。
+                    外注司机出金对账明細，仅供核对，不重复计入收支平衡；月份沿用訂単首个服务月。
                   </p>
                 </section>
                 <section className="rounded-lg border border-violet-200 bg-violet-50 px-5 py-4 shadow-sm">

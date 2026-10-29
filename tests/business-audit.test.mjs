@@ -1085,7 +1085,7 @@ test("A4 report exports omit signature fields and preserve report content", () =
     }), "経理統計月度财务表", "月份：2026-10"],
     [expenses.buildOrderExpensePrintHtml({
       name: "Test Order", period: "2026-10-01", note: "Keep this note", rows: [],
-    }), "团务費用明细", "行程日期：2026-10-01"],
+    }), "团务費用明細", "行程日期：2026-10-01"],
     [balance.buildBalancePrintHtml({
       ...base, summary: summarizeBalance("", [], [], []),
     }), "收支平衡月度報表", "服务月份：2026-10"],
@@ -2439,7 +2439,7 @@ test("balance payment reconciliation filters methods without changing expenses o
   assert.match(fs.readFileSync(path.join(root, "lib\\print-a4.ts"), "utf8"), /fitsPageAspect/);
   for (const [method, amount] of [["paypay", "100"], ["微信", "200"], ["支付宝", "300"], ["口座", "400"]]) {
     assert.ok(html.includes(`<td>${method}</td><td class="number">¥${amount}</td>`));
-    assert.ok(html.includes(`<h2>${method}明细</h2>`));
+    assert.ok(html.includes(`<h2>${method}明細</h2>`));
     assert.ok(html.includes(`${method}合计</td><td class="number">¥${amount}`));
   }
   assert.ok(html.includes("&lt;Order&gt;"));

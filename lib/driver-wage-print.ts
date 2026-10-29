@@ -71,7 +71,7 @@ export function buildDriverWagePrintHtml(data: DriverWagePrintData) {
   <div class="summary"><div>司机立替（工資外）<strong>¥${number(sum("driverAdvances"))}</strong></div>
   <div>工資总额<strong>¥${number(totalWage)}</strong></div>
   <div>支付总额<strong>¥${number(sum("driverAdvances") + totalWage)}</strong></div></div>
-  <h2>每日工資明细（日期升序，同日多单分别列示）</h2>
+  <h2>每日工資明細（日期升序，同日多单分别列示）</h2>
   <table><colgroup><col style="width:10%"><col style="width:17%"><col style="width:10%"><col style="width:9%"><col style="width:5%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:9%"></colgroup>
   <thead><tr><th>服务日期</th><th>訂単名称／核算担当</th><th>車両番号</th><th>司机立替</th><th>超時<br>h</th><th>超時工資</th><th>奖励</th><th>比例工資</th><th>固定工資</th><th>工資总额</th><th>支付总额</th></tr></thead>
   <tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.serviceDate)}</td>
