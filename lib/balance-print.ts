@@ -126,7 +126,7 @@ export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
     return `<section><h2>${method || "未设置出金方式"}明细</h2><table>
     <thead><tr><th>日期</th><th>訂単名称</th><th>所属会社</th><th>外注司机出金状态</th><th>外注司机备注</th><th class="number">金额（JPY）</th></tr></thead>
     <tbody>${entries.length ? entries.map((row) =>
-      `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer)}</td><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.status || "未选择")}</td><td style="white-space:pre-wrap">${escapeHtml(row.note || "")}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
+      `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer)}</td><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.status || "未選択")}</td><td style="white-space:pre-wrap">${escapeHtml(row.note || "")}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
       : '<tr><td colspan="6">暂无出金记录</td></tr>'}</tbody>
     <tfoot><tr><td colspan="5">${method || "未设置出金方式"}合计</td><td class="number">${yen(paymentAmounts[method])}</td></tr></tfoot></table></section>`;
   }).join("")}

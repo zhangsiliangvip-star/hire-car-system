@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     if (identity.response) return identity.response;
     const query = Object.fromEntries(new URL(request.url).searchParams);
     const parsed = z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }).strict().safeParse(query);
-    if (!parsed.success) return jsonResponse({ error: "请选择有效月份。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "请選択有效月份。" }, { status: 400 });
     const links = await identity.supabase.rpc("ensure_driver_historical_finance_links", {
       target_month: parsed.data.month,
     });

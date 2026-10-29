@@ -129,7 +129,7 @@ export default function DriverFinance() {
     if (!files?.length || lock.current || (!isFuel && !trip)) return;
     const selectedFiles = Array.from(files);
     const expense = expenses.find(item => item.id === id);
-    if (!isFuel && (!expense || !trip)) { setError("请先选择訂単和费用明细。"); return; }
+    if (!isFuel && (!expense || !trip)) { setError("请先選択訂単和费用明细。"); return; }
     const receiptCount = isFuel ? fuelReceipts.length : expense?.receipts.length || 0;
     if (receiptCount + selectedFiles.length > 5) { setError("每条明细最多5张票据。"); return; }
     const pathPrefix = isFuel ? date : trip && expense ? `${trip.assignmentId}/${expense.type}` : "";
@@ -182,7 +182,7 @@ export default function DriverFinance() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = fuelSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请选择当天关联訂単，填写正整数燃油费并检查油票。"); return; }
+    if (!parsed.success) { setError("请選択当天关联訂単，填写正整数燃油费并检查油票。"); return; }
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -277,8 +277,8 @@ export default function DriverFinance() {
         max={`${month}-${new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()}`} disabled={busy}
         onChange={event => changeDate(event.target.value)} /></label>
         <button className="driver-link" type="button" disabled={busy} onClick={() => changeDate(japanDate())}>当日</button></div>
-      <label className="driver-field">选择当天訂単<select value={selected} disabled={busy} onChange={event => choose(event.target.value)}>
-        <option value="">请选择当天訂単</option>{dayTrips.map(item =>
+      <label className="driver-field">選択当天訂単<select value={selected} disabled={busy} onChange={event => choose(event.target.value)}>
+        <option value="">请選択当天訂単</option>{dayTrips.map(item =>
           <option key={item.assignmentId} value={item.assignmentId}>{item.historical ? "历史訂単 · " : ""}{item.pickup} → {item.destination}</option>)}
       </select></label>
       {!dayTrips.length && <p className="driver-empty">当天暂无本人可申报的行程。</p>}
@@ -327,7 +327,7 @@ export default function DriverFinance() {
         {fuelClaim && <p className="driver-muted">{labels[fuelClaim.status]} {fuelClaim.reviewNote}</p>}
         <fieldset className="finance-fields" disabled={busy || fuelReadOnly || !fuelTrips.length}>
           <label className="driver-field">燃油费关联訂単<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
-            <option value="">请选择当天一张訂単</option>
+            <option value="">请選択当天一张訂単</option>
             {fuelClaim && !dayTrips.some(item => item.assignmentId === fuelClaim.assignmentId) &&
               <option value={fuelClaim.assignmentId}>原关联訂単（当前不可选）</option>}
             {fuelTrips.map(item => <option value={item.assignmentId} key={item.assignmentId}>{item.pickup} → {item.destination}</option>)}

@@ -64,7 +64,7 @@ export function usePersistedCollection<T extends Identified>(
     }));
     if (next.some((item) => !item.regionId)) {
       persistenceFailed.current = true;
-      reportError("新增业务数据前，请先选择一个具体地域。");
+      reportError("新增业务数据前，请先選択一个具体地域。");
       return;
     }
 

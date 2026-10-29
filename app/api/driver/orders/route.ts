@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const date = params.get("date");
     if ((assignment !== null && date !== null) || (assignment === null && date === null) ||
         (assignment !== null ? !assignmentIdSchema.safeParse(assignment).success : !serviceDateSchema.safeParse(date).success)) {
-      return jsonResponse({ error: "请选择有效日期或行程。" }, { status: 400 });
+      return jsonResponse({ error: "请選択有效日期或行程。" }, { status: 400 });
     }
     async function withVehicleNumbers(trips: DriverTrip[]) {
       if (!trips.length) return trips;

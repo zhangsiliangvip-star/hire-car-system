@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const date = z.iso.date().safeParse(params.get("date"));
     if (!date.success || [...params.keys()].some(key => key !== "date") || params.getAll("date").length !== 1)
-      return jsonResponse({ error: "请选择有效的日报日期。" }, { status: 400 });
+      return jsonResponse({ error: "请選択有效的日报日期。" }, { status: 400 });
     const { data, error } = await identity.supabase.rpc("driver_report_defaults", { target_date: date.data });
     if (error) {
       console.error("Driver report defaults rejected.", { code: error.code });

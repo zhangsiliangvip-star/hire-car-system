@@ -250,7 +250,7 @@ function SourceColorPicker({
     <span ref={pickerRef} className="inline-flex items-center gap-4">
       <button
         type="button"
-        aria-label={`选择${sourceName}的颜色`}
+        aria-label={`選択${sourceName}的颜色`}
         aria-expanded={isOpen}
         onClick={togglePalette}
         className="inline-flex h-8 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
@@ -275,7 +275,7 @@ function SourceColorPicker({
               <button
                 key={option}
                 type="button"
-                aria-label={`选择颜色 ${option}`}
+                aria-label={`選択颜色 ${option}`}
                 aria-pressed={color.toLowerCase() === option}
                 onClick={() => {
                   onSelect(option);
@@ -2112,7 +2112,7 @@ export default function Home() {
     }
     if (!requireSpecificRegionForNewData()) return;
     if (!selectedDriverFinanceDriver) {
-      alert("请先选择一位司机。");
+      alert("请先選択一位司机。");
       return;
     }
     setDriverWageItemDrafts((drafts) => [...drafts, {
@@ -2125,7 +2125,7 @@ export default function Home() {
     if (driverWageItemsMigrationPending) return;
     if (currentProfile?.role !== "admin" || !requireSpecificRegionForNewData()) return;
     if (!selectedDriverFinanceDriver) {
-      alert("请先选择一位司机。");
+      alert("请先選択一位司机。");
       return;
     }
     if (driverWageItemDrafts.length === 0) {
@@ -2472,7 +2472,7 @@ export default function Home() {
       return;
     }
     if (vehicleFinanceVehicleFilter && !selectedVehicleForFinance) {
-      alert("无法识别所选車両，请重新选择車両番号。");
+      alert("无法识别所选車両，请重新選択車両番号。");
       return;
     }
     try {
@@ -2558,7 +2558,7 @@ export default function Home() {
       balanceCompanyFilter === "" ||
       balanceCompanyFilter === "__unassigned_company__"
     ) {
-      setBalanceExpenseError("请先选择具体所属会社，再添加收支项目。");
+      setBalanceExpenseError("请先選択具体所属会社，再添加收支项目。");
       return;
     }
     const name = balanceExpenseNameDraft[kind].trim();
@@ -2597,7 +2597,7 @@ export default function Home() {
       balanceCompanyFilter === "" ||
       balanceCompanyFilter === "__unassigned_company__"
     ) {
-      setBalanceExpenseError("请选择具体所属会社后再保存收支金额。");
+      setBalanceExpenseError("请選択具体所属会社后再保存收支金额。");
       return;
     }
     const items = balanceExpenseItems.filter(
@@ -3004,7 +3004,7 @@ export default function Home() {
 
   function requireSpecificRegionForNewData() {
     if (!activeRegionId || activeRegionId === ALL_REGIONS_ID) {
-      setPersistenceError("新增业务数据前，请先选择一个具体地域。");
+      setPersistenceError("新增业务数据前，请先選択一个具体地域。");
       return false;
     }
     return true;
@@ -3062,7 +3062,7 @@ export default function Home() {
     }
     const batchVehicle = availableVehicleRecords.find((vehicle) => vehicle.id === batchOrderVehicle);
     if (!batchOrderDate || !batchVehicle) {
-      alert("请选择有效的日期和运营中的車両。");
+      alert("请選択有效的日期和运营中的車両。");
       return;
     }
 
@@ -3675,7 +3675,7 @@ export default function Home() {
       ) &&
       savedVehicle.ownerCompany !== existingVehicle?.ownerCompany
     ) {
-      alert("車両所属必须从所属会社列表中选择。");
+      alert("車両所属必须从所属会社列表中選択。");
       return;
     }
 
@@ -4205,7 +4205,7 @@ export default function Home() {
       !formVehicle &&
       orderFormVehicles.filter((vehicle) => vehicle.name === form.vehicle).length > 1
     ) {
-      alert(`车名「${form.vehicle}」有多台車両，请选择具体的車両番号。`);
+      alert(`车名「${form.vehicle}」有多台車両，请選択具体的車両番号。`);
       return;
     }
     if (
@@ -4232,7 +4232,7 @@ export default function Home() {
           Number.isSafeInteger(amount) && amount >= 0 && amount <= 99_999_999_999_999) &&
         (finance.companyAdvancePaymentNote || "").length <= 1000 && hasValidDriverPayment(finance),
       )) {
-      alert("车费、司机工资、会社立替及外注司机费用须为不超过 99,999,999,999,999 的非负日元整数；司机工资与外注费用须按费用类型选择。行程简概及外注司机备注最多1000字，预约最多3660个日历日。");
+      alert("车费、司机工资、会社立替及外注司机费用须为不超过 99,999,999,999,999 的非负日元整数；司机工资与外注费用须按费用类型選択。行程简概及外注司机备注最多1000字，预约最多3660个日历日。");
       return;
     }
     const savedForm: OrderDraft = {
@@ -4874,7 +4874,7 @@ export default function Home() {
                   <label className="text-sm font-medium">
                     所属会社
                     <select required value={loginAccountForm.company} onChange={(event) => setLoginAccountForm((current) => ({ ...current, company: event.target.value }))} className="mt-1 w-full rounded border bg-white p-2">
-                      <option value="">选择会社</option>
+                      <option value="">選択会社</option>
                       {[...new Set(allCompanyRecords.map((company) => company.name))].map((company) => <option key={company} value={company}>{company}</option>)}
                     </select>
                   </label>
@@ -4889,7 +4889,7 @@ export default function Home() {
                       }))}
                       className="mt-1 w-full rounded border bg-white p-2"
                     >
-                      <option value="">选择职位</option>
+                      <option value="">選択职位</option>
                       {loginAccountForm.position &&
                         !LOGIN_ACCOUNT_POSITIONS.some(
                           (position) => position === loginAccountForm.position,
@@ -4906,7 +4906,7 @@ export default function Home() {
                   <label className="text-sm font-medium">
                     管理地域
                     <select required value={loginAccountForm.regionId} onChange={(event) => setLoginAccountForm((current) => ({ ...current, regionId: event.target.value }))} className="mt-1 w-full rounded border bg-white p-2">
-                      <option value="">选择地域</option>
+                      <option value="">選択地域</option>
                       {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
                     </select>
                   </label>
@@ -5060,7 +5060,7 @@ export default function Home() {
                         : financeSourceFilter === UNSOURCED_ORDER
                           ? "未填写"
                           : getSourceDisplayName(financeSourceFilter, activeRegionId === ALL_REGIONS_ID ? undefined : activeRegionId)}
-                      {" · 点击选择"}
+                      {" · 点击選択"}
                     </button>
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
@@ -5204,7 +5204,7 @@ export default function Home() {
                             <button
                               type="button"
                               aria-label={`${order.customer} 請求書状态：${order.invoiceStatus}，点击更改`}
-                              title="点击选择状态和变更范围"
+                              title="点击選択状态和变更范围"
                               disabled={invoiceStatusSavingIds.has(order.id)}
                               onClick={() => openOrderStatusDialog(order, "invoice", "finance")}
                               className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-wait disabled:opacity-60 ${order.invoiceStatus === "已完成" ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
@@ -5216,7 +5216,7 @@ export default function Home() {
                             <button
                               type="button"
                               aria-label={`${order.customer} 入金状态：${order.depositDate ? "入金済み" : "未入金"}，点击更改`}
-                              title="点击选择状态和变更范围"
+                              title="点击選択状态和变更范围"
                               disabled={invoiceStatusSavingIds.has(order.id)}
                               onClick={() => openOrderStatusDialog(order, "deposit", "finance")}
                               className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-wait disabled:opacity-60 ${order.depositDate ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
@@ -5255,7 +5255,7 @@ export default function Home() {
                   type="button"
                   onClick={async () => {
                     if (activeRegionId === ALL_REGIONS_ID || !selectedDriverFinanceDriver) {
-                      alert("请先选择一个分区和一位司机，再导出月度工资表。");
+                      alert("请先選択一个分区和一位司机，再导出月度工资表。");
                       return;
                     }
                     if (
@@ -5317,7 +5317,7 @@ export default function Home() {
                       onClick={() => setDriverSelectionTarget("driver-finance-filter")}
                       className="rounded border bg-white px-3 py-2 text-sm text-gray-900"
                     >
-                      {selectedDriverFinanceDriver || "全部運転士"} · 点击选择
+                      {selectedDriverFinanceDriver || "全部運転士"} · 点击選択
                     </button>
                   </label>
                 </>
@@ -5426,7 +5426,7 @@ export default function Home() {
                   <div>
                     <h3 className="font-semibold">手动工资项目</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      按所选月份、司机和所属会社保存；全部会社筛选时可为每个项目单独选择会社。金额可填写正数或负数，并计入工资及支付总额。
+                      按所选月份、司机和所属会社保存；全部会社筛选时可为每个项目单独選択会社。金额可填写正数或负数，并计入工资及支付总额。
                     </p>
                   </div>
                   <button
@@ -5445,7 +5445,7 @@ export default function Home() {
                 </div>
                 {!selectedDriverFinanceDriver ? (
                   <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    请先选择運転士，再录入手动工资项目。
+                    请先選択運転士，再录入手动工资项目。
                   </p>
                 ) : driverWageItemsMigrationPending ? (
                   <p role="alert" className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -5485,7 +5485,7 @@ export default function Home() {
                               }
                               className="mt-1 w-full rounded border bg-white px-3 py-2"
                             >
-                              <option value="__select_company__">请选择所属会社</option>
+                              <option value="__select_company__">请選択所属会社</option>
                               <option value="__unassigned_company__">未设置所属会社</option>
                               {driverFinanceCompanies.map((company) => (
                                 <option key={company} value={company}>{company}</option>
@@ -5800,7 +5800,7 @@ export default function Home() {
                   </>
                 ) : (
                   <p className="text-sm text-gray-600">
-                    请先在右上角选择車両番号，再录入该車両的月度费用和公里数。
+                    请先在右上角選択車両番号，再录入该車両的月度费用和公里数。
                   </p>
                 )}
               </section>
@@ -6141,7 +6141,7 @@ export default function Home() {
                 </div>
                 {balanceCompanyFilter === "" && (
                   <p className="border-b bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    请选择具体所属会社后添加项目或录入金额；全部会社视图仅用于查看汇总。
+                    请選択具体所属会社后添加项目或录入金额；全部会社视图仅用于查看汇总。
                   </p>
                 )}
                 <div className="overflow-x-auto">
@@ -6278,7 +6278,7 @@ export default function Home() {
           <button
             type="button"
             aria-haspopup="dialog"
-            aria-label={`选择年份，当前${calendarCenterDate.getFullYear()}年`}
+            aria-label={`選択年份，当前${calendarCenterDate.getFullYear()}年`}
             onClick={() => setYearPickerStart(Math.min(2089, Math.max(2020, calendarCenterDate.getFullYear() - 5)))}
             className="calendar-year-button rounded-full border border-slate-200 bg-white px-3 py-1 text-center text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 sm:min-w-0 sm:flex-[1_1_0px] sm:px-0"
           >
@@ -6295,7 +6295,7 @@ export default function Home() {
                 className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl"
               >
                 <div className="dialog-floating-header mb-4 flex items-center justify-between gap-3">
-                  <h2 id="calendar-year-dialog-title" className="text-lg font-bold">选择年份</h2>
+                  <h2 id="calendar-year-dialog-title" className="text-lg font-bold">選択年份</h2>
                   <button type="button" aria-label="关闭" onClick={() => setYearPickerStart(null)} className="text-2xl text-gray-500">
                     ×
                   </button>
@@ -6381,7 +6381,7 @@ export default function Home() {
             </select>
           </label>
 
-          <div className="calendar-month-buttons hidden min-w-0 flex-[12_1_44px] flex-nowrap items-center justify-center gap-1 sm:flex" role="group" aria-label="选择月份">
+          <div className="calendar-month-buttons hidden min-w-0 flex-[12_1_44px] flex-nowrap items-center justify-center gap-1 sm:flex" role="group" aria-label="選択月份">
             {Array.from({ length: 12 }, (_, index) => {
               const selected = calendarCenterDate.getMonth() === index;
               return (
@@ -6423,7 +6423,7 @@ export default function Home() {
             min={1}
             max={calendarDaysInMonth}
             value={calendarCenterDate.getDate()}
-            aria-label="选择本月日期"
+            aria-label="選択本月日期"
             aria-valuetext={`${calendarCenterDate.getMonth() + 1}月${calendarCenterDate.getDate()}日`}
             style={{
               "--calendar-progress": `${((calendarCenterDate.getDate() - 1) / Math.max(1, calendarDaysInMonth - 1)) * 100}%`,
@@ -7189,7 +7189,7 @@ export default function Home() {
                   <span className="text-sm font-medium text-gray-600">日期</span>
                   <button
                     type="button"
-                    aria-label="选择预约筛选日期"
+                    aria-label="選択预约筛选日期"
                     aria-haspopup="dialog"
                     disabled={!orderMonth}
                     onClick={() => setShowOrderDateFilter(true)}
@@ -7256,7 +7256,7 @@ export default function Home() {
                       : orderSourceFilter === UNSOURCED_ORDER
                         ? "未填写"
                         : getSourceDisplayName(orderSourceFilter, activeRegionId === ALL_REGIONS_ID ? undefined : activeRegionId)}
-                    {" · 点击选择"}
+                    {" · 点击選択"}
                   </button>
                   <label htmlFor="order-company-filter" className="text-sm font-medium text-gray-600">
                     所属会社
@@ -7283,7 +7283,7 @@ export default function Home() {
                 <button
                   type="button"
                   aria-haspopup="dialog"
-                  aria-label={`选择预约年份，当前${orderMonth.slice(0, 4)}年`}
+                  aria-label={`選択预约年份，当前${orderMonth.slice(0, 4)}年`}
                   onClick={() => setOrderYearPickerStart(
                     Math.min(2089, Math.max(2020, Number(orderMonth.slice(0, 4)) - 5)),
                   )}
@@ -7301,7 +7301,7 @@ export default function Home() {
                       className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl"
                     >
                       <div className="dialog-floating-header mb-4 flex items-center justify-between gap-3">
-                        <h2 id="order-year-dialog-title" className="text-lg font-bold">选择预约年份</h2>
+                        <h2 id="order-year-dialog-title" className="text-lg font-bold">選択预约年份</h2>
                         <button type="button" aria-label="关闭" onClick={() => setOrderYearPickerStart(null)} className="text-2xl text-gray-500">
                           ×
                         </button>
@@ -7355,7 +7355,7 @@ export default function Home() {
                     </section>
                   </div>
                 )}
-                <div className="calendar-month-buttons grid min-w-0 flex-1 grid-cols-6 gap-1 sm:grid-cols-12 sm:flex-nowrap sm:items-center sm:justify-center" role="group" aria-label="选择预约月份">
+                <div className="calendar-month-buttons grid min-w-0 flex-1 grid-cols-6 gap-1 sm:grid-cols-12 sm:flex-nowrap sm:items-center sm:justify-center" role="group" aria-label="選択预约月份">
                   {Array.from({ length: 12 }, (_, index) => {
                     const month = String(index + 1).padStart(2, "0");
                     const selected = orderMonth.slice(5, 7) === month;
@@ -7480,7 +7480,7 @@ export default function Home() {
                                 disabled={isInvoiceStatusSaving}
                                 aria-label={`${order.customer} 請求書状态：${order.invoiceStatus}，点击切换`}
                                 aria-busy={isInvoiceStatusSaving}
-                                title="点击选择請求書状态和变更范围"
+                                title="点击選択請求書状态和变更范围"
                                 onClick={() => openOrderStatusDialog(order, "invoice", "reservation")}
                                 className={`rounded border px-2 py-1 text-xs font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${order.invoiceStatus === "已完成" ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
                               >
@@ -7556,7 +7556,7 @@ export default function Home() {
 
                 <fieldset>
                   <legend className="mb-2 text-sm font-semibold">
-                    {invoiceStatusDialog.kind === "invoice" ? "选择請求書状态" : "选择入金状态"}
+                    {invoiceStatusDialog.kind === "invoice" ? "選択請求書状态" : "選択入金状态"}
                   </legend>
                   <div className="grid grid-cols-2 gap-3">
                     {(invoiceStatusDialog.kind === "invoice"
@@ -8190,7 +8190,7 @@ export default function Home() {
                   className="mt-1 w-full rounded border px-3 py-2 text-left hover:bg-blue-50">
                   {(batchOrderSource
                     ? orderSourceShortNameByRegion.get(`${getRegionForNewRecords()}:${batchOrderSource}`) || batchOrderSource
-                    : "未填写来源")} · 点击选择
+                    : "未填写来源")} · 点击選択
                 </button>
               </div>
               <label className="block text-sm font-medium">
@@ -8208,7 +8208,7 @@ export default function Home() {
                   }}
                   className="mt-1 w-full rounded border px-3 py-2"
                 >
-                  <option value="">请选择所属公司</option>
+                  <option value="">请選択所属公司</option>
                   {companies.map((company) => (
                     <option key={company} value={company}>{company}</option>
                   ))}
@@ -8399,7 +8399,7 @@ export default function Home() {
                   className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50">
                   {(form.orderSource
                     ? orderSourceShortNameByRegion.get(`${form.regionId || getRegionForNewRecords()}:${form.orderSource}`) || form.orderSource
-                    : "未填写来源")} · 点击选择
+                    : "未填写来源")} · 点击選択
                 </button>
               </div>
 
@@ -8466,7 +8466,7 @@ export default function Home() {
                 }
               />
               {form.endDate !== form.date && <p className="text-xs text-gray-600">
-                上方为訂単默认車両，仅影响未单独换车的日期；某一天换车请在下方对应日期选择車両番号。
+                上方为訂単默认車両，仅影响未单独换车的日期；某一天换车请在下方对应日期選択車両番号。
               </p>}
 
               {/* 運転士 */}
@@ -8569,7 +8569,7 @@ export default function Home() {
                                 setReservationDriverPayment(getReservationFinance(current)[date] || emptyOrderFinance,
                                   type, getServiceDriver(current, date))));
                             }}>
-                            <option value="" disabled>选择工资或外注</option>
+                            <option value="" disabled>選択工资或外注</option>
                             <option value="wage">司机工资</option>
                             <option value="company_advance">司机外注</option>
                           </select>
@@ -8625,7 +8625,7 @@ export default function Home() {
                                     { companyAdvancePaymentStatus: status }));
                                 }
                               }}>
-                              <option value="">未选择</option>
+                              <option value="">未選択</option>
                               <option value="已完成">已完成</option>
                               <option value="未完成">未完成</option>
                             </select>
@@ -8702,7 +8702,7 @@ export default function Home() {
                     }
                   }}
                 >
-                  <option value="" disabled>请选择所属会社</option>
+                  <option value="" disabled>请選択所属会社</option>
                   {companies.map((company) => (
                     <option key={company} value={company}>{company}</option>
                   ))}
@@ -9018,7 +9018,7 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, ownerCompany: event.target.value })
                   }
                 >
-                  <option value="">请选择所属会社</option>
+                  <option value="">请選択所属会社</option>
                   {companyRecords.map((company) => (
                     <option key={company.id} value={company.name}>{company.name}</option>
                   ))}
@@ -9037,7 +9037,7 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, seats: event.target.value })
                   }
                 >
-                  <option value="">请选择座位数</option>
+                  <option value="">请選択座位数</option>
                   {["5", "7", "8", "10"].map((seats) => (
                     <option key={seats} value={seats}>{seats}座</option>
                   ))}
@@ -9055,7 +9055,7 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, fuelType: event.target.value })
                   }
                 >
-                  <option value="">请选择燃油类型</option>
+                  <option value="">请選択燃油类型</option>
                   {fuelTypes.map((fuelType) => (
                     <option key={fuelType} value={fuelType}>
                       {fuelType}
@@ -9184,7 +9184,7 @@ export default function Home() {
                 <span className="mt-1 flex items-center gap-3">
                   <input
                     type="color"
-                    aria-label="选择来源颜色"
+                    aria-label="選択来源颜色"
                     value={sourceForm.color || "#2563eb"}
                     onChange={(event) =>
                       setSourceForm({ ...sourceForm, color: event.target.value })
@@ -9722,14 +9722,14 @@ export default function Home() {
                     : `同日批量訂単：共 ${accountingBatchOrders.length} 单（同一天、同一車両的单日訂単）`}
                 </p>
                 <p className="mt-1 text-xs text-indigo-800">
-                  批量统一设置：在这里选择一次，本批全部訂単同步；下方各訂単仍可单独修改，只影响该訂単。
+                  批量统一设置：在这里選択一次，本批全部訂単同步；下方各訂単仍可单独修改，只影响该訂単。
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {([
                     ["driver", "司机（全部统一）", accountingBatchDriverOptions, accountingBatchCommon.driver, "未安排司机"],
                     ["orderSource", "訂単来源（全部统一）", accountingSourceOptions, accountingBatchCommon.orderSource, "未填写"],
                     ["company", "訂単所属（全部统一）", accountingCompanyOptions, accountingBatchCommon.company, "未设置"],
-                    ["status", "訂単状态（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "请选择訂単状态"],
+                    ["status", "訂単状态（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "请選択訂単状态"],
                   ] as const).map(([field, label, options, common, emptyLabel]) => (
                     <label key={field} className="block min-w-0 font-medium text-indigo-900">
                       {label}
@@ -9741,8 +9741,8 @@ export default function Home() {
                           className="mt-1 block h-10 w-full min-w-0 truncate whitespace-nowrap rounded border bg-white px-2 text-left leading-9 text-gray-900"
                         >
                           {common === null
-                            ? "（各单不同） · 点击选择"
-                            : `${common ? getSourceDisplayName(common, accountingPreviewOrder?.regionId) : emptyLabel} · 点击选择`}
+                            ? "（各单不同） · 点击選択"
+                            : `${common ? getSourceDisplayName(common, accountingPreviewOrder?.regionId) : emptyLabel} · 点击選択`}
                         </button>
                       ) : field === "driver" ? (
                         <button
@@ -9888,7 +9888,7 @@ export default function Home() {
                             >
                               {financeOrderMeta.orderSource
                                 ? getSourceDisplayName(financeOrderMeta.orderSource, financeOrder.regionId)
-                                : "未填写"} · 点击选择
+                                : "未填写"} · 点击選択
                             </button>
                           </label>
                           <label className="block text-sm font-medium">
@@ -9982,7 +9982,7 @@ export default function Home() {
                               current[financeKey] || emptyOrderFinance, type,
                               getServiceDriver({ driver: "", financeByDate: { day: current[financeKey] } }, "day")) }));
                           }}>
-                          <option value="" disabled>请选择司机费用类型</option>
+                          <option value="" disabled>请選択司机费用类型</option>
                           <option value="wage">司机工资</option>
                           <option value="company_advance">司机外注</option>
                         </select>
@@ -10034,7 +10034,7 @@ export default function Home() {
                                 updateAccountingFinance(financeKey, { companyAdvancePaymentStatus: status });
                               }
                             }}>
-                            <option value="">未选择</option>
+                            <option value="">未選択</option>
                             <option value="已完成">已完成</option>
                             <option value="未完成">未完成</option>
                           </select>
@@ -10160,7 +10160,7 @@ export default function Home() {
                                     <select className="mt-1 h-10 w-full rounded border bg-gray-100 p-2" disabled
                                       value={finance.driverPaymentType === "company_advance"
                                         ? finance.companyAdvancePaymentStatus || "" : ""}>
-                                      <option value="">未选择</option>
+                                      <option value="">未選択</option>
                                       <option value="已完成">已完成</option>
                                       <option value="未完成">未完成</option>
                                     </select>
@@ -10351,7 +10351,7 @@ export default function Home() {
                   value={accountingAssignee}
                   onChange={(event) => setAccountingAssignee(event.target.value)}
                 >
-                  <option value="">请选择核算担当</option>
+                  <option value="">请選択核算担当</option>
                   {accountingAccounts.map((account) => (
                     <option key={account.id} value={account.email}>
                       {account.fullName.trim() || "未填写姓名"}
@@ -10411,7 +10411,7 @@ export default function Home() {
                     setAccountingDepositMethod(event.target.value as Order["depositMethod"])
                   }
                 >
-                  <option value="">未选择</option>
+                  <option value="">未選択</option>
                   <option value="口座入金">口座入金</option>
                   <option value="现金入金">现金入金</option>
                 </select>

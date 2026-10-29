@@ -165,7 +165,7 @@ test("trip list date picker follows tomorrow and changes the shared date without
   const picker = elements(tree).find(node => node.type === "input" && node.props.type === "date");
   assert.ok(picker);
   const html = renderToStaticMarkup(tree);
-  assert.ok(html.indexOf("明天") < html.indexOf('aria-label="选择行程日期"'));
+  assert.ok(html.indexOf("明天") < html.indexOf('aria-label="選択行程日期"'));
   picker.props.onChange({ target: { value: "" } });
   assert.equal(states[0], "2026-10-27");
   picker.props.onChange({ target: { value: "2026-11-03" } });

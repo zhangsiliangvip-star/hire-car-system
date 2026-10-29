@@ -139,9 +139,9 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
         </select>
         <input type="hidden" name="vehicleBaseline" defaultValue={r.header?.vehicleNumber ?? ""} />
         <span className="mt-1 block text-amber-800">{r.header?.assignmentId
-          ? "关联车牌跟随訂単最新选择；在此修改并保存，也会同步该日訂単及其他页面。"
-          : "尚未确认訂単关联，原车牌保持不变；选择并保存后开启同步。"}</span>
-        <span className="mt-1 block text-gray-600">修改日报日期会清除关联；先保存日期，再重新选择该日訂単。</span>
+          ? "关联车牌跟随訂単最新選択；在此修改并保存，也会同步该日訂単及其他页面。"
+          : "尚未确认訂単关联，原车牌保持不变；選択并保存后开启同步。"}</span>
+        <span className="mt-1 block text-gray-600">修改日报日期会清除关联；先保存日期，再重新選択该日訂単。</span>
       </label>}
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <legend className="mb-2 font-semibold">基本信息与点呼</legend>
@@ -317,7 +317,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
         onClick={() => void output(filtered, `${month.slice(5)}月 运行日报`)}>月批量打印（{filtered.length}份）</button>
     </div>
     <p className="text-xs text-gray-600">日本时间 · 每10秒同步。工时＝退勤点呼－出勤点呼；日期或时间缺失时不计算。
-      月批量打印遵循当前会社、車両番号和日期筛选，每份日报一页；清空日期可打印整月。导出PDF时在打印窗口选择“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
+      月批量打印遵循当前会社、車両番号和日期筛选，每份日报一页；清空日期可打印整月。导出PDF时在打印窗口選択“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
     {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {!data && !error && <p role="status">正在读取司机日报…</p>}

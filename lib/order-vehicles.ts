@@ -58,7 +58,7 @@ export function getCalendarVehicleRows(vehicles: Vehicle[], orders: Order[], dat
       regionId: order.regionId, name: selected.vehicle || "未安排車両", plate: selected.vehiclePlate,
       calendarOnly: true, status: "停运中", calendarOrder: null,
       defaultParkingFee: 0, defaultInsuranceFee: 0, ownerCompany: "", seats: "", fuelType: "",
-      inspectionExpiry: "", liabilityExpiry: "", notes: "訂単车牌未登记或未指定，请选择已登记車両番号",
+      inspectionExpiry: "", liabilityExpiry: "", notes: "訂単车牌未登记或未指定，请選択已登记車両番号",
     });
   }
   return rows;

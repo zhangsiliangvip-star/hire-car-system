@@ -63,8 +63,8 @@ export function SourceSelectionDialog({
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="source-selection-title"
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
         <div className="dialog-floating-header mb-3 flex items-center justify-between gap-3">
-          <h2 id="source-selection-title" className="text-xl font-bold">来源选择</h2>
-          <button type="button" onClick={onClose} aria-label="关闭来源选择" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
+          <h2 id="source-selection-title" className="text-xl font-bold">来源選択</h2>
+          <button type="button" onClick={onClose} aria-label="关闭来源選択" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
         <p className="mb-4 text-sm text-gray-500">按訂単数由多到少排列，常用来源在左上角；取消訂単不计入，同訂単数按名称排序。</p>
         <input aria-label="搜索来源" placeholder="搜索来源简称" value={search}
@@ -89,7 +89,7 @@ export function SourceSelectionDialog({
           <input aria-label="手动输入来源" placeholder="手动输入新来源" maxLength={200} value={manualName}
             onChange={(event) => setManualName(event.target.value)} className="min-w-0 flex-1 rounded border p-2" />
           <button type="button" disabled={!manualName.trim()} onClick={() => onSelect(manualName.trim())}
-            className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">选择</button>
+            className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">選択</button>
         </div>
         <div className="mt-5 flex justify-between gap-3">
           {allLabel ? (

@@ -48,9 +48,9 @@ export function OrderVehiclePlateSelect({
           }}
         >
           <option value="" disabled={!financeMode}>
-            {!selected && sameNameCount > 1 ? "同名車両有多台，请选择車両番号"
+            {!selected && sameNameCount > 1 ? "同名車両有多台，请選択車両番号"
               : selected ? "当前車両未登记番号"
-              : vehicleName ? "当前車両未登记或未指定番号" : financeMode ? "使用訂単默认車両" : "请选择車両番号"}
+              : vehicleName ? "当前車両未登记或未指定番号" : financeMode ? "使用訂単默认車両" : "请選択車両番号"}
           </option>
           {vehicles.filter((vehicle) => vehicle.plate).map((vehicle) => {
             const unavailable = !financeMode && getStatus(vehicle) !== "运营中";
@@ -63,10 +63,10 @@ export function OrderVehiclePlateSelect({
           })}
         </select>
       </label>
-      {!financeMode && <p className="mt-1 text-xs text-gray-500">选择番号会同步切换上方車両；未登记番号的車両请在上方选择。</p>}
+      {!financeMode && <p className="mt-1 text-xs text-gray-500">選択番号会同步切换上方車両；未登记番号的車両请在上方選択。</p>}
       {!selected && sameNameCount > 1 && (
         <p role="alert" className="mt-1 text-xs text-amber-800">
-          车名「{vehicleName}」有多台車両，请选择具体的車両番号。
+          车名「{vehicleName}」有多台車両，请選択具体的車両番号。
         </p>
       )}
     </div>

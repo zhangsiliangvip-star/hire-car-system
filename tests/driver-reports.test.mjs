@@ -149,7 +149,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   function render() { cursor = 0; refCursor = 0; return renderToStaticMarkup(React.createElement(Component)); }
   let html = render();
   assert.equal(checkoutProps.disabled, true);
-  assert.match(html, /请选择当天訂単/);
+  assert.match(html, /请選択当天訂単/);
   select.onChange({ target: { value: id } });
   html = render();
   assert.equal(checkoutProps.disabled, false);

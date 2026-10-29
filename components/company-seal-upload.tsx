@@ -27,7 +27,7 @@ export function CompanySealUpload({ value, onChange, onBusyChange, standalone = 
     onBusyChange(true);
     try {
       if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-        throw new Error("请选择 PNG、JPG 或 WebP 图片，不支持 SVG 等格式。");
+        throw new Error("请選択 PNG、JPG 或 WebP 图片，不支持 SVG 等格式。");
       }
       if (file.size > 2 * 1024 * 1024) throw new Error("印章原图不能超过2MB。");
       const bitmap = await createImageBitmap(file);
@@ -51,7 +51,7 @@ export function CompanySealUpload({ value, onChange, onBusyChange, standalone = 
       if (request === sequence.current) onChange(data);
     } catch (error) {
       if (request === sequence.current) {
-        setError(error instanceof Error ? error.message : "印章图片读取失败，请重新选择。");
+        setError(error instanceof Error ? error.message : "印章图片读取失败，请重新選択。");
       }
     } finally {
       if (request === sequence.current) {

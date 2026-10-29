@@ -358,7 +358,7 @@ export default function DriverReport() {
             if (dirty && !window.confirm("更换訂単会重新带入車両番号及车库地址，是否继续？")) return;
             setAssignment(e.target.value); setDirty(true);
           }}>
-            <option value="">请选择当天訂単</option>
+            <option value="">请選択当天訂単</option>
             {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
               {order.time} · {order.pickup} → {order.destination} · {order.vehicleNumber || "未填車両番号"}
             </option>)}
@@ -387,7 +387,7 @@ export default function DriverReport() {
           </select>
           <span className="driver-muted">{report.header?.assignmentId
             ? "車両番号与关联訂単按服务日同步；修改并保存也会更新訂単。"
-            : "尚未确认訂単关联，保留原车牌；请人工选择后保存以开启同步。"}</span>
+            : "尚未确认訂単关联，保留原车牌；请人工選択后保存以开启同步。"}</span>
           <input name="vehicleBaseline" type="hidden" defaultValue={report.header?.vehicleNumber ?? ""} />
         </label>}
         <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
@@ -421,7 +421,7 @@ export default function DriverReport() {
             <th scope="col">到着</th><th scope="col">出发</th></tr></thead>
           {!report && <LocationRows key={serviceDate} locationKey={assignment} depot={selectedOrder?.depot ?? null}
             disabled={saving || !currentDefaults || needsOrder} save={async p => {
-            if (!currentDefaults || needsOrder) { setError("请先读取当天訂単并选择訂単。"); return false; }
+            if (!currentDefaults || needsOrder) { setError("请先读取当天訂単并選択訂単。"); return false; }
             try { return await save("checkout", { ...p, header: readHeader() }); }
             catch (cause) { console.error("Invalid report header.", cause); setError("请检查日期、点呼时间、車両番号、運転手和客数。"); return false; }
           }} />}

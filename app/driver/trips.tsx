@@ -37,7 +37,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
       if (loading || savingRef.current) return;
       loading = true;
       try {
-        if (detail && !assignmentIdSchema.safeParse(assignmentId).success) throw new Error("行程链接无效，请返回列表重新选择。");
+        if (detail && !assignmentIdSchema.safeParse(assignmentId).success) throw new Error("行程链接无效，请返回列表重新選択。");
         const query = detail ? `assignmentId=${encodeURIComponent(assignmentId!)}` : `date=${date}`;
         const [me, response] = await Promise.all([
           fetch("/api/driver/me", { cache: "no-store", signal: controller.signal }),
@@ -133,7 +133,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
         onClick={() => changeDate(japanDate(offset))}>
         {offset ? "明天" : "今天"} · {japanDate(offset).slice(5)}
       </button>)}
-      <input type="date" aria-label="选择行程日期" value={date}
+      <input type="date" aria-label="選択行程日期" value={date}
         onChange={event => changeDate(event.target.value)} />
       <Link className="driver-calendar-link" href="/driver/calendar">日历</Link>
     </div>}

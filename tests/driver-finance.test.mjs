@@ -303,7 +303,7 @@ test("top buttons switch exclusive views while preserving the claim draft", () =
 });
 test("date then order then categories precede the final all-order driver advance summary", () => {
   const h = renderFinance();
-  const markers = ["用车日期", "选择当天訂単", "<h2>社报立替</h2>", "<h2>旅报立替</h2>", "司机立替汇总"];
+  const markers = ["用车日期", "選択当天訂単", "<h2>社报立替</h2>", "<h2>旅报立替</h2>", "司机立替汇总"];
   let position = -1;
   for (const marker of markers) {
     const next = h.html.indexOf(marker, position + 1);

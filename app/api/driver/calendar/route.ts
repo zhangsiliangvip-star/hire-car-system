@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     if (identity.response) return identity.response;
     const query = z.object({ month: shiftMonthSchema }).strict()
       .safeParse(Object.fromEntries(new URL(request.url).searchParams));
-    if (!query.success) return jsonResponse({ error: "请选择有效月份。" }, { status: 400 });
+    if (!query.success) return jsonResponse({ error: "请選択有效月份。" }, { status: 400 });
     const range = driverCalendarRange(query.data.month);
     const { data, error } = await identity.supabase.rpc("driver_calendar", { range_start: range.start, range_end: range.end });
     if (error || !data) {

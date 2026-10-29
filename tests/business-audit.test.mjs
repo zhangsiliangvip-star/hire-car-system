@@ -593,7 +593,7 @@ test("reservation date filter includes service ranges, excludes off days and pre
   assert.deepEqual(evaluate("", "A", "S"), ["multi", "off", "single", "later", "cross-month"]);
   assert.deepEqual(evaluate("2026-10-31"), []);
   assert.deepEqual(evaluate("2026-10-02", "B"), ["other-company"]);
-  assert.match(source, /选择预约年份，当前\$\{orderMonth\.slice\(0, 4\)\}年/);
+  assert.match(source, /選択预约年份，当前\$\{orderMonth\.slice\(0, 4\)\}年/);
   assert.match(source, /setOrderMonth\(`\$\{year\}-\$\{orderMonth\.slice\(5, 7\)\}`\);[\s\S]*setOrderDateFilter\(""\)/);
   assert.match(source, /aria-haspopup="dialog"/);
 });
@@ -606,16 +606,16 @@ test("reservation management puts the year first and shows all twelve month butt
   const monthControlsStart = controls.indexOf("calendar-date-controls mb-3 mt-0");
   const monthControlsEnd = controls.indexOf('<div className="overflow-x-auto border bg-white">', monthControlsStart);
   const monthControls = controls.slice(monthControlsStart, monthControlsEnd);
-  assert.ok(controls.indexOf('id="order-company-filter"') < controls.indexOf("选择预约年份，当前"));
-  assert.ok(controls.indexOf("选择预约年份，当前") < controls.indexOf('aria-label="选择预约月份"'));
-  assert.match(monthControls, /aria-label=\{`选择预约年份，当前\$\{orderMonth\.slice\(0, 4\)\}年`\}[\s\S]*setOrderYearPickerStart/);
+  assert.ok(controls.indexOf('id="order-company-filter"') < controls.indexOf("選択预约年份，当前"));
+  assert.ok(controls.indexOf("選択预约年份，当前") < controls.indexOf('aria-label="選択预约月份"'));
+  assert.match(monthControls, /aria-label=\{`選択预约年份，当前\$\{orderMonth\.slice\(0, 4\)\}年`\}[\s\S]*setOrderYearPickerStart/);
   assert.match(monthControls, /role="dialog"[\s\S]*aria-labelledby="order-year-dialog-title"/);
-  assert.match(monthControls, /选择预约年份/);
+  assert.match(monthControls, /選択预约年份/);
   assert.match(monthControls, /aria-label="上一组预约年份"[\s\S]*Math\.max\(2020, \(start \?\? 2020\) - 12\)/);
   assert.match(monthControls, /aria-label="下一组预约年份"[\s\S]*Math\.min\(2089, \(start \?\? 2020\) \+ 12\)/);
   assert.match(monthControls, /Array\.from\(\{ length: 12 \}, \(_, index\) => orderYearPickerStart \+ index\)/);
   assert.match(monthControls, /setOrderMonth\(`\$\{year\}-\$\{orderMonth\.slice\(5, 7\)\}`\);[\s\S]*setOrderDateFilter\(""\);[\s\S]*setOrderYearPickerStart\(null\)/);
-  assert.match(monthControls, /role="group" aria-label="选择预约月份"[\s\S]*Array\.from\(\{ length: 12 \}/);
+  assert.match(monthControls, /role="group" aria-label="選択预约月份"[\s\S]*Array\.from\(\{ length: 12 \}/);
   assert.match(monthControls, /aria-pressed=\{selected\}/);
   assert.match(monthControls, /setOrderMonth\(`\$\{orderMonth\.slice\(0, 4\)\}-\$\{month\}`\)/);
   assert.match(monthControls, /calendar-date-controls mb-3 mt-0[^"]*rounded-2xl[^"]*bg-slate-50/);
@@ -1555,9 +1555,9 @@ test("vehicle list can be filtered by owner company", () => {
 
 test("vehicle form selects start empty so the first fuel type, seat count, and company can be saved", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  assert.match(source, /<option value="">请选择燃油类型<\/option>\s*\{fuelTypes\.map/);
-  assert.match(source, /<option value="">请选择座位数<\/option>/);
-  assert.match(source, /<option value="">请选择所属会社<\/option>/);
+  assert.match(source, /<option value="">请選択燃油类型<\/option>\s*\{fuelTypes\.map/);
+  assert.match(source, /<option value="">请選択座位数<\/option>/);
+  assert.match(source, /<option value="">请選択所属会社<\/option>/);
 });
 
 test("orders link vehicles by plate so vehicle names may repeat, while plates stay unique", () => {
@@ -1889,7 +1889,7 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   const shared = [...vehicles, { ...vehicles[0], id: "duplicate", plate: "品川 400" }];
   view = render("Alphard 01", shared);
   assert.equal(view.select.props.value, "");
-  assert.ok(view.html.includes("请选择具体的車両番号"));
+  assert.ok(view.html.includes("请選択具体的車両番号"));
   assert.equal(render("Alphard 01", shared, false, "品川 400").select.props.value, "duplicate");
   view.select.props.onChange({ target: { value: "duplicate" } });
   assert.deepEqual(changes.at(-1), { name: "Alphard 01", plate: "品川 400" });
@@ -2570,7 +2570,7 @@ test("reservation table centers fields and shows order and request status in the
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
   assert.deepEqual(columnWidths, [15, 7, 7, 21, 7, 8, 8, 9, 8, 10]);
   assert.match(table, /statusStyles\[order\.status\]/);
-  assert.match(table, /点击选择請求書状态和变更范围/);
+  assert.match(table, /点击選択請求書状态和变更范围/);
   assert.match(table, /onClick=\{\(\) => openOrderStatusDialog\(order, "invoice", "reservation"\)\}/);
   assert.doesNotMatch(table, /同来源批量/);
   assert.match(table, /flex flex-nowrap items-center justify-center gap-2/);
@@ -2732,7 +2732,7 @@ test("overtime editor has five fields and recalculates both read-only totals on 
   assert.match(input(1).props.className, /h-10/);
   assert.match(paymentGrid().props.children[2].props.className, /col-span-2/);
   assert.deepEqual(plain(statusSelect().props.children.map((option) => option.props.children)), [
-    "未选择", "已完成", "未完成",
+    "未選択", "已完成", "未完成",
   ]);
   for (const status of ["已完成", "未完成", ""]) {
     context.finance.companyAdvancePaymentStatus = status;
@@ -2805,7 +2805,7 @@ test("overtime request API validates independent values and round-trips legacy o
     assert.equal(restored.companyAdvancePaymentStatus, companyAdvancePaymentStatus);
     assert.equal(restored.companyAdvancePaymentNote, value.companyAdvancePaymentNote);
   }
-  for (const companyAdvancePaymentStatus of ["未选择", "invalid", null, 1]) {
+  for (const companyAdvancePaymentStatus of ["未選択", "invalid", null, 1]) {
     assert.equal(context.schema.safeParse({ companyAdvancePaymentStatus }).success, false);
   }
   assert.equal(context.schema.safeParse({ companyAdvancePaymentNote: "a".repeat(1000) }).success, true);
@@ -3078,7 +3078,7 @@ test("manual driver wage items can be entered with all-company filtering", () =>
   assert.match(save, /draft\.companyName === undefined/);
   assert.match(save, /companyName: draft\.companyName \?\? ""/);
   assert.match(panel, /driverFinanceCompanyFilter === "" && \(/);
-  assert.match(panel, /请选择所属会社/);
+  assert.match(panel, /请選択所属会社/);
   assert.match(panel, /未设置所属会社/);
 });
 
@@ -3390,12 +3390,12 @@ test("calendar uses a year dialog, tiles month buttons on desktop and keeps the 
   assert.doesNotMatch(controls, /type="number"/);
   assert.match(controls, /aria-haspopup="dialog"/);
   assert.match(controls, /role="dialog"[\s\S]*aria-labelledby="calendar-year-dialog-title"/);
-  assert.match(controls, /选择年份/);
+  assert.match(controls, /選択年份/);
   assert.match(controls, /event\.key === "Escape"/);
   assert.match(controls, /\.filter\(\(year\) => year <= 2100\)/);
   assert.match(controls, /<label className="calendar-month-select [^"]*sm:hidden">/);
   assert.match(controls, /<select/);
-  assert.match(controls, /className="calendar-month-buttons hidden [^"]*sm:flex" role="group" aria-label="选择月份"/);
+  assert.match(controls, /className="calendar-month-buttons hidden [^"]*sm:flex" role="group" aria-label="選択月份"/);
   assert.match(controls, /Array\.from\(\{ length: 12 \}/);
   assert.match(controls, /aria-pressed=\{selected\}/);
   assert.match(controls, /calendar-date-controls flex flex-wrap items-center justify-center/);

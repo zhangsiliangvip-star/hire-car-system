@@ -95,7 +95,7 @@ export default function DriverShifts() {
   return <main className="driver-main driver-shifts">
     <DriverNavigation active="shifts" busy={busy} canLeave={canLeave} />
     <h1>シフト提出</h1>
-    <p className="driver-muted">按月选择希望休息的日期，可多选；提交后立即显示“休”提示，不会阻止调度選任。切后台会清除未提交草稿。</p>
+    <p className="driver-muted">按月選択希望休息的日期，可多选；提交后立即显示“休”提示，不会阻止调度選任。切后台会清除未提交草稿。</p>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy} onChange={event => {
       const next = event.target.value;
       if (!next || next === month || !canLeave()) return;
@@ -119,7 +119,7 @@ export default function DriverShifts() {
         <p className="driver-muted">已选 {dates.length} 天{dates.length ? `：${[...dates].sort().map(date => date.slice(5)).join("、")}` : "（本月无希望休可直接提交）"}</p>
         <label className="driver-field">备注<textarea rows={3} maxLength={1000} value={note} disabled={busy}
           placeholder="例：希望连休、时间安排等" onChange={event => { setNote(event.target.value); setNotice(""); }} /></label>
-        <p className="driver-muted">{saved.version ? "已提交，可修改后重新提交；重新提交会替换本月原选择。" : "尚未提交"}{dirty ? " · 有未提交修改" : ""}</p>
+        <p className="driver-muted">{saved.version ? "已提交，可修改后重新提交；重新提交会替换本月原選択。" : "尚未提交"}{dirty ? " · 有未提交修改" : ""}</p>
         <button className="driver-button" disabled={busy} onClick={() => void submit()}>{busy ? "正在提交…" : "提交シフト"}</button>
       </section>
     </>}

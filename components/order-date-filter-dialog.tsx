@@ -26,7 +26,7 @@ export function OrderDateFilterDialog({ month, selected, onSelect, onClose }: Pr
       className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-lg border-0 bg-white p-0 text-gray-900 shadow-xl backdrop:bg-black/50">
       <section className="p-5">
         <div className="dialog-floating-header mb-4 flex items-center justify-between gap-3">
-          <h2 id="order-date-filter-title" className="text-lg font-bold">{month} · 选择日期</h2>
+          <h2 id="order-date-filter-title" className="text-lg font-bold">{month} · 選択日期</h2>
           <button type="button" onClick={onClose} aria-label="关闭日期筛选"
             className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
