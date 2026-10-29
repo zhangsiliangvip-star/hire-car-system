@@ -4386,7 +4386,7 @@ export default function Home() {
     }
     if (targets.some(({ key, orderId, date }) => accountingForm[key]?.driverPaymentType !==
       allOrders.find(order => order.id === orderId)?.financeByDate[date]?.driverPaymentType)) {
-      alert("费用类型尚未保存，请先保存财务数据后再选任司机；未保存的金额不会自动提交。");
+      alert("费用类型尚未保存，请先保存财务数据后再選任司机；未保存的金额不会自动提交。");
       return;
     }
     if (targets.some(({ key, orderId, date }) => {
@@ -4397,7 +4397,7 @@ export default function Home() {
         [finance, accountingForm[key]].some(entry => entry &&
           (withCompanyAdvanceDriver(entry, name).companyAdvancePaymentNote || "").length > 1000);
     })) {
-      alert("司机姓名加入后外注司机备注超过1000字，请先缩短备注再选任。");
+      alert("司机姓名加入后外注司机备注超过1000字，请先缩短备注再選任。");
       return;
     }
     setOrders(current => current.map(order => {
@@ -7465,7 +7465,7 @@ export default function Home() {
                             <button
                               type="button"
                               aria-haspopup="dialog"
-                              aria-label={`选任司机：${order.customer}`}
+                              aria-label={`選任司机：${order.customer}`}
                               onClick={() => setDriverSelectionTarget(order.id)}
                               className="font-medium text-blue-700 hover:underline"
                             >
@@ -8179,7 +8179,7 @@ export default function Home() {
                   onClick={() => setDriverSelectionTarget("batch")}
                   className="mt-1 w-full rounded border px-3 py-2 text-left hover:bg-blue-50"
                 >
-                  {batchOrderDriver || "未安排司机"} · 点击选任
+                  {batchOrderDriver || "未安排司机"} · 点击選任
                 </button>
               </div>
               <div className="block text-sm font-medium">
@@ -8475,9 +8475,9 @@ export default function Home() {
                 <button type="button" aria-haspopup="dialog"
                   onClick={() => setDriverSelectionTarget("form")}
                   className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50">
-                  {getOrderDriverLabel(form)} · 点击选任
+                  {getOrderDriverLabel(form)} · 点击選任
                 </button>
-                <p className="mt-1 text-xs text-gray-600">选任后统一应用到所有用车日；可在下方逐日调整司机。</p>
+                <p className="mt-1 text-xs text-gray-600">選任后统一应用到所有用车日；可在下方逐日调整司机。</p>
               </div>
 
               {customDriverMode && (
@@ -9751,7 +9751,7 @@ export default function Home() {
                           title={common || emptyLabel}
                           className="mt-1 block h-10 w-full min-w-0 truncate whitespace-nowrap rounded border bg-white px-2 text-left leading-9 text-gray-900"
                         >
-                          {common === null ? "（各单不同） · 点击选任" : `${common || emptyLabel} · 点击选任`}
+                          {common === null ? "（各单不同） · 点击選任" : `${common || emptyLabel} · 点击選任`}
                         </button>
                       ) : (
                         <select

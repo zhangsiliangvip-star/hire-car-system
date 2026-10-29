@@ -38,7 +38,7 @@ export function FinanceDriverSelect({
           onClick={() => setIsOpen(true)}
           className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50"
         >
-          {value || "未安排司机"} · 点击选任
+          {value || "未安排司机"} · 点击選任
         </button>
       </div>
       {isOpen && (

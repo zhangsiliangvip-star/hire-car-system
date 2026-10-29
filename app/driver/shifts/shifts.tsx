@@ -85,7 +85,7 @@ export default function DriverShifts() {
       const data = shiftDataSchema.parse(result);
       if (data.month !== month) throw new Error("提交月份不一致，请刷新核对。");
       setSaved(data); setDates(data.dates); setNote(data.note); pending.current = null;
-      setNotice("シフト已提交，休息提示立即生效；仍可被选任，最终安排请与调度确认。");
+      setNotice("シフト已提交，休息提示立即生效；仍可被選任，最终安排请与调度确认。");
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver shift submit failed.", cause);
@@ -95,7 +95,7 @@ export default function DriverShifts() {
   return <main className="driver-main driver-shifts">
     <DriverNavigation active="shifts" busy={busy} canLeave={canLeave} />
     <h1>シフト提出</h1>
-    <p className="driver-muted">按月选择希望休息的日期，可多选；提交后立即显示“休”提示，不会阻止调度选任。切后台会清除未提交草稿。</p>
+    <p className="driver-muted">按月选择希望休息的日期，可多选；提交后立即显示“休”提示，不会阻止调度選任。切后台会清除未提交草稿。</p>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy} onChange={event => {
       const next = event.target.value;
       if (!next || next === month || !canLeave()) return;

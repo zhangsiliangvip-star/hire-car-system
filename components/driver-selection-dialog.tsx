@@ -84,8 +84,8 @@ export function DriverSelectionDialog({
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="driver-selection-title"
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
         <div className="dialog-floating-header mb-3 flex items-center justify-between gap-3">
-          <h2 id="driver-selection-title" className="text-xl font-bold">司机选任</h2>
-          <button type="button" onClick={onClose} aria-label="关闭司机选任" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
+          <h2 id="driver-selection-title" className="text-xl font-bold">司机選任</h2>
+          <button type="button" onClick={onClose} aria-label="关闭司机選任" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
         {showServiceDays && (
           <>
@@ -113,7 +113,7 @@ export function DriverSelectionDialog({
               )}
               {resting.length > 0 && <span className="absolute bottom-2 right-2 text-sm font-bold text-red-600"
                 aria-label={`希望休：${resting.map(day => day.date).join("、")}`}
-                title={`希望休：${resting.map(day => day.date).join("、")}（仅提示，仍可选任）`}>休</span>}
+                title={`希望休：${resting.map(day => day.date).join("、")}（仅提示，仍可選任）`}>休</span>}
             </button>
           ); })}
         </div>
@@ -123,7 +123,7 @@ export function DriverSelectionDialog({
             <input aria-label="手动输入司机姓名" placeholder="手动输入新司机" maxLength={120} value={manualName}
               onChange={(event) => setManualName(event.target.value)} className="min-w-0 flex-1 rounded border p-2" />
             <button type="button" disabled={!manualName.trim()} onClick={() => onSelect(manualName.trim(), true)}
-              className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">选任</button>
+              className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">選任</button>
           </div>
         )}
         <div className="mt-5 flex justify-between gap-3">
