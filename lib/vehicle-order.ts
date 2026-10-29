@@ -30,8 +30,7 @@ export function resolveOrderVehicle<T extends VehicleIdentity>(vehicles: T[], or
     (vehicle) => (vehicle.regionId ?? "") === (order.regionId ?? ""),
   );
   if (order.vehiclePlate) {
-    const byPlate = regionVehicles.find((vehicle) => vehicle.plate === order.vehiclePlate);
-    if (byPlate) return byPlate;
+    return regionVehicles.find((vehicle) => vehicle.plate === order.vehiclePlate);
   }
   const byName = regionVehicles.filter((vehicle) => vehicle.name === order.vehicle);
   return byName.length === 1 ? byName[0] : undefined;

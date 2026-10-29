@@ -18,7 +18,8 @@ export const auditTables = {
   companies: "所属会社",
   vehicle_monthly_finances: "车辆月度费用",
   balance_expense_items: "手动收入／支出",
-  invoice_numbers: "请求书编号",
+  driver_wage_items: "司机工资手动项目",
+  invoice_numbers: "請求書编号",
 } as const;
 
 export type AuditTable = keyof typeof auditTables;
@@ -62,6 +63,7 @@ export const collectionAuditTable = {
   orders: "orders", drivers: "drivers", vehicles: "vehicles",
   orderSources: "order_sources", companies: "companies",
   vehicleMonthlyFinances: "vehicle_monthly_finances", balanceExpenseItems: "balance_expense_items",
+  driverWageItems: "driver_wage_items",
 } as const satisfies Record<CollectionName, AuditTable>;
 
 const fieldLabels: Record<string, string> = {
@@ -72,7 +74,7 @@ const fieldLabels: Record<string, string> = {
   customer: "订单名称", phone: "电话", pickup: "上车地点", destination: "目的地",
   time: "配車時間", status: "状態", notes: "备注", order_source: "来源", company: "所属会社",
   sales_rep: "担当", order_price: "订单价格", accounting_status: "核算状态",
-  invoice_status: "请求书状态", invoice_sent_date: "请求书发送日", deposit_method: "入金方式",
+  invoice_status: "請求書状态", invoice_sent_date: "請求書发送日", deposit_method: "入金方式",
   deposit_date: "入金日", accounting_assignee: "核算担当", finance_note: "财务备注",
   finance_by_date: "每日财务", name: "名称", wechat: "微信", whatsapp: "WhatsApp",
   license_expiry: "免許有効期限", plate: "車両番号", owner_company: "車両所属",
@@ -85,12 +87,18 @@ const fieldLabels: Record<string, string> = {
   contact_info: "联系方式", address: "地址", color: "颜色", operations_manager: "运行管理者",
   maintenance_manager: "整备管理者", roll_call_address: "营业所地址", garage_address: "车库地址",
   bank_account: "口座", tax_registration_number: "T番号", seal_image: "印章",
-  order_id: "订单编号", company_id: "会社编号", serial_number: "请求书流水号",
+  order_id: "订单编号", company_id: "会社编号", serial_number: "請求書流水号",
   etcCompanyReport: "ETC会社", etcTripReport: "ETC旅报", fuelCost: "燃油费",
   fuelConsumption: "油量", driverAdvanceCompanyReport: "司机立替会社",
   driverAdvanceTripReport: "司机立替旅报", companyAdvanceCompanyReport: "会社立替会社",
+  externalDriverFee: "外注司机费用",
+  companyAdvancePaymentMethod: "外注司机出金方式",
+  companyAdvancePaymentStatus: "外注司机出金状态",
+  companyAdvancePaymentNote: "外注司机备注",
+  driverPaymentType: "司机费用类型（工资／司机外注）",
   companyAdvanceTripReport: "会社立替旅报", driverOvertimeHours: "超时时数",
-  driverOvertimeRate: "超时单价", driverOvertimeFee: "超时费", driverWageMode: "工资模式",
+  driverOvertimeRate: "超时费用（工资）", driverOvertimeFee: "超时工资",
+  overtimeRequestRate: "超时费用（旅报）", overtimeRequestAmount: "超时请求（旅报）", driverWageMode: "工资模式",
   driverWagePercentage: "工资比例", driverWage: "工资", driverBonusWage: "奖励",
   description: "项目名称", amount: "金额",
 };

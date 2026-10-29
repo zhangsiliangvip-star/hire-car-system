@@ -80,7 +80,7 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
         </button>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        仅管理员可查看。记录启用后的业务新增、修改、删除及请求书编号分配；相同内容重复保存不产生记录。
+        仅管理员可查看。记录启用后的业务新增、修改、删除及請求書编号分配；相同内容重复保存不产生记录。
         时间均为日本时间。历史操作无法补查；印章只记录图片指纹，不保留图片副本。
       </p>
       <div className="mb-4 grid gap-3 rounded border bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">

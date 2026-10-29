@@ -107,7 +107,6 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
   td { text-align: center; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
   .supplies, .notes { margin-top: 10px; line-height: 1.8; overflow-wrap: anywhere; }
-  .signatures { display: flex; justify-content: space-between; margin-top: 25px; padding-bottom: 10px; }
   </style></head><body><div class="sheet"><article class="content">
   <header><h1>車両統計月度财务表</h1><div class="meta"><span>月份：${escapeHtml(data.month)}</span>
   <span>車両番号：${escapeHtml(data.vehicleNumber)}</span><span>分区：${escapeHtml(data.region)}</span><span>币种：JPY ／ 里程：km</span></div></header>
@@ -126,7 +125,6 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
     ? "运营明细采用已保存的日财务记录；月度费用和里程采用当前页面填写内容，导出不会自动保存。扣除费用后利润＝订单利润总和－月度费用；每公里利润＝扣除费用后利润÷走行公里数。"
     : "全部车辆模式仅汇总运营明细，不包含车辆月度固定费用、备品和里程。请筛选具体车辆查看完整月度费用及净利润。"}
   <br>司机立替与工资分别列示，财务口径与車両統計列表一致。内部资料，请妥善保管。</p>
-  <div class="signatures"><span>制表：________________</span><span>审核：________________</span><span>日期：________________</span></div>
   </article></div></body></html>`;
 }
 
@@ -162,7 +160,6 @@ export function buildVehicleSummaryPrintHtml(data: VehicleSummaryPrintData) {
   .number { text-align: right; font-variant-numeric: tabular-nums; }
   small { display: block; color: #555; }
   .notes { margin-top: 14px; line-height: 1.8; }
-  .signatures { display: flex; justify-content: space-between; margin-top: 28px; padding-bottom: 10px; }
   </style></head><body><div class="sheet"><article class="content">
   <h1>全车辆月度统计表</h1><div class="meta"><span>服务月份：${escapeHtml(data.month)}</span>
   <span>分区：${escapeHtml(data.region)}</span><span>车辆数：${data.rows.length}</span><span>单位：JPY</span></div>
@@ -177,7 +174,6 @@ export function buildVehicleSummaryPrintHtml(data: VehicleSummaryPrintData) {
   <p class="notes">订单利润＝请求总金额－司机立替－会社支付－司机工资－固定费用与备品。<br>
   月度费用优先采用所选月份已保存的记录；未登记时仅采用车辆资料的默认停车场费及保险费。无运营记录车辆仍列示固定成本；未匹配到车辆资料的历史记录单独标注，固定成本未知，暂记0。<br>
   本表包含外注车辆，番号旁标注“外注”；未登记番号时明确提示。按车辆及分区归集，未保存的单车费用编辑不计入。内部财务资料，请妥善保管。</p>
-  <div class="signatures"><span>制表：________________</span><span>审核：________________</span><span>日期：________________</span></div>
   </article></div></body></html>`;
 }
 

@@ -1,4 +1,5 @@
 import type { Driver, Order } from "@/lib/domain";
+import { getServiceDriver } from "@/lib/order-drivers";
 
 export function rankDriversByRecentService(
   drivers: Driver[],
@@ -17,7 +18,7 @@ export function rankDriversByRecentService(
     if (order.status === "キャンセル") continue;
     for (const day of days) {
       if (day < order.date || day > (order.endDate || order.date) || order.offDates.includes(day)) continue;
-      const name = order.financeByDate[day]?.driver || order.driver;
+      const name = getServiceDriver(order, day);
       if (!name) continue;
       const key = keyFor(order.regionId, name);
       const dates = serviceDays.get(key) || new Set<string>();

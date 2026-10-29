@@ -41,12 +41,10 @@ export function SourceSelectionDialog({
   return (
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          onClose();
         }
         if (event.key === "Tab") {
           const elements = dialogRef.current?.querySelectorAll<HTMLElement>("button, input");
@@ -64,7 +62,7 @@ export function SourceSelectionDialog({
     >
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="source-selection-title"
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="dialog-floating-header mb-3 flex items-center justify-between gap-3">
           <h2 id="source-selection-title" className="text-xl font-bold">来源选择</h2>
           <button type="button" onClick={onClose} aria-label="关闭来源选择" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
@@ -104,7 +102,6 @@ export function SourceSelectionDialog({
           ) : (
             <button type="button" onClick={() => onSelect("")} className="rounded border px-4 py-2">不填写来源</button>
           )}
-          <button type="button" onClick={onClose} className="rounded border px-4 py-2">取消</button>
         </div>
       </section>
     </div>

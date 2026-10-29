@@ -1,0 +1,39 @@
+.report :global(.driver-stops){padding:10px}
+.report :global(.driver-report-header){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.report :global(.driver-report-header) label{display:flex;flex-direction:column;min-width:0;font-size:12px;line-height:18px}
+.report :global(.driver-report-header) :global(.driver-report-order-link){grid-column:1/-1}
+.report :global(.driver-report-order-link) select{width:100%;min-width:0;min-height:36px;margin:3px 0;padding:4px 6px;border:1px solid #dbe5dd;border-radius:4px;background:white;font:inherit;font-size:16px}
+.report :global(.driver-report-header) input[type=hidden]{display:none}
+.report :global(.driver-report-header) input{box-sizing:border-box;display:block;width:100%;min-width:0;height:36px;min-height:36px;max-height:36px;margin:3px 0 0;padding:4px 6px;border:1px solid #dbe5dd;border-radius:4px;background:white;color:inherit;font:inherit;font-size:16px;line-height:26px}
+.report :global(.driver-report-header) input:is([type=date],[type=time]){-webkit-appearance:none;appearance:none}
+.report :global(.driver-report-header) input::-webkit-date-and-time-value{min-height:26px;line-height:26px;text-align:left;margin:0}
+.report :global(.driver-report-header) input::-webkit-datetime-edit{padding:0;line-height:26px}
+.report :global(.driver-stops) > :global(.driver-muted){margin:0 0 4px;line-height:1.5}
+.report :global(.driver-stop-table){width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px}
+.report :global(.driver-stop-table) caption{text-align:left;padding:4px 0;color:#537063;font-size:11px}
+.report :global(.driver-stop-table) th,.report :global(.driver-stop-table) td{border:1px solid #cddbd1;padding:2px;text-align:left;vertical-align:middle;overflow-wrap:anywhere}
+.report :global(.driver-stop-table) thead th{background:#e2ece5;font-weight:500}
+.report :global(.driver-col-label){width:32px}
+.report :global(.driver-col-address){width:auto}
+.report :global(.driver-col-km){width:18%}
+.report :global(.driver-col-time){width:56px}
+.report :global(.driver-stop-table) thead th:first-child{text-align:center}
+.report :global(.driver-stop-table) tbody th{font-weight:500;text-align:center;height:40px;font-size:10px;white-space:nowrap}
+.report :global(.driver-sheet-location){background:#edf3ef;height:40px}
+.report :global(.driver-sheet-location) > th,.report :global(.driver-sheet-location) > td{height:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.report :global(.driver-sheet-location) :global(.driver-check){height:34px;max-height:34px;overflow:hidden;white-space:nowrap}
+.report :global(.driver-sheet) input:not([type=checkbox]){box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;height:34px;min-height:34px;max-height:34px;margin:0;padding:2px 3px;line-height:28px;background:white;color:inherit;border:1px solid #dbe5dd;border-radius:2px;font-size:16px}
+.report :global(.driver-sheet) input[type=time]{-webkit-appearance:none;appearance:none;padding:2px 0;text-align:center}
+.report :global(.driver-sheet) input[type=time]::-webkit-calendar-picker-indicator{display:none}
+.report :global(.driver-sheet) input[type=time]::-webkit-date-and-time-value{text-align:center;min-width:0;height:28px;line-height:28px;margin:0;padding:0}
+.report :global(.driver-sheet) input[type=time]::-webkit-datetime-edit{display:block;text-align:center;height:28px;line-height:28px;margin:0;padding:0}
+.report :global(.driver-sheet) :global(.driver-time-cell){text-align:center}
+.report :global(.driver-sheet) :global(.driver-check) input{width:auto;min-height:0}
+.report :global(.driver-sheet) p:global(.driver-muted){margin:2px 0;font-size:11px;line-height:1.4}
+.report :global(.driver-stop-actions){display:flex;gap:6px;padding:0}
+.report :global(.driver-stop-actions) :global(.driver-button){flex:1;min-width:0;height:36px;min-height:36px;padding:4px;border-radius:4px;font-size:13px;margin:0}
+.report :global(.driver-stop-add){width:100%}
+.report :global(.driver-stop-add) > :global(.driver-stop-actions){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.report :global(.driver-stop-add) > :global(.driver-stop-actions) > :global(.driver-button):only-child{grid-column:1/-1}
+.report :global(.driver-stop-row-controls){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;min-width:0}
+.report :global(.driver-stop-add) :global(.driver-button){box-sizing:border-box;flex:1;min-width:0;width:100%;height:36px;min-height:36px;padding:4px;border-radius:4px;font-size:13px}

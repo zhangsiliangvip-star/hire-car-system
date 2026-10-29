@@ -28,6 +28,7 @@ type InvoiceData = {
   etcTrip: number;
   driverAdvanceTrip: number;
   companyAdvanceTrip: number;
+  overtimeRequest?: number;
 };
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -35,7 +36,7 @@ const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 function formatInvoiceDay(date: string) {
   const parsed = new Date(`${date}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(parsed.getTime())) {
-    throw new Error("请求书日期格式不正确。");
+    throw new Error("請求書日期格式不正确。");
   }
   return `${date.slice(5, 7)}/${date.slice(8, 10)}（${WEEKDAYS[parsed.getUTCDay()]}）`;
 }
@@ -48,15 +49,16 @@ function escapeHtml(value: string) {
 
 export function buildInvoicePrintHtml(data: InvoiceData) {
   if (!isCompanySealDataUrl(data.sealImage || "")) throw new Error("会社印章无效，请重新上传后导出。");
-  const amounts = [data.orderPrice, data.etcTrip, data.driverAdvanceTrip, data.companyAdvanceTrip];
+  const overtimeRequest = data.overtimeRequest ?? 0;
+  const amounts = [data.orderPrice, data.etcTrip, data.driverAdvanceTrip, data.companyAdvanceTrip, overtimeRequest];
   if (amounts.some((value) => !Number.isSafeInteger(value) || value < 0)) {
-    throw new Error("请求书金额必须是非负日元整数。");
+    throw new Error("請求書金额必须是非负日元整数。");
   }
   const total = amounts.reduce((sum, value) => sum + value, 0);
-  if (!Number.isSafeInteger(total)) throw new Error("请求书合计超出金额范围。");
+  if (!Number.isSafeInteger(total)) throw new Error("請求書合计超出金额范围。");
   const days = data.days ?? [];
   if (days.some((day) => !Number.isSafeInteger(day.fare) || day.fare < 0)) {
-    throw new Error("请求书当日车费必须是非负日元整数。");
+    throw new Error("請求書当日车费必须是非负日元整数。");
   }
   if (days.length > 0 && days.reduce((sum, day) => sum + day.fare, 0) !== data.orderPrice) {
     throw new Error("每日车费合计与订单价格不一致，请保存后重新导出。");
@@ -76,6 +78,9 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   const tripReportTotal = data.etcTrip + data.driverAdvanceTrip + data.companyAdvanceTrip;
   const tripReportRow = tripReportTotal > 0
     ? `<tr class="trip-report"><td>旅報費用（全日程合計）<span class="breakdown">${tripReportParts.map(([label, amount]) => `${label} ${yen(amount)}`).join("／")}</span></td><td>10%</td><td class="number">${yen(tripReportTotal)}</td></tr>`
+    : "";
+  const overtimeRow = overtimeRequest > 0
+    ? `<tr class="overtime-request"><td>超時料金（全日程合計）</td><td>10%</td><td class="number">${yen(overtimeRequest)}</td></tr>`
     : "";
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>請求書</title><style>
   @page { size: A4 portrait; margin: 10mm; }
@@ -120,7 +125,7 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   ${days.length > 0 ? `<p class="subject">件名：${escapeHtml(data.customer)}</p>` : ""}
   <table><colgroup><col style="width:65%"><col style="width:10%"><col style="width:25%"></colgroup>
   <thead><tr><th>請求内容</th><th>税率</th><th>金額（税込）</th></tr></thead>
-  <tbody>${fareRows}${tripReportRow}</tbody></table>
+  <tbody>${fareRows}${tripReportRow}${overtimeRow}</tbody></table>
   <table class="tax"><tbody><tr><td>10%対象額（税込）</td><td class="number">${yen(total)}</td></tr>
   <tr><td>うち消費税額（10%）</td><td class="number">${yen(tax)}</td></tr>
   <tr><td>合計（税込）</td><td class="number">${yen(total)}</td></tr></tbody></table>

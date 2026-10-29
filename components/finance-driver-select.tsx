@@ -10,6 +10,7 @@ export function FinanceDriverSelect({
   orders,
   regionId,
   today,
+  serviceDate,
   value,
   onChange,
 }: {
@@ -17,6 +18,7 @@ export function FinanceDriverSelect({
   orders: Order[];
   regionId: string | undefined;
   today: string;
+  serviceDate: string;
   value: string;
   onChange: (name: string) => void;
 }) {
@@ -43,9 +45,9 @@ export function FinanceDriverSelect({
         <DriverSelectionDialog
           drivers={candidates}
           selected={value}
+          serviceDates={[serviceDate]}
           onSelect={(name) => {
             onChange(name);
-            setIsOpen(false);
           }}
           onClose={() => setIsOpen(false)}
         />

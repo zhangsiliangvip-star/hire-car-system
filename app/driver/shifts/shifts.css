@@ -1,0 +1,6 @@
+.shift-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.shift-weekday { padding: 6px 0; text-align: center; font-size: 13px; color: #64748b; }
+.driver-shifts .shift-day { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 48px; padding: 4px 0; border: 1px solid #dbe3eb; border-radius: 8px; background: #fff; color: #334155; }
+.driver-shifts .shift-day[aria-pressed="true"] { border-color: #dc2626; background: #fef2f2; color: #dc2626; font-weight: 700; }
+.shift-day small { font-size: 11px; line-height: 14px; }
+.driver-shifts textarea { width: 100%; min-width: 0; padding: 10px; border: 1px solid #dbe3eb; border-radius: 8px; font: inherit; resize: vertical; }

@@ -18,7 +18,7 @@ export function OrderVehiclePlateSelect({
   onSelect: (vehicle: { name: string; plate: string }) => void;
   financeMode?: boolean;
 }) {
-  const selected = vehicleName || vehiclePlate
+  const selected = vehiclePlate
     ? resolveOrderVehicle(vehicles, {
         regionId: vehicles[0]?.regionId,
         vehicle: vehicleName,
@@ -50,7 +50,7 @@ export function OrderVehiclePlateSelect({
           <option value="" disabled={!financeMode}>
             {!selected && sameNameCount > 1 ? "同名车辆有多台，请选择車両番号"
               : selected ? "当前车辆未登记番号"
-              : vehicleName ? "当前车辆未登记或已删除" : financeMode ? "未设置" : "请选择車両番号"}
+              : vehicleName ? "当前车辆未登记或未指定番号" : financeMode ? "使用订单默认车辆" : "请选择車両番号"}
           </option>
           {vehicles.filter((vehicle) => vehicle.plate).map((vehicle) => {
             const unavailable = !financeMode && getStatus(vehicle) !== "运营中";

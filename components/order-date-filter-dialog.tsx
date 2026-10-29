@@ -22,11 +22,10 @@ export function OrderDateFilterDialog({ month, selected, onSelect, onClose }: Pr
 
   return (
     <dialog ref={dialogRef} aria-labelledby="order-date-filter-title"
-      onCancel={onClose}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      onCancel={(event) => event.preventDefault()}
       className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-lg border-0 bg-white p-0 text-gray-900 shadow-xl backdrop:bg-black/50">
       <section className="p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="dialog-floating-header mb-4 flex items-center justify-between gap-3">
           <h2 id="order-date-filter-title" className="text-lg font-bold">{month} · 选择日期</h2>
           <button type="button" onClick={onClose} aria-label="关闭日期筛选"
             className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
@@ -50,7 +49,6 @@ export function OrderDateFilterDialog({ month, selected, onSelect, onClose }: Pr
         </div>
         <div className="mt-5 flex justify-between gap-3">
           <button type="button" onClick={() => onSelect("")} className="rounded border px-4 py-2">全部日期</button>
-          <button type="button" onClick={onClose} className="rounded border px-4 py-2">取消</button>
         </div>
       </section>
     </dialog>

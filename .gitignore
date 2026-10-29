@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-driver-pwa/
 /out/
 
 # production

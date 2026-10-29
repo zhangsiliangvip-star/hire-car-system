@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { shiftStatusSchema } from "@/lib/driver/shifts";
 
 type Props = {
   drivers: { id: string; name: string; serviceDays: number }[];
@@ -10,6 +11,7 @@ type Props = {
   allowManual?: boolean;
   emptyLabel?: string;
   showServiceDays?: boolean;
+  serviceDates?: string[];
 };
 
 export function DriverSelectionDialog({
@@ -20,10 +22,37 @@ export function DriverSelectionDialog({
   allowManual = true,
   emptyLabel = "未安排司机",
   showServiceDays = true,
+  serviceDates = [],
 }: Props) {
   const [search, setSearch] = useState("");
   const [manualName, setManualName] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
+  const [restDays, setRestDays] = useState<{ key: string; days: { driverId: string; date: string }[] } | null>(null);
+  const [restError, setRestError] = useState("");
+  const [restRevision, setRestRevision] = useState(0);
+  const datesKey = JSON.stringify([...new Set(serviceDates)].sort());
+  useEffect(() => {
+    const dates: string[] = JSON.parse(datesKey);
+    if (!dates.length) return;
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch("/api/driver-shifts/status", { method: "POST", cache: "no-store",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dates }), signal: controller.signal });
+        const result = await response.json();
+        if (controller.signal.aborted) return;
+        if (!response.ok) throw new Error(result.error || "休息提示读取失败。");
+        const parsed = shiftStatusSchema.parse(result);
+        setRestDays({ key: datesKey, days: parsed.days }); setRestError("");
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        console.error("Driver rest indicator load failed.", cause);
+        setRestDays(null); setRestError(cause instanceof Error ? cause.message : "休息提示读取失败，不能据此判断司机可出勤。");
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [datesKey, restRevision]);
   useEffect(() => {
     const previous = document.activeElement;
     dialogRef.current?.querySelector<HTMLInputElement>("input")?.focus();
@@ -33,12 +62,10 @@ export function DriverSelectionDialog({
   return (
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          onClose();
         }
         if (event.key === "Tab") {
           const elements = dialogRef.current?.querySelectorAll<HTMLElement>("button, input");
@@ -56,7 +83,7 @@ export function DriverSelectionDialog({
     >
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="driver-selection-title"
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="dialog-floating-header mb-3 flex items-center justify-between gap-3">
           <h2 id="driver-selection-title" className="text-xl font-bold">司机选任</h2>
           <button type="button" onClick={onClose} aria-label="关闭司机选任" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
@@ -68,17 +95,27 @@ export function DriverSelectionDialog({
         )}
         <input aria-label="搜索司机" placeholder="搜索司机姓名" value={search}
           onChange={(event) => setSearch(event.target.value)} className="mb-4 w-full rounded border p-3" />
+        {serviceDates.length > 0 && restError && <p role="alert" className="mb-3 text-sm text-red-600">
+          {restError} <button type="button" className="underline" onClick={() => setRestRevision(value => value + 1)}>重试休息提示</button>
+        </p>}
+        {serviceDates.length > 0 && !restError && restDays?.key !== datesKey &&
+          <p role="status" className="mb-3 text-sm text-gray-500">正在读取休息提示…</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {matches.map((driver) => (
+          {matches.map((driver) => {
+            const resting = restDays?.key === datesKey ? restDays.days.filter(day => day.driverId === driver.id) : [];
+            return (
             <button key={driver.id} type="button" aria-pressed={selected === driver.name}
               onClick={() => onSelect(driver.name, false)}
-              className={`min-h-20 break-words rounded-lg border p-3 text-left hover:border-blue-500 hover:bg-blue-50 ${selected === driver.name ? "border-blue-600 bg-blue-50" : "border-gray-200"}`}>
+              className={`relative min-h-20 break-words rounded-lg border p-3 pr-9 text-left hover:border-blue-500 hover:bg-blue-50 ${selected === driver.name ? "border-blue-600 bg-blue-50" : "border-gray-200"}`}>
               <span className="block font-semibold">{driver.name}</span>
               {showServiceDays && (
                 <span className="mt-1 block text-xs text-gray-500">最近30天 · {driver.serviceDays}天</span>
               )}
+              {resting.length > 0 && <span className="absolute bottom-2 right-2 text-sm font-bold text-red-600"
+                aria-label={`希望休：${resting.map(day => day.date).join("、")}`}
+                title={`希望休：${resting.map(day => day.date).join("、")}（仅提示，仍可选任）`}>休</span>}
             </button>
-          ))}
+          ); })}
         </div>
         {matches.length === 0 && <p className="py-5 text-center text-sm text-gray-500">{allowManual ? "暂无匹配司机，可在下方手动输入。" : "暂无匹配司机。"}</p>}
         {allowManual && (
@@ -91,7 +128,6 @@ export function DriverSelectionDialog({
         )}
         <div className="mt-5 flex justify-between gap-3">
           <button type="button" onClick={() => onSelect("", false)} className="rounded border px-4 py-2">{emptyLabel}</button>
-          <button type="button" onClick={onClose} className="rounded border px-4 py-2">取消</button>
         </div>
       </section>
     </div>

@@ -51,7 +51,6 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   .profit { color: #000; } .loss { color: #dc2626; }
   .result { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; border: 2px solid #263b53; padding: 14px; font-size: 19px; font-weight: bold; }
   .notes { margin-top: 14px; line-height: 1.8; }
-  .signatures { display: flex; justify-content: space-between; gap: 10px; margin-top: 28px; padding-bottom: 10px; }
   </style></head><body><div class="sheet"><article class="content">
   <header><h1>收支平衡月度报表</h1><div class="meta">
   <span>服务月份：${escapeHtml(data.month)}</span><span>分区：${escapeHtml(data.region)}</span>
@@ -81,15 +80,60 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   <tfoot><tr><td colspan="2">手动支出合计</td><td class="number">${yen(expenseTotal)}</td></tr></tfoot></table>
   <div class="result ${resultClass}"><span>${resultLabel}</span><span>${yen(net)}</span></div>
   <p class="notes">当月利润／亏损＝请求总金额＋手动其他收入总和－手动支出总和。不自动扣除车辆费用、司机工资、立替或其他运营支出。<br>
-  整单请求金额＝订单价格＋全日期ETC旅报＋司机立替旅报＋会社立替旅报＋超时费，全部归首个服务日所在月份（排除休运日），跨月不分摊。<br>
+  整单请求金额＝订单价格＋全日期ETC旅报＋司机立替旅报＋会社立替旅报＋超时请求（旅报），全部归首个服务日所在月份（排除休运日），跨月不分摊。<br>
   请求按订单所属会社归集，手动收入和支出按项目所属会社及录入月份归集；其他统计和工资算法不变。<br>
   请求按订单入金方式细分为口座入金、现金入金及未设置入金方式，不以入金日期判断实收；三项之和等于请求总和，不重复计入利润。<br>
   本表沿用页面所选月份、分区与所属会社范围。收入和支出金额采用当前页面输入值，空白按0计算，导出不会自动保存。<br>
   内部财务资料，请妥善保管。</p>
-  <div class="signatures"><span>制表：________________</span><span>审核：________________</span><span>日期：________________</span></div>
   </article></div></body></html>`;
 }
 
 export async function printBalance(data: BalancePrintData) {
   await printA4Html(buildBalancePrintHtml(data), "收支平衡月度报表打印");
+}
+
+export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
+  const { payments, paymentAmounts, paymentTotal } = data.summary;
+  if (![paymentTotal, ...Object.values(paymentAmounts)].every((value) =>
+    Number.isSafeInteger(value) && value >= 0,
+  )) {
+    throw new Error("外注司机出金合计无效或超出金额范围。");
+  }
+  const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
+  const methods = ["paypay", "微信", "支付宝", "口座", ""] as const;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>外注司机出金明细</title><style>
+  @page { size: A4 portrait; margin: 10mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; color: #172033; background: white; }
+  body { font: 11px Arial, "Microsoft YaHei", sans-serif; }
+  .sheet { width: 190mm; height: 276mm; overflow: hidden; }
+  .content.fit-page-width { width: 190mm; transform-origin: top left; }
+  h1 { text-align: center; font-size: 24px; margin: 0 0 14px; }
+  h2 { font-size: 15px; margin: 18px 0 8px; }
+  .meta, .notes { line-height: 1.8; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { border: 1px solid #bac3cd; padding: 7px; overflow-wrap: anywhere; text-align: left; }
+  th, tfoot { background: #edf1f5; font-weight: bold; }
+  .number { text-align: right; font-variant-numeric: tabular-nums; }
+  </style></head><body><div class="sheet"><article class="content fit-page-width">
+  <h1>外注司机出金明细</h1>
+  <p class="meta">服务月份：${escapeHtml(data.month)}　分区：${escapeHtml(data.region)}　所属会社：${escapeHtml(data.company)}　单位：JPY</p>
+  <h2>外注司机出金方式汇总</h2><table><thead><tr><th>外注司机出金方式</th><th class="number">总金额（JPY）</th></tr></thead>
+  <tbody>${methods.map((method) => `<tr><td>${method || "未设置出金方式"}</td><td class="number">${yen(paymentAmounts[method])}</td></tr>`).join("")}</tbody>
+  <tfoot><tr><td>合计</td><td class="number">${yen(paymentTotal)}</td></tr></tfoot></table>
+  ${methods.map((method) => {
+    const entries = payments.filter((row) => row.method === method);
+    return `<section><h2>${method || "未设置出金方式"}明细</h2><table>
+    <thead><tr><th>日期</th><th>订单名称</th><th>所属会社</th><th>外注司机出金状态</th><th>外注司机备注</th><th class="number">金额（JPY）</th></tr></thead>
+    <tbody>${entries.length ? entries.map((row) =>
+      `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer)}</td><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.status || "未选择")}</td><td style="white-space:pre-wrap">${escapeHtml(row.note || "")}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
+      : '<tr><td colspan="6">暂无出金记录</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="5">${method || "未设置出金方式"}合计</td><td class="number">${yen(paymentAmounts[method])}</td></tr></tfoot></table></section>`;
+  }).join("")}
+  <p class="notes">仅供对账，不重复计入收支平衡。沿用页面所选月份、分区与所属会社范围，按订单首个服务月归集订单全部日期的外注司机费用。使用已保存的财务记录，未设置出金方式单列以免漏账。</p>
+  </article></div></body></html>`;
+}
+
+export async function printCompanyAdvances(data: BalancePrintData) {
+  await printA4Html(buildCompanyAdvancePrintHtml(data), "外注司机出金明细打印");
 }

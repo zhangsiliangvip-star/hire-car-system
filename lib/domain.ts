@@ -10,6 +10,7 @@ export type OrderStatus =
 export type ActiveView =
   | "calendar"
   | "orders"
+  | "operations"
   | "orderFinance"
   | "driverFinance"
   | "vehicleFinance"
@@ -25,8 +26,10 @@ export type CalendarVehicleFilter = "all" | "alphard" | "hiace" | "tesla" | "ext
 
 export type OrderFinance = {
   driver: string;
+  driverPaymentType?: "wage" | "company_advance";
   vehicle: string;
   vehiclePlate: string;
+  vehicleOverride?: boolean;
   tripSummary: string;
   dailyFare: number;
   etcCompanyReport: number;
@@ -36,10 +39,16 @@ export type OrderFinance = {
   driverAdvanceCompanyReport: number;
   driverAdvanceTripReport: number;
   companyAdvanceCompanyReport: number;
+  externalDriverFee?: number;
+  companyAdvancePaymentMethod?: "" | "paypay" | "微信" | "支付宝" | "口座";
+  companyAdvancePaymentStatus?: "" | "已完成" | "未完成";
+  companyAdvancePaymentNote?: string;
   companyAdvanceTripReport: number;
   driverOvertimeHours: number;
   driverOvertimeRate: number;
   driverOvertimeFee: number;
+  overtimeRequestAmount?: number;
+  overtimeRequestRate?: number;
   driverWageMode: "fixed" | "percentage";
   driverWagePercentage: 50 | 60 | 70;
   driverWage: number;
@@ -90,6 +99,7 @@ export type Driver = AuditedRecord & {
   wechat: string;
   whatsapp: string;
   licenseExpiry: string;
+  personalSlogan: string;
 };
 
 export type DriverDraft = Omit<Driver, "id">;
@@ -174,6 +184,16 @@ export type BalanceExpenseItem = AuditedRecord & {
   monthlyAmounts: Record<string, number>;
 };
 
+export type DriverWageItem = AuditedRecord & {
+  id: string;
+  regionId?: string;
+  month: string;
+  driver: string;
+  companyName: string;
+  name: string;
+  amount: number;
+};
+
 export type BatchAddType = "drivers" | "vehicles" | "sources" | "companies";
 
 export type AccountRole = "admin" | "user";
@@ -204,6 +224,8 @@ export type DashboardData = {
   companies: Company[];
   vehicleMonthlyFinances: VehicleMonthlyFinance[];
   balanceExpenseItems: BalanceExpenseItem[];
+  driverWageItems: DriverWageItem[];
+  driverWageItemsMigrationPending?: boolean;
 };
 
 export type LoginAccount = AccountProfile;
@@ -215,4 +237,5 @@ export type CollectionName =
   | "orderSources"
   | "companies"
   | "vehicleMonthlyFinances"
-  | "balanceExpenseItems";
+  | "balanceExpenseItems"
+  | "driverWageItems";

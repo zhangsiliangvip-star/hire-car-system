@@ -5,6 +5,7 @@ import type { AccountProfile } from "@/lib/domain";
 import { jsonResponse } from "@/lib/api-response";
 import { readAllPages } from "@/lib/supabase/pagination";
 import { verifyDeletePassword } from "@/lib/delete-password";
+import { isDriverPwaEnabled } from "@/lib/driver/test-runtime";
 
 const createSchema = z.object({
   email: z.email().max(320),
@@ -150,7 +151,10 @@ export async function POST(request: Request) {
 
     const { data: savedProfile, error: profileError } = await admin
       .from("profiles")
-      .update({ role: parsed.data.role, region_id: parsed.data.regionId })
+      .update({
+        role: parsed.data.role, region_id: parsed.data.regionId,
+        ...(isDriverPwaEnabled() ? { account_type: "staff" as const } : {}),
+      })
       .eq("id", data.user.id)
       .select("id")
       .maybeSingle();

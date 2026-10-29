@@ -4,6 +4,7 @@ import { getAuthenticatedProfile } from "@/lib/supabase/authorization";
 import type {
   Company,
   BalanceExpenseItem,
+  DriverWageItem,
   Driver,
   Order,
   OrderFinance,
@@ -17,15 +18,18 @@ import { jsonResponse } from "@/lib/api-response";
 import { readAllPages } from "@/lib/supabase/pagination";
 import { verifyDeletePassword } from "@/lib/delete-password";
 import { isCompanySealDataUrl, MAX_SEAL_DATA_LENGTH } from "@/lib/company-seal";
-import { collectionAuditTable, toLastOperation, type LastOperation } from "@/lib/audit";
+import { toLastOperation, type LastOperation } from "@/lib/audit";
+import { hasValidDriverPayment } from "@/lib/reservation-driver-payment";
 
 const idSchema = z.string().uuid();
 const dateSchema = z.iso.date();
 const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 const orderFinanceSchema = z.object({
   driver: z.string().max(200).default(""),
+  driverPaymentType: z.enum(["wage", "company_advance"]).optional(),
   vehicle: z.string().max(200).default(""),
   vehiclePlate: z.string().max(100).default(""),
+  vehicleOverride: z.boolean().optional(),
   tripSummary: z.string().max(1000).default(""),
   dailyFare: z.number().int().min(0).max(99_999_999_999_999).default(0),
   etcCompanyReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
@@ -37,17 +41,25 @@ const orderFinanceSchema = z.object({
   driverAdvanceCompanyReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
   driverAdvanceTripReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
   companyAdvanceCompanyReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
+  externalDriverFee: z.number().int().min(0).max(99_999_999_999_999).optional(),
+  companyAdvancePaymentMethod: z.enum(["", "paypay", "微信", "支付宝", "口座"]).default(""),
+  companyAdvancePaymentStatus: z.enum(["", "已完成", "未完成"]).default(""),
+  companyAdvancePaymentNote: z.string().max(1000).default(""),
   companyAdvanceTripReport: z.number().int().min(0).max(99_999_999_999_999).default(0),
   driverOvertimeHours: z.number().min(0).max(99_999_999.99)
     .refine((value) => Number(value.toFixed(2)) === value)
     .default(0),
   driverOvertimeRate: z.number().int().min(0).max(99_999_999_999_999).default(0),
   driverOvertimeFee: z.number().int().min(0).max(99_999_999_999_999).default(0),
+  overtimeRequestAmount: z.number().int().min(0).max(99_999_999_999_999).optional(),
+  overtimeRequestRate: z.number().int().min(0).max(99_999_999_999_999).optional(),
   driverWageMode: z.enum(["fixed", "percentage"]).default("fixed"),
   driverWagePercentage: z.union([z.literal(50), z.literal(60), z.literal(70)]).default(50),
   driverWage: z.number().int().min(0).max(99_999_999_999_999).default(0),
   driverBonusWage: z.number().int().min(0).max(99_999_999_999_999).default(0),
-}).strict().refine((finance) => {
+}).strict().refine(hasValidDriverPayment, {
+  message: "Driver wages and external-driver payments must be mutually exclusive.",
+}).refine((finance) => {
   if (finance.driverOvertimeRate === 0) {
     return true;
   }
@@ -57,6 +69,14 @@ const orderFinanceSchema = z.object({
     finance.driverOvertimeFee === overtimeFee;
 }, {
   message: "Driver overtime fee must equal overtime hours multiplied by the hourly rate.",
+}).refine((finance) => {
+  if (finance.overtimeRequestRate === undefined) return true;
+  const request = Math.round(finance.driverOvertimeHours * finance.overtimeRequestRate);
+  return Number.isSafeInteger(request) &&
+    request <= 99_999_999_999_999 &&
+    finance.overtimeRequestAmount === request;
+}, {
+  message: "Overtime request must equal overtime hours multiplied by the trip-report hourly rate.",
 });
 const financeByDateSchema = z.record(dateSchema, orderFinanceSchema)
   .refine((entries) => Object.keys(entries).length <= 3660);
@@ -102,6 +122,7 @@ const driverSchema = z.object({
   wechat: z.string().max(200),
   whatsapp: z.string().max(200),
   licenseExpiry: z.union([dateSchema, z.literal("")]),
+  personalSlogan: z.string().max(100).default(""),
 }).strict();
 const vehicleSchema = z.object({
   id: idSchema,
@@ -151,6 +172,15 @@ const balanceExpenseItemSchema = z.object({
     monthSchema,
     z.number().int().min(0).max(99_999_999_999_999),
   ),
+}).strict();
+const driverWageItemSchema = z.object({
+  id: idSchema,
+  regionId: idSchema,
+  month: monthSchema,
+  driver: z.string().min(1).max(200),
+  companyName: z.string().max(200),
+  name: z.string().min(1).max(200),
+  amount: z.number().int().min(-99_999_999_999_999).max(99_999_999_999_999),
 }).strict();
 const orderSourceSchema = z.object({
   id: idSchema,
@@ -207,6 +237,12 @@ const mutationSchema = z.discriminatedUnion("collection", [
     deletePassword: z.string().max(1024),
   }).strict(),
   z.object({
+    collection: z.literal("driverWageItems"),
+    upsert: z.array(driverWageItemSchema).max(500),
+    deleteIds: z.array(idSchema).max(500),
+    deletePassword: z.string().max(1024),
+  }).strict(),
+  z.object({
     collection: z.literal("orderSources"),
     upsert: z.array(orderSourceSchema).max(500),
     deleteIds: z.array(idSchema).max(500),
@@ -243,6 +279,10 @@ function toOrderFinance(value: unknown): OrderFinance {
       driverAdvanceCompanyReport: 0,
       driverAdvanceTripReport: 0,
       companyAdvanceCompanyReport: 0,
+      externalDriverFee: 0,
+      companyAdvancePaymentMethod: "",
+      companyAdvancePaymentStatus: "",
+      companyAdvancePaymentNote: "",
       companyAdvanceTripReport: 0,
       driverOvertimeHours: 0,
       driverOvertimeRate: 0,
@@ -256,10 +296,15 @@ function toOrderFinance(value: unknown): OrderFinance {
 
   const entry = value as Partial<OrderFinance>;
   const fuelConsumption = entry.fuelConsumption;
+  const legacyExternalDriverFee = entry.driverPaymentType === "company_advance" &&
+    entry.externalDriverFee === undefined;
   return {
     driver: typeof entry.driver === "string" ? entry.driver.slice(0, 200) : "",
+    ...(entry.driverPaymentType === "wage" || entry.driverPaymentType === "company_advance"
+      ? { driverPaymentType: entry.driverPaymentType } : {}),
     vehicle: typeof entry.vehicle === "string" ? entry.vehicle.slice(0, 200) : "",
     vehiclePlate: typeof entry.vehiclePlate === "string" ? entry.vehiclePlate.slice(0, 100) : "",
+    ...(typeof entry.vehicleOverride === "boolean" ? { vehicleOverride: entry.vehicleOverride } : {}),
     tripSummary: typeof entry.tripSummary === "string" ? entry.tripSummary.slice(0, 1000) : "",
     dailyFare: toFinanceAmount(entry.dailyFare),
     etcCompanyReport: toFinanceAmount(entry.etcCompanyReport),
@@ -274,7 +319,22 @@ function toOrderFinance(value: unknown): OrderFinance {
         : 0,
     driverAdvanceCompanyReport: toFinanceAmount(entry.driverAdvanceCompanyReport),
     driverAdvanceTripReport: toFinanceAmount(entry.driverAdvanceTripReport),
-    companyAdvanceCompanyReport: toFinanceAmount(entry.companyAdvanceCompanyReport),
+    companyAdvanceCompanyReport: legacyExternalDriverFee
+      ? 0 : toFinanceAmount(entry.companyAdvanceCompanyReport),
+    externalDriverFee: toFinanceAmount(legacyExternalDriverFee
+      ? entry.companyAdvanceCompanyReport : entry.externalDriverFee),
+    companyAdvancePaymentMethod:
+      entry.companyAdvancePaymentMethod === "paypay" ||
+      entry.companyAdvancePaymentMethod === "微信" ||
+      entry.companyAdvancePaymentMethod === "支付宝" ||
+      entry.companyAdvancePaymentMethod === "口座"
+        ? entry.companyAdvancePaymentMethod
+        : "",
+    companyAdvancePaymentStatus:
+      entry.companyAdvancePaymentStatus === "已完成" || entry.companyAdvancePaymentStatus === "未完成"
+        ? entry.companyAdvancePaymentStatus : "",
+    companyAdvancePaymentNote: typeof entry.companyAdvancePaymentNote === "string"
+      ? entry.companyAdvancePaymentNote.slice(0, 1000) : "",
     companyAdvanceTripReport: toFinanceAmount(entry.companyAdvanceTripReport),
     driverOvertimeHours:
       typeof entry.driverOvertimeHours === "number" &&
@@ -285,6 +345,12 @@ function toOrderFinance(value: unknown): OrderFinance {
         : 0,
     driverOvertimeRate: toFinanceAmount(entry.driverOvertimeRate),
     driverOvertimeFee: toFinanceAmount(entry.driverOvertimeFee),
+    ...(entry.overtimeRequestAmount === undefined
+      ? {}
+      : { overtimeRequestAmount: toFinanceAmount(entry.overtimeRequestAmount) }),
+    ...(entry.overtimeRequestRate === undefined
+      ? {}
+      : { overtimeRequestRate: toFinanceAmount(entry.overtimeRequestRate) }),
     driverWageMode: entry.driverWageMode === "percentage" ? "percentage" : "fixed",
     driverWagePercentage:
       entry.driverWagePercentage === 60 || entry.driverWagePercentage === 70
@@ -373,6 +439,7 @@ function toDriver(row: Database["public"]["Tables"]["drivers"]["Row"]): Driver {
     wechat: row.wechat,
     whatsapp: row.whatsapp,
     licenseExpiry: row.license_expiry || "",
+    personalSlogan: row.personal_slogan ?? "",
   };
 }
 
@@ -429,6 +496,21 @@ function toBalanceExpenseItem(
     companyName: row.company_name,
     name: row.name,
     monthlyAmounts: row.monthly_amounts,
+  };
+}
+
+function toDriverWageItem(
+  row: Database["public"]["Tables"]["driver_wage_items"]["Row"],
+): DriverWageItem {
+  return {
+    lastOperation: toLastOperation(row.last_operation),
+    id: row.id,
+    regionId: row.region_id,
+    month: row.month,
+    driver: row.driver,
+    companyName: row.company_name,
+    name: row.name,
+    amount: row.amount,
   };
 }
 
@@ -510,6 +592,7 @@ function toDriverRow(driver: Driver): Database["public"]["Tables"]["drivers"]["I
     wechat: driver.wechat,
     whatsapp: driver.whatsapp,
     license_expiry: driver.licenseExpiry || null,
+    personal_slogan: driver.personalSlogan,
   };
 }
 
@@ -563,6 +646,20 @@ function toBalanceExpenseItemRow(
   };
 }
 
+function toDriverWageItemRow(
+  item: DriverWageItem,
+): Database["public"]["Tables"]["driver_wage_items"]["Insert"] {
+  return {
+    id: item.id,
+    region_id: item.regionId ?? "",
+    month: item.month,
+    driver: item.driver,
+    company_name: item.companyName,
+    name: item.name,
+    amount: item.amount,
+  };
+}
+
 function toOrderSourceRow(
   source: OrderSource,
 ): Database["public"]["Tables"]["order_sources"]["Insert"] {
@@ -596,14 +693,27 @@ function toCompanyRow(
   };
 }
 
+type SavedOperation = { id: string; lastOperation: LastOperation | null };
+type SavedOperationRow = { id: string; last_operation: unknown };
+
+function toSavedOperations(rows: SavedOperationRow[] | null): SavedOperation[] {
+  return (rows ?? []).map((row) => ({
+    id: row.id,
+    lastOperation: toLastOperation(row.last_operation),
+  }));
+}
+
 async function applyMutation(
   supabase: Awaited<ReturnType<typeof getAuthenticatedProfile>>["supabase"],
   mutation: z.infer<typeof mutationSchema>,
-) {
+): Promise<SavedOperation[]> {
+  let saved: SavedOperation[] = [];
   if (mutation.collection === "orders") {
     if (mutation.upsert.length) {
-      const { error } = await supabase.from("orders").upsert(mutation.upsert.map(toOrderRow));
+      const { data, error } = await supabase.from("orders")
+        .upsert(mutation.upsert.map(toOrderRow)).select("id, last_operation");
       if (error) throw error;
+      saved = toSavedOperations(data);
     }
     if (mutation.deleteIds.length) {
       const { error } = await supabase.from("orders").delete().in("id", mutation.deleteIds);
@@ -611,8 +721,10 @@ async function applyMutation(
     }
   } else if (mutation.collection === "drivers") {
     if (mutation.upsert.length) {
-      const { error } = await supabase.from("drivers").upsert(mutation.upsert.map(toDriverRow));
+      const { data, error } = await supabase.from("drivers")
+        .upsert(mutation.upsert.map(toDriverRow)).select("id, last_operation");
       if (error) throw error;
+      saved = toSavedOperations(data);
     }
     if (mutation.deleteIds.length) {
       const { error } = await supabase.from("drivers").delete().in("id", mutation.deleteIds);
@@ -620,8 +732,10 @@ async function applyMutation(
     }
   } else if (mutation.collection === "vehicles") {
     if (mutation.upsert.length) {
-      const { error } = await supabase.from("vehicles").upsert(mutation.upsert.map(toVehicleRow));
+      const { data, error } = await supabase.from("vehicles")
+        .upsert(mutation.upsert.map(toVehicleRow)).select("id, last_operation");
       if (error) throw error;
+      saved = toSavedOperations(data);
     }
     if (mutation.deleteIds.length) {
       const { error } = await supabase.from("vehicles").delete().in("id", mutation.deleteIds);
@@ -629,10 +743,11 @@ async function applyMutation(
     }
   } else if (mutation.collection === "vehicleMonthlyFinances") {
     if (mutation.upsert.length) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("vehicle_monthly_finances")
-        .upsert(mutation.upsert.map(toVehicleMonthlyFinanceRow));
+        .upsert(mutation.upsert.map(toVehicleMonthlyFinanceRow)).select("id, last_operation");
       if (error) throw error;
+      saved = toSavedOperations(data);
     }
     if (mutation.deleteIds.length) {
       const { error } = await supabase
@@ -643,10 +758,11 @@ async function applyMutation(
     }
   } else if (mutation.collection === "balanceExpenseItems") {
     if (mutation.upsert.length) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("balance_expense_items")
-        .upsert(mutation.upsert.map(toBalanceExpenseItemRow));
+        .upsert(mutation.upsert.map(toBalanceExpenseItemRow)).select("id, last_operation");
       if (error) throw error;
+      saved = toSavedOperations(data);
     }
     if (mutation.deleteIds.length) {
       const { error } = await supabase
@@ -655,10 +771,26 @@ async function applyMutation(
         .in("id", mutation.deleteIds);
       if (error) throw error;
     }
+  } else if (mutation.collection === "driverWageItems") {
+    if (mutation.upsert.length) {
+      const { data, error } = await supabase
+        .from("driver_wage_items")
+        .upsert(mutation.upsert.map(toDriverWageItemRow)).select("id, last_operation");
+      if (error) throw error;
+      saved = toSavedOperations(data);
+    }
+    if (mutation.deleteIds.length) {
+      const { error } = await supabase
+        .from("driver_wage_items")
+        .delete()
+        .in("id", mutation.deleteIds);
+      if (error) throw error;
+    }
   } else if (mutation.collection === "orderSources") {
     if (mutation.upsert.length) {
       const rows = mutation.upsert.map(toOrderSourceRow);
-      const { error } = await supabase.from("order_sources").upsert(rows);
+      const { data, error } = await supabase.from("order_sources")
+        .upsert(rows).select("id, last_operation");
       if (error) {
         // Until the short_name migration is applied, save everything else and keep existing data intact.
         const shortNameColumnMissing =
@@ -667,14 +799,17 @@ async function applyMutation(
         if (rows.some((row) => row.short_name)) {
           throw new Error("数据库尚未添加来源简称字段，请先执行 order_source_short_name 迁移后再保存简称。");
         }
-        const { error: fallbackError } = await supabase
+        const { data: fallbackData, error: fallbackError } = await supabase
           .from("order_sources")
           .upsert(rows.map((row) => {
             const legacyRow = { ...row };
             delete legacyRow.short_name;
             return legacyRow;
-          }));
+          })).select("id, last_operation");
         if (fallbackError) throw fallbackError;
+        saved = toSavedOperations(fallbackData);
+      } else {
+        saved = toSavedOperations(data);
       }
     }
     if (mutation.deleteIds.length) {
@@ -686,10 +821,11 @@ async function applyMutation(
     }
   } else if (mutation.collection === "companies") {
     if (mutation.upsert.length) {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("companies")
-        .upsert(mutation.upsert.map(toCompanyRow));
+        .upsert(mutation.upsert.map(toCompanyRow)).select("id, last_operation");
       if (error) throw error;
+      saved = toSavedOperations(data);
     }
     if (mutation.deleteIds.length) {
       const { error } = await supabase
@@ -699,6 +835,7 @@ async function applyMutation(
       if (error) throw error;
     }
   }
+  return saved;
 }
 
 export async function GET() {
@@ -793,6 +930,38 @@ export async function GET() {
       );
     }
     }
+    let driverWageItems: Database["public"]["Tables"]["driver_wage_items"]["Row"][] = [];
+    let driverWageItemsMigrationPending = false;
+    if (profile.role === "admin") {
+      try {
+        driverWageItems = await readAllPages((from, to) =>
+          supabase
+            .from("driver_wage_items")
+            .select("*")
+            .order("month")
+            .order("driver")
+            .order("company_name")
+            .order("id")
+            .range(from, to),
+        );
+      } catch (error) {
+        if (
+          typeof error !== "object" ||
+          error === null ||
+          !("code" in error) ||
+          error.code !== "PGRST205" ||
+          !("message" in error) ||
+          typeof error.message !== "string" ||
+          !error.message.includes("driver_wage_items")
+        ) {
+          throw error;
+        }
+        driverWageItemsMigrationPending = true;
+        console.warn(
+          "Driver wage item migration is not applied; loading the rest of the dashboard without manual wage items.",
+        );
+      }
+    }
 
     return jsonResponse({
       profile,
@@ -804,6 +973,8 @@ export async function GET() {
       vehicleMonthlyFinanceMigrationPending,
       balanceExpenseItems: balanceExpenseItems.map(toBalanceExpenseItem),
       balanceExpensesMigrationPending,
+      driverWageItems: driverWageItems.map(toDriverWageItem),
+      driverWageItemsMigrationPending,
       orderSources: orderSources.map(toOrderSource),
       companies: companies.map(toCompany),
     });
@@ -836,9 +1007,10 @@ export async function POST(request: Request) {
     if (
       profile.role !== "admin" &&
       (parsed.data.collection === "vehicleMonthlyFinances" ||
-        parsed.data.collection === "balanceExpenseItems")
+        parsed.data.collection === "balanceExpenseItems" ||
+        parsed.data.collection === "driverWageItems")
     ) {
-      return jsonResponse({ error: "仅管理员可以管理车辆统计及收支平衡数据。" }, { status: 403 });
+      return jsonResponse({ error: "仅管理员可以管理车辆统计、收支平衡及司机工资手动项目。" }, { status: 403 });
     }
     if (parsed.data.deleteIds.length > 0) {
       const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);
@@ -857,17 +1029,8 @@ export async function POST(request: Request) {
       return jsonResponse({ error: "不能在其他地域新增或修改数据。" }, { status: 403 });
     }
 
-    await applyMutation(supabase, parsed.data);
-    let saved: { id: string; lastOperation: LastOperation | null }[] = [];
+    const saved = await applyMutation(supabase, parsed.data);
     if (parsed.data.upsert.length) {
-      const { data, error } = await supabase
-        .from(collectionAuditTable[parsed.data.collection])
-        .select("id, last_operation")
-        .in("id", parsed.data.upsert.map((record) => record.id));
-      if (error) throw error;
-      saved = (data ?? []).map((record) => ({
-        id: record.id, lastOperation: toLastOperation(record.last_operation),
-      }));
       if (saved.length !== new Set(parsed.data.upsert.map((record) => record.id)).size) {
         throw new Error("Unable to confirm all saved records.");
       }
@@ -875,6 +1038,12 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: true, saved });
   } catch (error) {
     console.error("Failed to persist dashboard data.", error);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "PDR01") {
+      return jsonResponse(
+        { error: "订单已关联司机派单或执行历史，不能永久删除；请改为取消订单。历史记录和小票会保留。" },
+        { status: 409 },
+      );
+    }
     if (
       typeof error === "object" && error !== null &&
       "code" in error && error.code === "PGRST204" &&

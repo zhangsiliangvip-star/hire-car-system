@@ -25,16 +25,16 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Failed to allocate invoice number:", error);
-      return jsonResponse({ error: `请求书编号分配失败：${error.message}` }, {
+      return jsonResponse({ error: `請求書编号分配失败：${error.message}` }, {
         status: error.code === "42501" ? 403 : error.code === "22023" ? 409 : 500,
       });
     }
     if (typeof data !== "string" || !/^INV-\d{6,}$/.test(data)) {
-      throw new Error("数据库返回的请求书编号格式不正确。");
+      throw new Error("数据库返回的請求書编号格式不正确。");
     }
     return jsonResponse({ number: data });
   } catch (error) {
     console.error("Invoice number request failed:", error);
-    return jsonResponse({ error: "请求书编号分配失败，请刷新后重试。" }, { status: 500 });
+    return jsonResponse({ error: "請求書编号分配失败，请刷新后重试。" }, { status: 500 });
   }
 }

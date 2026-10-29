@@ -1,4 +1,4 @@
-import type { Order } from "@/lib/domain";
+import type { Order, OrderFinance } from "@/lib/domain";
 
 type BalanceOrderTotals = {
   companyName: string;
@@ -7,6 +7,15 @@ type BalanceOrderTotals = {
 };
 
 export type BalanceExpense = { companyName: string; name: string; amount: number };
+export type BalancePayment = {
+  companyName: string;
+  customer: string;
+  date: string;
+  method: NonNullable<OrderFinance["companyAdvancePaymentMethod"]>;
+  status?: OrderFinance["companyAdvancePaymentStatus"];
+  note?: string;
+  amount: number;
+};
 export type BalanceCompanyRow = Omit<BalanceOrderTotals, "depositMethod"> & {
   bankRequestAmount: number;
   cashRequestAmount: number;
@@ -32,6 +41,7 @@ export function summarizeBalance(
   orderTotals: BalanceOrderTotals[],
   manualExpenses: BalanceExpense[],
   manualIncomes: BalanceExpense[] = [],
+  companyAdvancePayments: BalancePayment[] = [],
 ) {
   const groups = new Map<string, BalanceCompanyRow>();
   const groupFor = (name: string) => {
@@ -72,7 +82,19 @@ export function summarizeBalance(
       if (!Number.isSafeInteger(totals[key])) throw new Error("收支合计超出金额范围，请缩小筛选范围。");
     }
   }
-  return { rows, expenses, incomes, totals };
+  const paymentAmounts = { paypay: 0, 微信: 0, 支付宝: 0, 口座: 0, "": 0 };
+  const payments = companyAdvancePayments.filter((item) => matches(item.companyName))
+    .slice().sort((a, b) => a.date.localeCompare(b.date) || a.customer.localeCompare(b.customer));
+  let paymentTotal = 0;
+  for (const item of payments) {
+    if (!Object.hasOwn(paymentAmounts, item.method)) throw new Error("会社立替出金方式无效，请检查财务记录。");
+    paymentAmounts[item.method] += check(item.amount);
+    paymentTotal += item.amount;
+    if (!Number.isSafeInteger(paymentAmounts[item.method]) || !Number.isSafeInteger(paymentTotal)) {
+      throw new Error("会社立替出金合计超出金额范围，请缩小筛选范围。");
+    }
+  }
+  return { rows, expenses, incomes, totals, payments, paymentAmounts, paymentTotal };
 }
 
 export type BalanceSummary = ReturnType<typeof summarizeBalance>;

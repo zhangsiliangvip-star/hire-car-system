@@ -1,3 +1,5 @@
+import { getServiceDriver } from "@/lib/order-drivers";
+
 export type ConflictCheckOrder = {
   id?: number | string;
   regionId?: string | null;
@@ -9,7 +11,8 @@ export type ConflictCheckOrder = {
   offDates?: string[] | null;
   time: string;
   status: string;
-  financeByDate?: Record<string, { vehicle?: string | null; vehiclePlate?: string | null; driver?: string | null } | undefined> | null;
+  financeByDate?: Record<string, { vehicle?: string | null; vehiclePlate?: string | null; driver?: string | null;
+    driverPaymentType?: string; companyAdvancePaymentNote?: string | null } | undefined> | null;
 };
 
 export type OrderConflictReason = "vehicle" | "driver";
@@ -53,7 +56,7 @@ function getDailyAssignments(order: ConflictCheckOrder) {
     assignments.set(date, {
       vehicle: dayVehicle || normalizeName(order.vehicle),
       plate: dayVehicle ? normalizeName(finance?.vehiclePlate) : normalizeName(order.vehiclePlate),
-      driver: normalizeName(finance?.driver) || normalizeName(order.driver),
+      driver: normalizeName(getServiceDriver(order, date)),
     });
   }
   return assignments;

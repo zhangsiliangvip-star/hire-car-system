@@ -1,0 +1,17 @@
+.receipts { margin: 0 0 1rem; padding: .65rem .75rem; border: 1px solid #e5e7eb; border-radius: .5rem; background: #f9fafb; font-size: .75rem; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.refresh { color: #2563eb; cursor: pointer; white-space: nowrap; }
+.groups { display: flex; flex-wrap: wrap; gap: .65rem 1.25rem; margin-top: .5rem; }
+.groups h4 { margin: 0 0 .25rem; color: #4b5563; font-weight: 500; }
+.thumbnails { display: flex; flex-wrap: wrap; gap: .35rem; }
+.thumbnail { width: 52px; height: 60px; padding: 2px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: zoom-in; }
+.thumbnail img { width: 100%; height: 100%; object-fit: contain; }
+.thumbnail:focus-visible, .close:focus-visible, .refresh:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.empty { margin-top: .35rem; color: #6b7280; }
+.error { margin-top: .35rem; color: #b91c1c; }
+.dialog { width: min(1100px, 94vw); max-width: 94vw; max-height: 94dvh; margin: auto; padding: 0; border: 0; border-radius: .75rem; background: #fff; color: #111827; }
+.dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.viewer { padding: .75rem; }
+.viewer .toolbar { margin-bottom: .65rem; font-size: .875rem; overflow-wrap: anywhere; }
+.close { flex-shrink: 0; padding: .4rem .8rem; border: 1px solid #d1d5db; border-radius: .35rem; cursor: pointer; }
+.large { display: block; width: 100%; height: min(78dvh, 1000px); object-fit: contain; }

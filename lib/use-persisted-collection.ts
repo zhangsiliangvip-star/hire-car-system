@@ -31,8 +31,10 @@ export function usePersistedCollection<T extends Identified>(
   const saveQueue = useRef(Promise.resolve());
   const pendingSaves = useRef(0);
   const changeVersion = useRef(0);
+  const persistenceFailed = useRef(false);
 
   const replaceItems = useCallback((nextItems: T[]) => {
+    persistenceFailed.current = false;
     itemsRef.current = nextItems;
     setItems(nextItems);
   }, []);
@@ -61,6 +63,7 @@ export function usePersistedCollection<T extends Identified>(
       regionId: item.regionId || previousById.get(item.id)?.regionId || defaultRegionId || "",
     }));
     if (next.some((item) => !item.regionId)) {
+      persistenceFailed.current = true;
       reportError("新增业务数据前，请先选择一个具体地域。");
       return;
     }
@@ -119,6 +122,7 @@ export function usePersistedCollection<T extends Identified>(
         const message =
           error instanceof Error ? error.message : `保存${collection}时发生未知错误。`;
         console.error(`Failed to persist ${collection}.`, error);
+        persistenceFailed.current = true;
         reportError(message);
       })
       .finally(() => {
@@ -127,5 +131,10 @@ export function usePersistedCollection<T extends Identified>(
       });
   }, [collection, getDeletePassword, getRegionId, reportError, reportPending]);
 
-  return { items, updateItems, replaceItems, syncItems, getChangeVersion };
+  const waitForSave = useCallback(async () => {
+    await saveQueue.current;
+    return !persistenceFailed.current;
+  }, []);
+
+  return { items, updateItems, replaceItems, syncItems, getChangeVersion, waitForSave };
 }

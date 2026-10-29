@@ -1,0 +1,18 @@
+.driver-finance .finance-fields{border:0;padding:0;min-width:0;margin:0}
+.driver-finance .finance-expense{border-top:1px solid #dbe5dd;padding:12px 0}
+.driver-finance .finance-expense h3{font-size:14px;font-weight:600}
+.driver-finance .driver-field{margin:12px 0}
+.driver-finance .driver-field input{padding:10px;width:100%;min-height:42px}
+.driver-finance .driver-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.driver-finance .finance-receipt{max-width:100%;height:auto}
+.driver-finance summary{font-size:13px;padding:12px 0;cursor:pointer}
+.driver-finance .driver-field input[type=date],.driver-finance .driver-field input[type=month]{appearance:none;min-width:0}
+.driver-finance .driver-row span{min-width:0;overflow-wrap:anywhere}
+.driver-finance .driver-card p{overflow-wrap:anywhere}
+.driver-finance .finance-expense-row{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:8px}
+.driver-finance .finance-expense-row .driver-field{min-width:0;margin:6px 0}
+.driver-finance .finance-expense-row input{height:36px;min-height:36px;margin-top:5px;padding:6px 8px}
+.driver-finance .finance-expense-row input[type=number]{text-align:right}
+.driver-finance .finance-date-row{display:flex;align-items:flex-end;gap:12px}
+.driver-finance .finance-date-row .driver-field{flex:1;min-width:0}
+.driver-finance .finance-date-row button{margin-bottom:12px;min-height:42px}

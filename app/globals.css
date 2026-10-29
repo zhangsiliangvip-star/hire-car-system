@@ -25,6 +25,43 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.dialog-floating-header {
+  position: sticky;
+  top: -1.5rem;
+  z-index: 20;
+  margin: -1.5rem -1.5rem 1.25rem;
+  padding: 1.5rem 1.5rem 0.5rem;
+  background: #fff;
+}
+
+.dialog-floating-header > button:last-child {
+  display: inline-flex;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #475569;
+  font-size: 1.5rem;
+  line-height: 1;
+  box-shadow: 0 10px 15px -3px rgb(15 23 42 / 20%), 0 0 0 4px rgb(255 255 255 / 90%);
+  transition: border-color 150ms, background-color 150ms, color 150ms;
+}
+
+.dialog-floating-header > button:last-child:hover {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.dialog-floating-header > button:last-child:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+}
+
 .dashboard,
 .auth-screen {
   color-scheme: light;
@@ -47,6 +84,212 @@ body {
 .dashboard .overflow-x-auto,
 .dashboard .overflow-auto {
   overscroll-behavior-x: contain;
+}
+
+.dashboard .management-table :is(th, td) {
+  padding: 0.75rem 0.625rem;
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dashboard .management-table th {
+  line-height: 1.5;
+}
+
+.dashboard .management-table :is(button, input, select) {
+  max-width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.dashboard .management-table td > .flex,
+.dashboard .management-table td > div > .flex {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.dashboard .management-table td {
+  min-width: 0;
+}
+
+.dashboard .management-table .truncate {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.calendar-grid {
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+.calendar-vehicle-row > :not(.calendar-vehicle-column) {
+  zoom: var(--calendar-scale, 1);
+}
+
+.calendar-date-header,
+.calendar-vehicle-content {
+  font-size: calc(16px * var(--calendar-scale, 1));
+  line-height: calc(24px * var(--calendar-scale, 1));
+}
+
+.calendar-invoice-status {
+  display: inline-block;
+  max-width: 100%;
+  border-width: 1px;
+  border-radius: 4px;
+  padding-inline: 4px;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.calendar-date-header [data-calendar-date] {
+  padding: calc(12px * var(--calendar-scale, 1));
+  border-width: 0 calc(1px * var(--calendar-scale, 1)) calc(1px * var(--calendar-scale, 1)) 0;
+}
+
+.calendar-date-header .text-sm {
+  font-size: calc(14px * var(--calendar-scale, 1));
+  line-height: calc(20px * var(--calendar-scale, 1));
+}
+
+.calendar-date-header .text-xs,
+.calendar-vehicle-content .text-xs {
+  font-size: calc(12px * var(--calendar-scale, 1));
+  line-height: calc(16px * var(--calendar-scale, 1));
+}
+
+.calendar-vehicle-content .text-\[13px\] {
+  font-size: calc(13px * var(--calendar-scale, 1));
+  line-height: 1.25;
+}
+
+.calendar-vehicle-content .mt-1 {
+  margin-top: calc(4px * var(--calendar-scale, 1));
+}
+
+@media (max-width: 639px), (hover: none) and (pointer: coarse) {
+  .calendar-vehicle-column {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    isolation: isolate;
+  }
+
+  .mobile-calendar-view .dashboard-header > :not(.dashboard-actions),
+  .mobile-calendar-view .dashboard-actions > :not(.calendar-region-selector):not(.calendar-today-button):not(.calendar-quick-date),
+  .mobile-calendar-view .dashboard-sidebar,
+  .mobile-calendar-view .calendar-vehicle-filters,
+  .mobile-calendar-view .calendar-toolbar {
+    display: none;
+  }
+
+  .mobile-calendar-view {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mobile-calendar-view .dashboard-header {
+    flex-shrink: 0;
+    padding: 8px 12px;
+  }
+
+  .mobile-calendar-view .dashboard-actions {
+    display: flex;
+    width: 100%;
+  }
+
+  .mobile-calendar-view .calendar-quick-date input {
+    width: 145px;
+  }
+
+  .mobile-calendar-view .dashboard-layout {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .mobile-calendar-view .workspace-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .mobile-calendar-view .calendar-scroll {
+    --calendar-vehicle-width: 100px;
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    padding: 0;
+    overflow-anchor: none;
+  }
+
+  .mobile-calendar-view .calendar-reorder-handle {
+    display: none;
+  }
+
+  .mobile-calendar-view .calendar-vehicle-desktop-field {
+    display: none;
+  }
+
+  .mobile-calendar-view .calendar-vehicle-column {
+    padding: calc(12px * var(--calendar-scale, 1)) calc(3px * var(--calendar-scale, 1));
+    border-right-width: calc(1px * var(--calendar-scale, 1));
+    border-bottom-width: calc(1px * var(--calendar-scale, 1));
+  }
+
+  .mobile-calendar-view .calendar-vehicle-content {
+    width: calc(93px * var(--calendar-scale, 1));
+    flex-shrink: 0;
+  }
+
+  .mobile-calendar-view .calendar-vehicle-row > .calendar-order-card {
+    zoom: 1;
+    margin-inline: calc(4px * var(--calendar-scale, 1));
+    padding: calc(4px * var(--calendar-scale, 1)) calc(8px * var(--calendar-scale, 1));
+    border-width: calc(1px * var(--calendar-scale, 1));
+    border-radius: calc(8px * var(--calendar-scale, 1));
+    font-size: calc(12px * var(--calendar-scale, 1));
+    line-height: calc(16px * var(--calendar-scale, 1));
+  }
+
+  .mobile-calendar-view .calendar-order-card .calendar-card-content {
+    font-size: inherit;
+    line-height: inherit;
+    padding-inline: calc(4px * var(--calendar-scale, 1));
+  }
+
+  .mobile-calendar-view .calendar-vehicle-content .truncate,
+  .mobile-calendar-view .calendar-card-content .truncate {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-calendar-view .calendar-card-content .flex {
+    flex-wrap: wrap;
+  }
+
+  .mobile-calendar-view .calendar-mobile-execution > span {
+    font-size: inherit;
+    line-height: inherit;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    padding-inline: calc(4px * var(--calendar-scale, 1));
+  }
+
+  .mobile-calendar-view .calendar-mobile-summary {
+    padding: calc(2px * var(--calendar-scale, 1)) calc(4px * var(--calendar-scale, 1));
+    margin-top: calc(2px * var(--calendar-scale, 1));
+  }
 }
 
 @media (max-width: 639px) {
