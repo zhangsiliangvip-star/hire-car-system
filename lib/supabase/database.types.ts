@@ -57,7 +57,7 @@ export type Database = {
         accounting_status: "未完成" | "完成核算";
         invoice_status: "未完成" | "已完成";
         invoice_sent_date: string | null;
-        deposit_method: "" | "口座入金" | "現金入金";
+        deposit_method: "" | "口座入金" | "现金入金" | "現金入金";
         deposit_date: string | null;
         accounting_assignee: string;
         finance_note: string;

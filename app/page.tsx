@@ -10427,7 +10427,7 @@ export default function Home() {
                 >
                   <option value="">未選択</option>
                   <option value="口座入金">口座入金</option>
-                  <option value="現金入金">現金入金</option>
+                  <option value="现金入金">現金入金</option>
                 </select>
               </label>
               <label className="block text-sm font-semibold">

@@ -95,8 +95,8 @@ test("finance dialog groups driver selection and wage quick entry below daily fa
   const externalNote = nodes(context.render()).find(node =>
     node.props?.["aria-label"] === "2026-10-27 外注運転士备注");
   assert.equal(externalNote.props.value, "");
-  externalNote.props.onChange({ target: { value: "外注運転士：Driver" } });
-  assert.equal(context.finance.companyAdvancePaymentNote, "外注運転士：Driver");
+  externalNote.props.onChange({ target: { value: "外注司机：Driver" } });
+  assert.equal(context.finance.companyAdvancePaymentNote, "外注司机：Driver");
   const salaryInput = nodes(context.render()).find(node =>
     node.props?.["aria-label"] === "2026-10-27 運転士工資快捷入力");
   assert.equal(salaryInput, undefined);
@@ -131,7 +131,7 @@ test("company advance external names appear in order labels but stay excluded fr
     offDates: [], driver: "Old default", time: "09:00", status: "予約確定", vehicle: "",
     financeByDate: { "2026-10-25": { driver: "Daily" }, "2026-10-26": { driver: "" },
       "2026-10-27": { driver: "", driverPaymentType: "company_advance",
-        companyAdvancePaymentNote: "外注運転士：External" } } };
+        companyAdvancePaymentNote: "外注司机：External" } } };
   assert.deepEqual(plain(getOrderDriverNames(order)), ["Daily", ""]);
   assert.equal(getOrderDriverLabel(order), "Daily／未安排／External");
   assert.deepEqual(plain(getOrderDriverLabelEntries(order)), [
@@ -181,7 +181,7 @@ test("daily calendar driver groups exclude external names saved in company advan
   const order = { driver: "Default", offDates: ["2026-10-29"], financeByDate: {
     "2026-10-27": { driver: "A" }, "2026-10-28": { driver: "A" },
     "2026-10-30": { driver: "B" }, "2026-10-31": { driver: "" },
-    "2026-11-01": { driver: "", driverPaymentType: "company_advance", companyAdvancePaymentNote: "外注運転士：External\nOther" },
+    "2026-11-01": { driver: "", driverPaymentType: "company_advance", companyAdvancePaymentNote: "外注司机：External\nOther" },
   } };
   assert.equal(getServiceDriver(order, "2026-10-31"), "");
   assert.equal(getServiceDriver(order, "2026-11-02"), "Default");
@@ -195,9 +195,9 @@ test("daily calendar driver groups exclude external names saved in company advan
   ]);
   const externalSegments = getDriverSegments({ driver: "", offDates: [], financeByDate: {
     "2026-11-01": { driver: "", driverPaymentType: "company_advance",
-      companyAdvancePaymentNote: "外注運転士：External A" },
+      companyAdvancePaymentNote: "外注司机：External A" },
     "2026-11-02": { driver: "", driverPaymentType: "company_advance",
-      companyAdvancePaymentNote: "外注運転士：External B" },
+      companyAdvancePaymentNote: "外注司机：External B" },
   } }, ["2026-11-01", "2026-11-02"]);
   assert.deepEqual(plain(externalSegments), [
     { driver: "", label: "External A", isExternal: true, start: 0, end: 1 },
@@ -211,10 +211,10 @@ test("external accounting reassignment synchronizes only its name and preserves 
   const body = source.slice(start, source.indexOf("  const accountingMixedValue", start));
   const key = `${id}|2026-10-27`;
   const finance = { driver: "", driverPaymentType: "company_advance", driverWage: 0,
-    companyAdvanceCompanyReport: 100, companyAdvancePaymentNote: "外注運転士：Before\nParking" };
+    companyAdvanceCompanyReport: 100, companyAdvancePaymentNote: "外注司机：Before\nParking" };
   let records = [{ id, date: "2026-10-27", endDate: "2026-10-27", offDates: [],
     driver: "Default", financeByDate: { "2026-10-27": finance } }];
-  let draft = { [key]: { ...finance, companyAdvanceCompanyReport: 999, companyAdvancePaymentNote: "外注運転士：Before\nDraft remark" } };
+  let draft = { [key]: { ...finance, companyAdvanceCompanyReport: 999, companyAdvancePaymentNote: "外注司机：Before\nDraft remark" } };
   const context = {
     ...load("lib\\order-drivers.ts"), ...load("lib\\reservation-driver-payment.ts"),
     dialogSavingRef: { current: false }, allOrders: records, accountingForm: draft,
@@ -229,9 +229,9 @@ test("external accounting reassignment synchronizes only its name and preserves 
   vm.createContext(context);
   vm.runInContext(ts.transpileModule(body, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
   await context.saveAccountingDrivers([key], "After");
-  assert.equal(records[0].financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注運転士：After\nParking");
+  assert.equal(records[0].financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注司机：After\nParking");
   assert.equal(records[0].financeByDate["2026-10-27"].companyAdvanceCompanyReport, 100);
-  assert.equal(draft[key].companyAdvancePaymentNote, "外注運転士：After\nDraft remark");
+  assert.equal(draft[key].companyAdvancePaymentNote, "外注司机：After\nDraft remark");
   assert.equal(draft[key].companyAdvanceCompanyReport, 999);
   assert.equal(draft[key].driver, "");
   assert.equal(context.getServiceDriver(records[0], "2026-10-27"), "");
@@ -497,7 +497,7 @@ test("orders API validates and round-trips persistent batch metadata", async () 
   assert.equal(stored.import_batch_id, null);
   assert.equal(stored.import_batch_index, null);
   const externalFinance = { driverPaymentType: "company_advance", driver: "",
-    companyAdvanceCompanyReport: 15000, companyAdvancePaymentNote: "外注運転士：Manual external" };
+    companyAdvanceCompanyReport: 15000, companyAdvancePaymentNote: "外注司机：Manual external" };
   assert.equal((await post({ ...order, driver: "Manual external",
     financeByDate: { [order.date]: externalFinance } })).status, 200);
   assert.equal(stored.finance_by_date[order.date].driver, "");
@@ -506,18 +506,18 @@ test("orders API validates and round-trips persistent batch metadata", async () 
   assert.equal(restored.financeByDate[order.date].driverPaymentType, "company_advance");
   assert.equal(restored.financeByDate[order.date].companyAdvanceCompanyReport, 0);
   assert.equal(restored.financeByDate[order.date].externalDriverFee, 15000);
-  assert.equal(restored.financeByDate[order.date].companyAdvancePaymentNote, "外注運転士：Manual external");
+  assert.equal(restored.financeByDate[order.date].companyAdvancePaymentNote, "外注司机：Manual external");
   assert.equal((await post({ ...order, financeByDate: { [order.date]: {
     driverPaymentType: "company_advance", companyAdvanceCompanyReport: 2500, externalDriverFee: 15000,
     companyAdvancePaymentMethod: "口座", companyAdvancePaymentStatus: "已完成",
-    companyAdvancePaymentNote: "外注運転士：Separate",
+    companyAdvancePaymentNote: "外注司机：Separate",
   } } })).status, 200);
   const separated = (await route.GET()).data.orders[0].financeByDate[order.date];
   assert.equal(separated.companyAdvanceCompanyReport, 2500);
   assert.equal(separated.externalDriverFee, 15000);
   assert.equal(separated.companyAdvancePaymentMethod, "口座");
   assert.equal(separated.companyAdvancePaymentStatus, "已完成");
-  assert.equal(separated.companyAdvancePaymentNote, "外注運転士：Separate");
+  assert.equal(separated.companyAdvancePaymentNote, "外注司机：Separate");
   for (const invalid of [{ driver: "Cannot become payroll" }, { driverWage: 1 }, { driverBonusWage: 1 },
     { driverWageMode: "percentage" }, { driverOvertimeRate: 4000 }, { driverPaymentType: "bad" },
     { companyAdvanceCompanyReport: -1 }, { companyAdvanceCompanyReport: 0.1 },
@@ -2285,7 +2285,7 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   assert.equal(external.driver, "");
   assert.equal(external.driverWage, 0);
   assert.equal(external.externalDriverFee, 15000);
-  assert.equal(external.companyAdvancePaymentNote, "外注運転士：External A");
+  assert.equal(external.companyAdvancePaymentNote, "外注司机：External A");
   assert.equal(payment.isDriverWageEntry(external), false);
   assert.equal(input("2026-10-26 運転士工資").props.disabled, true);
   assert.equal(input("2026-10-26 外注運転士費用").props.disabled, false);
@@ -2296,9 +2296,9 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   assert.equal(payment.isDriverWageEntry(context.form.financeByDate["2026-10-27"]), true);
   assert.equal(external.companyAdvanceCompanyReport, 0);
   assert.equal(external.externalDriverFee, 15000);
-  input("2026-10-26 外注運転士备注").props.onChange({ target: { value: "外注運転士：External A\n停車費已含" } });
+  input("2026-10-26 外注運転士备注").props.onChange({ target: { value: "外注司机：External A\n停車費已含" } });
   context.form = context.updateReservationDriver(context.form, "External B");
-  assert.equal(context.form.financeByDate["2026-10-26"].companyAdvancePaymentNote, "外注運転士：External A\n停車費已含");
+  assert.equal(context.form.financeByDate["2026-10-26"].companyAdvancePaymentNote, "外注司机：External A\n停車費已含");
   assert.equal(context.form.financeByDate["2026-10-27"].driver, "External B");
   context.form = context.updateReservationDriver(context.form, "External B");
   assert.equal((context.form.financeByDate["2026-10-26"].companyAdvancePaymentNote.match(/External A/g) || []).length, 1);
@@ -2314,10 +2314,10 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   assert.equal(driver(1).props.value, "", "clearing a daily wage driver stays unassigned");
   driver(1).props.onChange("Daily C");
   input("2026-10-27 運転士費用类型").props.onChange({ target: { value: "company_advance" } });
-  assert.equal(context.form.financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注運転士：Daily C");
+  assert.equal(context.form.financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注司机：Daily C");
   driver(1).props.onChange("Daily D");
   assert.equal(driver(1).props.value, "");
-  assert.equal(context.form.financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注運転士：Daily D");
+  assert.equal(context.form.financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注司机：Daily D");
   assert.equal(context.form.financeByDate["2026-10-27"].driver, "");
   driver(1).props.onChange("");
   assert.equal(driver(1).props.value, "", "external name remains outside the daily driver assignment");
@@ -2370,7 +2370,7 @@ test("payment type conversions preserve unrelated finances and prevent duplicate
     "company_advance", "External").overtimeRequestAmount, 10000, "independent customer rate survives conversion");
   assert.equal(external.fuelCost, 1500);
   assert.equal(external.dailyFare, 50000);
-  assert.equal(external.companyAdvancePaymentNote, "外注運転士：External\nExisting note");
+  assert.equal(external.companyAdvancePaymentNote, "外注司机：External\nExisting note");
   assert.equal(payment.hasValidDriverPayment(external), true);
   const normalized = context.initializeAccountingFinance(external);
   assert.equal(normalized.driverPaymentType, "company_advance");
@@ -2927,9 +2927,12 @@ test("accounting total requests split by deposit method in the page and A4 repor
     "@/lib/print-a4": {},
     "@/lib/request-amount-summary": helper,
   });
+  assert.deepEqual(plain(helper.summarizeRequestAmounts([
+    { depositMethod: "現金入金", requestAmount: 5 },
+  ])), { bank: 0, cash: 5, unassigned: 0 });
   const rows = [
     { depositMethod: "口座入金", requestAmount: 1000, paid: false },
-    { depositMethod: "現金入金", requestAmount: 2000, paid: true },
+    { depositMethod: "现金入金", requestAmount: 2000, paid: true },
     { depositMethod: "", requestAmount: 300, paid: false },
     { depositMethod: "口座入金", requestAmount: 50, paid: true },
   ].map((row) => ({
@@ -2951,6 +2954,9 @@ test("accounting total requests split by deposit method in the page and A4 repor
   assert.match(html, /未设置入金方式：¥300/);
   assert.doesNotMatch(html, /総卖上/);
   const page = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(page, /<option value="现金入金">現金入金<\/option>/);
+  const dataRoute = fs.readFileSync(path.join(root, "app\\api\\data\\route.ts"), "utf8");
+  assert.match(dataRoute, /z\.enum\(\["", "口座入金", "现金入金", "現金入金"\]\)/);
   assert.match(page, /summarizeRequestAmounts\(\s*filteredOrderFinanceOrders\.map/);
   assert.match(page, /requestAmount: getOrderFinanceForOrder\(order\)\.requestAmount/);
   assert.match(page, /総請求金額<\/p>/);
@@ -2965,7 +2971,7 @@ test("balance adds manual income, subtracts only manual expense and prints match
   const { buildBalancePrintHtml } = load("lib\\balance-print.ts", {
     "@/lib/print-a4": { printA4Html() {} },
   });
-  const orders = [{ companyName: "A", requestAmount: 1000, depositMethod: "口座入金" }, { companyName: "B", requestAmount: 50, depositMethod: "現金入金" }];
+  const orders = [{ companyName: "A", requestAmount: 1000, depositMethod: "口座入金" }, { companyName: "B", requestAmount: 50, depositMethod: "现金入金" }];
   const expenses = [{ companyName: "A", name: "Costs", amount: 400 }, { companyName: "B", name: "Cost", amount: 200 }];
   const incomes = [{ companyName: "A", name: "<Income>", amount: 200 }, { companyName: "B", name: "Other", amount: 50 }];
   const summary = balance.summarizeBalance("", ["A", "B"], orders, expenses, incomes);
@@ -2993,11 +2999,11 @@ test("balance request breakdown reconciles across companies without treating met
   const { summarizeBalance } = load("lib\\balance-summary.ts");
   const orders = [
     { companyName: "A", requestAmount: 100, depositMethod: "口座入金", depositDate: "" },
-    { companyName: "A", requestAmount: 200, depositMethod: "現金入金", depositDate: "2026-11-01" },
+    { companyName: "A", requestAmount: 200, depositMethod: "现金入金", depositDate: "2026-11-01" },
     { companyName: "A", requestAmount: 50, depositMethod: "" },
     { companyName: "B", requestAmount: 300, depositMethod: "口座入金" },
     { companyName: "", requestAmount: 25, depositMethod: "" },
-    { companyName: "B", requestAmount: 0, depositMethod: "現金入金" },
+    { companyName: "B", requestAmount: 0, depositMethod: "现金入金" },
   ];
   const summary = summarizeBalance("", ["A", "B"], orders, []);
   assert.equal(summary.totals.bankRequestAmount, 400);

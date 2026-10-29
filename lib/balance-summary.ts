@@ -64,7 +64,9 @@ export function summarizeBalance(
     const row = groupFor(order.companyName);
     row.requestAmount += check(order.requestAmount);
     if (order.depositMethod === "口座入金") row.bankRequestAmount += order.requestAmount;
-    else if (order.depositMethod === "現金入金") row.cashRequestAmount += order.requestAmount;
+    else if (order.depositMethod === "现金入金" || order.depositMethod === "現金入金") {
+      row.cashRequestAmount += order.requestAmount;
+    }
     else if (order.depositMethod === "") row.unassignedRequestAmount += order.requestAmount;
     else throw new Error("訂単入金方式无效，请检查訂単資料。");
   }

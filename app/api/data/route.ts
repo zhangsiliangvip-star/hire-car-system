@@ -105,7 +105,7 @@ const orderSchema = z.object({
   accountingStatus: z.enum(["完成核算", "未完成"]).default("未完成"),
   invoiceStatus: z.enum(["未完成", "已完成"]),
   invoiceSentDate: z.union([dateSchema, z.literal("")]),
-  depositMethod: z.enum(["", "口座入金", "現金入金"]).default(""),
+  depositMethod: z.enum(["", "口座入金", "现金入金", "現金入金"]).default(""),
   depositDate: z.union([dateSchema, z.literal("")]).default(""),
   accountingAssignee: z.string().max(200).default(""),
   financeNote: z.string().max(5000).default(""),

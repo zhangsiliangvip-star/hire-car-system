@@ -4,9 +4,9 @@ export function withCompanyAdvanceDriver(finance: OrderFinance, name: string): O
   const trimmedName = name.trim();
   if (!trimmedName) return { ...finance, driver: "" };
   const note = (finance.companyAdvancePaymentNote || "").split("\n")
-    .filter(line => !line.startsWith("外注運転士：")).join("\n");
+    .filter(line => !line.startsWith("外注司机：") && !line.startsWith("外注運転士：")).join("\n");
   return { ...finance, driver: "",
-    companyAdvancePaymentNote: [`外注運転士：${trimmedName}`, note].filter(Boolean).join("\n") };
+    companyAdvancePaymentNote: [`外注司机：${trimmedName}`, note].filter(Boolean).join("\n") };
 }
 
 export function setReservationDriverPayment(

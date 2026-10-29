@@ -18,8 +18,11 @@ export function getServiceDriver(order: DriverAssignment, date: string): string 
 function getServiceDriverPresentation(order: DriverAssignment, date: string): { label: string; isExternal: boolean } {
   const finance = order.financeByDate?.[date];
   if (finance?.driverPaymentType === "company_advance") {
-    const label = finance.companyAdvancePaymentNote?.split(/\r?\n/)
-      .find(line => line.startsWith("外注運転士："))?.slice("外注運転士：".length).trim() || "";
+    const prefixes = ["外注司机：", "外注運転士："];
+    const line = finance.companyAdvancePaymentNote?.split(/\r?\n/)
+      .find(candidate => prefixes.some(prefix => candidate.startsWith(prefix)));
+    const prefix = prefixes.find(candidate => line?.startsWith(candidate));
+    const label = line && prefix ? line.slice(prefix.length).trim() : "";
     return { label, isExternal: Boolean(label) };
   }
   return { label: getServiceDriver(order, date), isExternal: false };
