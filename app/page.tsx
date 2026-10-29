@@ -4139,7 +4139,7 @@ export default function Home() {
         calculateOrderFinance(finance).driverWages <= 99_999_999_999_999;
     });
     if (!validOrderPrice || !validFinance) {
-      alert("日元金额请输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超时时间最多填写两位小数，超时计算金额不得超出限额，行程简概及出金备注最多 1000 字，出金状态须为有效选项。");
+      alert("日元金额请输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超时时间最多填写两位小数，超时计算金额不得超出限额，行程簡概及出金备注最多 1000 字，出金状态须为有效选项。");
       return;
     }
 
@@ -4232,7 +4232,7 @@ export default function Home() {
           Number.isSafeInteger(amount) && amount >= 0 && amount <= 99_999_999_999_999) &&
         (finance.companyAdvancePaymentNote || "").length <= 1000 && hasValidDriverPayment(finance),
       )) {
-      alert("车费、司机工资、会社立替及外注司机费用须为不超过 99,999,999,999,999 的非负日元整数；司机工资与外注费用须按费用类型選択。行程简概及外注司机备注最多1000字，预约最多3660个日历日。");
+      alert("车费、司机工资、会社立替及外注司机费用须为不超过 99,999,999,999,999 的非负日元整数；司机工资与外注费用须按费用类型選択。行程簡概及外注司机备注最多1000字，预约最多3660个日历日。");
       return;
     }
     const savedForm: OrderDraft = {
@@ -7953,7 +7953,7 @@ export default function Home() {
                     <tr>
                       <th className="px-3 py-2 font-semibold">颜色</th>
                       <th className="px-3 py-2 font-semibold">会社全称</th>
-                      <th className="px-3 py-2 font-semibold">简称</th>
+                      <th className="px-3 py-2 font-semibold">簡称</th>
                       <th className="px-3 py-2 font-semibold">担当</th>
                       <th className="px-3 py-2 font-semibold">連絡先</th>
                       <th className="px-3 py-2 font-semibold">地址</th>
@@ -8519,7 +8519,7 @@ export default function Home() {
                       })}
                     />
                     <label className="block text-sm font-medium">
-                      行程简概
+                      行程簡概
                       <textarea
                         rows={2}
                         maxLength={1000}
@@ -9168,7 +9168,7 @@ export default function Home() {
                 />
               </label>
               <label className="block text-sm font-medium">
-                简称（显示在カレンダー卡片上，留空则显示全称）
+                簡称（显示在カレンダー卡片上，留空则显示全称）
                 <input
                   type="text"
                   maxLength={50}
@@ -9916,7 +9916,7 @@ export default function Home() {
                       )}
                       <div className="md:col-span-2 grid gap-3 rounded border border-blue-200 bg-blue-50/40 p-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
                         <label className="block text-sm font-medium">
-                          行程简概
+                          行程簡概
                           <textarea
                             rows={2}
                             maxLength={1000}

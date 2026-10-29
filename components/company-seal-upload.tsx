@@ -47,7 +47,7 @@ export function CompanySealUpload({ value, onChange, onBusyChange, standalone = 
       } finally {
         bitmap.close();
       }
-      if (!isCompanySealDataUrl(data)) throw new Error("处理后的印章图片过大或无效，请使用更简洁的印章图片。");
+      if (!isCompanySealDataUrl(data)) throw new Error("处理后的印章图片过大或无效，请使用更簡洁的印章图片。");
       if (request === sequence.current) onChange(data);
     } catch (error) {
       if (request === sequence.current) {

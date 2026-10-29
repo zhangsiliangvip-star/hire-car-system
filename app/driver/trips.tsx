@@ -146,7 +146,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
           <span className="driver-muted driver-daily-number">訂単 {index + 1}</span>
           <div className="driver-daily-content">
             <h2>{trip.details?.orderName || "訂単内容未填写"}</h2>
-            <p className="driver-daily-summary">{trip.details?.tripSummary || "行程简概未填写"}</p>
+            <p className="driver-daily-summary">{trip.details?.tripSummary || "行程簡概未填写"}</p>
           </div>
           <p className="driver-muted driver-daily-plate">車両番号：{trip.vehicleNumber || "未填写"}</p>
         </div>)}</div>
@@ -176,7 +176,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
         <div className="driver-row"><span>車両番号</span><strong className="break-words">{trip.vehicleNumber || "未填写"}</strong></div>
         {detail && trip.details && <div className="space-y-3 break-words">
           <div className="driver-row"><span>訂単名称</span><strong>{trip.details.orderName || "未填写"}</strong></div>
-          <div><p className="driver-muted">行程简概</p><p className="whitespace-pre-wrap">{trip.details.tripSummary || "未填写"}</p></div>
+          <div><p className="driver-muted">行程簡概</p><p className="whitespace-pre-wrap">{trip.details.tripSummary || "未填写"}</p></div>
         </div>}
         {detail ? <>
           {!("historical" in trip) && tripActions[trip.status] && <button className="driver-button" disabled={saving || refreshing} onClick={() => advance(trip)}>{saving ? "正在记录…" : refreshing ? "正在更新…" : tripActions[trip.status]?.label}</button>}

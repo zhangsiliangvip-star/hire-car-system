@@ -83,7 +83,7 @@ const fieldLabels: Record<string, string> = {
   liability_expiry: "自賠責有効期限", vehicle_id: "車両编号", month: "月份",
   parking_fee: "停车场费", insurance_fee: "保险费", inspection_fee: "点检费",
   repair_fee: "维修费", supplies: "备品", start_odometer: "起始里程", end_odometer: "结束里程",
-  company_name: "会社", short_name: "简称", monthly_amounts: "各月金额", contact_name: "联系人",
+  company_name: "会社", short_name: "簡称", monthly_amounts: "各月金额", contact_name: "联系人",
   contact_info: "联系方式", address: "地址", color: "颜色", operations_manager: "运行管理者",
   maintenance_manager: "整备管理者", roll_call_address: "营业所地址", garage_address: "车库地址",
   bank_account: "口座", tax_registration_number: "T番号", seal_image: "印章",

@@ -67,7 +67,7 @@ export function SourceSelectionDialog({
           <button type="button" onClick={onClose} aria-label="关闭来源選択" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
         <p className="mb-4 text-sm text-gray-500">按訂単数由多到少排列，常用来源在左上角；取消訂単不计入，同訂単数按名称排序。</p>
-        <input aria-label="搜索来源" placeholder="搜索来源简称" value={search}
+        <input aria-label="搜索来源" placeholder="搜索来源簡称" value={search}
           onChange={(event) => setSearch(event.target.value)} className="mb-4 w-full rounded border p-3" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {matches.map((source) => (

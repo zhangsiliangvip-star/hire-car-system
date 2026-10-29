@@ -189,7 +189,7 @@ test("phone detail renders only the current legal action and never financial fie
     assert.ok(html.includes(orders.tripStatusLabels[status]));
     assert.ok(html.indexOf("車両</span>") < html.indexOf("車両番号</span>"));
     assert.ok(html.includes("足立300い4968"));
-    assert.ok(html.includes("訂単名称")); assert.ok(html.includes("行程简概")); assert.ok(html.includes("備考"));
+    assert.ok(html.includes("訂単名称")); assert.ok(html.includes("行程簡概")); assert.ok(html.includes("備考"));
     assert.ok(html.includes("&lt;Order&gt;")); assert.ok(html.includes("Airport\nHotel"));
     assert.ok(html.includes("&lt;script&gt;private notes&lt;/script&gt;"));
     assert.doesNotMatch(html, /<script>/);

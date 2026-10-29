@@ -2200,7 +2200,7 @@ test("reservation daily summary and fares share accounting data and preserve leg
   const legend = source.indexOf(">每日行程与车费</legend>");
   const start = source.lastIndexOf("<fieldset", legend);
   const form = source.slice(start, source.indexOf("</fieldset>", legend));
-  assert.ok(form.includes("每日行程与车费") && form.includes("行程简概") && form.includes("当日车费（JPY）"));
+  assert.ok(form.includes("每日行程与车费") && form.includes("行程簡概") && form.includes("当日车费（JPY）"));
   assert.match(form, /getOrderDateKeys\(form\)\.map/);
   assert.match(source, /financeByDate: getReservationFinance\(order\)/);
   assert.match(source, /financeByDate: shiftFinanceDates\(form\.financeByDate, dateOffset\)/);

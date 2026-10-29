@@ -797,7 +797,7 @@ async function applyMutation(
           error.code === "PGRST204" && error.message.includes("short_name");
         if (!shortNameColumnMissing) throw error;
         if (rows.some((row) => row.short_name)) {
-          throw new Error("数据库尚未添加来源简称字段，请先执行 order_source_short_name 迁移后再保存简称。");
+          throw new Error("数据库尚未添加来源簡称字段，请先执行 order_source_short_name 迁移后再保存簡称。");
         }
         const { data: fallbackData, error: fallbackError } = await supabase
           .from("order_sources")
