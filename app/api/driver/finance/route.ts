@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     const fuel = await identity.supabase.rpc("driver_daily_fuel_data", { target_month: parsed.data.month });
     if (fuel.error) {
       console.error("Driver daily fuel read rejected.", { code: fuel.error.code });
-      return jsonResponse({ error: "燃油费申报读取失败，请重试。" }, { status: 503 });
+      return jsonResponse({ error: "燃油費申报读取失败，请重试。" }, { status: 503 });
     }
     const historical = await identity.supabase.rpc("driver_historical_finance_data", {
       target_month: parsed.data.month,

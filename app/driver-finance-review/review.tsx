@@ -64,7 +64,7 @@ export default function Review() {
     const note = notes[`${row.claim.assignmentId}-${row.claim.category}`] || "";
     if (decision === "rejected" && !note.trim()) { setError("退回时请填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      `确认${financeCategoryLabels[row.claim.category]}入账？仅处理此分类；请核对是否已手工录入相同费用。` : "确认退回给司机修改？")) return;
+      `确认${financeCategoryLabels[row.claim.category]}入账？仅处理此分类；请核对是否已手工录入相同費用。` : "确认退回给司机修改？")) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -87,7 +87,7 @@ export default function Review() {
     const note = notes[row.claim.id] || "";
     if (decision === "rejected" && !note.trim()) { setError("退回时请填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      "确认将燃油费追加到指定訂単当天的燃油费？公司支付／油卡，不加到司机立替和应发金额。请核对是否已手工录入。" : "确认退回燃油费？")) return;
+      "确认将燃油費追加到指定訂単当天的燃油費？公司支付／油卡，不加到司机立替和应发金额。请核对是否已手工录入。" : "确认退回燃油費？")) return;
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -97,13 +97,13 @@ export default function Review() {
         }) });
       const result = await response.json();
       if (current !== generation.current) return;
-      if (!response.ok) throw new Error(result.error || "燃油费审核未确认。");
+      if (!response.ok) throw new Error(result.error || "燃油費审核未确认。");
       const saved = fuelClaimSchema.parse(result.fuelClaim);
       setFuelRows(items => items.map(item => item.claim.id === saved.id ? { ...item, claim: saved } : item));
-      setNotice("燃油费已处理。");
+      setNotice("燃油費已处理。");
     } catch (cause) {
       if (current !== generation.current) return;
-      console.error("Daily fuel review failed.", cause); setError(cause instanceof Error ? cause.message : "燃油费审核失败。");
+      console.error("Daily fuel review failed.", cause); setError(cause instanceof Error ? cause.message : "燃油費审核失败。");
     } finally { if (current === generation.current) { lock.current = false; setBusy(false); } }
   }
   async function viewReceipt(path: string, bucket = "driver-finance-receipts") {
@@ -126,7 +126,7 @@ export default function Review() {
       setBusy(true); setRows([]); setError(""); setReceipt(""); setNotes({}); setRevision(value => value + 1);
       setFuelRows([]);
     }}>刷新</button>
-    <p className="driver-muted">立替金额作为新增费用追加；超时小时数替换当日原值，单价仍由后台设定。确认前请核对重复票据。司机月工资只读，包含后台手动加减项目。</p>
+    <p className="driver-muted">立替金额作为新增費用追加；超时小时数替换当日原值，单价仍由后台设定。确认前请核对重复票据。司机月工资只读，包含后台手动加减项目。</p>
     {error && <p role="alert" className="driver-error">{error}</p>}
     {notice && <p role="status" className="driver-notice">{notice}</p>}
     {busy && <p className="driver-muted">正在处理…</p>}
@@ -153,17 +153,17 @@ export default function Review() {
       </section>;
     })}
     {fuelRows.map(row => <section className="driver-card" key={row.claim.id}>
-      <h2>{row.claim.date} · {row.driverName} · 燃油费</h2>
+      <h2>{row.claim.date} · {row.driverName} · 燃油費</h2>
       <p>关联訂単：{row.pickup} → {row.destination}</p>
-      <p>¥{row.claim.amount.toLocaleString()} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已计入訂単燃油费" : "已退回"}</p>
-      <p className="driver-muted">每天一笔，全部关联指定訂単当日燃油费；不计司机立替及应发金额。</p>
+      <p>¥{row.claim.amount.toLocaleString()} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已计入訂単燃油費" : "已退回"}</p>
+      <p className="driver-muted">每天一笔，全部关联指定訂単当日燃油費；不计司机立替及应发金额。</p>
       {row.claim.receipts.map((path, index) => <button className="driver-link" key={path}
         onClick={() => void viewReceipt(path, "driver-fuel-receipts")}>油票 {index + 1}　</button>)}
       {row.claim.status === "pending" ? <>
         <label className="driver-field">审核备注（退回必填）<input value={notes[row.claim.id] || ""} maxLength={500}
           disabled={busy} onChange={event => setNotes(items => ({ ...items, [row.claim.id]: event.target.value }))} /></label>
-        <button className="driver-button" disabled={busy} onClick={() => void reviewFuel(row, "approved")}>确认燃油费并入账</button>
-        <button className="driver-button driver-secondary" disabled={busy} onClick={() => void reviewFuel(row, "rejected")}>退回燃油费</button>
+        <button className="driver-button" disabled={busy} onClick={() => void reviewFuel(row, "approved")}>确认燃油費并入账</button>
+        <button className="driver-button driver-secondary" disabled={busy} onClick={() => void reviewFuel(row, "rejected")}>退回燃油費</button>
       </> : <p className="driver-muted">{row.claim.reviewNote}</p>}
     </section>)}
     {receipt && <section className="driver-card"><button className="driver-link" onClick={() => setReceipt("")}>关闭票据</button>

@@ -79,7 +79,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
     : '<tr><td colspan="3">暂无支出项目</td></tr>'}</tbody>
   <tfoot><tr><td colspan="2">手动支出合计</td><td class="number">${yen(expenseTotal)}</td></tr></tfoot></table>
   <div class="result ${resultClass}"><span>${resultLabel}</span><span>${yen(net)}</span></div>
-  <p class="notes">当月利润／亏损＝请求总金额＋手动其他收入总和－手动支出总和。不自动扣除車両费用、司机工资、立替或其他运营支出。<br>
+  <p class="notes">当月利润／亏损＝请求总金额＋手动其他收入总和－手动支出总和。不自动扣除車両費用、司机工资、立替或其他运营支出。<br>
   整单请求金额＝訂単价格＋全日期ETC旅报＋司机立替旅报＋会社立替旅报＋超时请求（旅报），全部归首个服务日所在月份（排除休运日），跨月不分摊。<br>
   请求按訂単所属会社归集，手动收入和支出按项目所属会社及录入月份归集；其他统计和工资算法不变。<br>
   请求按訂単入金方式细分为口座入金、现金入金及未设置入金方式，不以入金日期判断实收；三项之和等于请求总和，不重复计入利润。<br>
@@ -130,7 +130,7 @@ export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
       : '<tr><td colspan="6">暂无出金记录</td></tr>'}</tbody>
     <tfoot><tr><td colspan="5">${method || "未设置出金方式"}合计</td><td class="number">${yen(paymentAmounts[method])}</td></tr></tfoot></table></section>`;
   }).join("")}
-  <p class="notes">仅供对账，不重复计入收支平衡。沿用页面所选月份、分区与所属会社范围，按訂単首个服务月归集訂単全部日期的外注司机费用。使用已保存的财务记录，未设置出金方式单列以免漏账。</p>
+  <p class="notes">仅供对账，不重复计入收支平衡。沿用页面所选月份、分区与所属会社范围，按訂単首个服务月归集訂単全部日期的外注司机費用。使用已保存的财务记录，未设置出金方式单列以免漏账。</p>
   </article></div></body></html>`;
 }
 

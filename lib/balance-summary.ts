@@ -31,7 +31,7 @@ export function getBalanceServiceMonth(
 ) {
   const offDates = new Set(order.offDates);
   const firstServiceDate = dateKeys.filter((date) => !offDates.has(date)).sort()[0];
-  if (!firstServiceDate) throw new Error("訂単没有服务日，请检查用车日期和休运日。");
+  if (!firstServiceDate) throw new Error("訂単没有服务日，请检查用車日期和休运日。");
   return firstServiceDate.slice(0, 7);
 }
 

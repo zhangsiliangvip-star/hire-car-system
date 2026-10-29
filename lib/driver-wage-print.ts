@@ -81,7 +81,7 @@ export function buildDriverWagePrintHtml(data: DriverWagePrintData) {
   <tfoot><tr><td colspan="3">月度合计</td>${cell(sum("driverAdvances"))}${cell(sum("overtimeHours"))}${cell(sum("overtimeFee"))}${cell(sum("bonusWage"))}${cell(sum("percentageWage"))}${cell(sum("fixedWage"))}${cell(sum("totalWage"))}${cell(sum("driverAdvances") + sum("totalWage"))}</tr></tfoot></table>
   ${data.manualItems.length > 0 ? `<h2>其他手动工资项目</h2><table><thead><tr><th>项目名称</th><th>金额（JPY）</th></tr></thead><tbody>${data.manualItems.map((item) => `<tr><td>${escapeHtml(item.name)}</td>${cell(item.amount)}</tr>`).join("")}</tbody><tfoot><tr><td>手动项目合计</td>${cell(manualWageTotal)}</tr></tfoot></table>` : ""}
   <div class="notes">工资总额 = 超时工资 ＋ 奖励 ＋ 比例工资 ＋ 固定工资 ＋ 手动工资项目。<br>
-  支付总额 = 司机立替 ＋ 工资总额；司机立替不计入工资，不含会社立替。未扣除税费或其他扣款，不代表扣税后实发工资或已支付金额。<br>
+  支付总额 = 司机立替 ＋ 工资总额；司机立替不计入工资，不含会社立替。未扣除税費或其他扣款，不代表扣税后实发工资或已支付金额。<br>
   有记录日数按不同服务日期去重统计，不作为考勤认定。</div>
   <footer>依据当前所选月份、分区和司机的已保存财务记录生成。訂単价格、请求金额及利润不在本表中显示。</footer>
   </article></div></body></html>`;
@@ -163,7 +163,7 @@ export function buildCompanyWagePrintHtml(data: CompanyWagePrintData) {
   <div class="notes">按訂単所属会社归集所选月份的全部司机，不受单个司机筛选影响。<br>
   同名司机跨分区分别列示；同一司机同一天的多笔訂単，记录日数只计一次。无财务记录的司机不列入本表。<br>
   工资总额 = 超时工资 ＋ 奖励 ＋ 比例工资 ＋ 固定工资 ＋ 手动工资项目。支付总额 = 司机立替 ＋ 工资总额。<br>
-  司机立替不计入工资，不含会社立替。未扣除税费或其他扣款，不代表扣税后实发工资或已支付金额。</div>
+  司机立替不计入工资，不含会社立替。未扣除税費或其他扣款，不代表扣税后实发工资或已支付金额。</div>
   </article></div></body></html>`;
 }
 

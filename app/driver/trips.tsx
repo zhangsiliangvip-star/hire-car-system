@@ -158,8 +158,8 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
           <span className={`driver-status ${trip.status === "assigned" ? "pending" : ""}`}>
             {"historical" in trip ? "历史訂単（只读）" : tripStatusLabels[trip.status]}</span></div>
         <div className="my-3 space-y-3">
-          <TripLocation label="上车地点" address={trip.pickup} />
-          <TripLocation label="下车地点" address={trip.destination} />
+          <TripLocation label="上車地点" address={trip.pickup} />
+          <TripLocation label="下車地点" address={trip.destination} />
           {"historical" in trip ? <div className="break-words"><p className="driver-muted">備考</p>
             <p className="whitespace-pre-wrap">{trip.details?.notes || "未填写"}</p></div> :
             <DriverTripNotes assignmentId={trip.assignmentId} notes={trip.details?.notes ?? ""} disabled={saving || refreshing}

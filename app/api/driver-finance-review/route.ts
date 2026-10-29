@@ -41,14 +41,14 @@ export async function POST(request: Request) {
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     if (typeof body === "object" && body !== null && "fuelId" in body) {
       const fuel = fuelReviewSchema.safeParse(body);
-      if (!fuel.success) return jsonResponse({ error: "燃油费审核无效，退回时请填写原因。" }, { status: 400 });
+      if (!fuel.success) return jsonResponse({ error: "燃油費审核无效，退回时请填写原因。" }, { status: 400 });
       const { fuelId, expectedVersion, decision, note } = fuel.data;
       const { data, error } = await supabase.rpc("review_driver_daily_fuel", {
         target_fuel: fuelId, expected_version: expectedVersion, decision, note,
       });
       if (error) {
         console.error("Daily fuel review rejected.", { code: error.code });
-        return jsonResponse({ error: "燃油费审核未完成，訂単燃油费或申报状态可能已变化，请刷新核对或退回重提。" },
+        return jsonResponse({ error: "燃油費审核未完成，訂単燃油費或申报状态可能已变化，请刷新核对或退回重提。" },
           { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : 503 });
       }
       return jsonResponse({ fuelClaim: fuelClaimSchema.parse(data) });

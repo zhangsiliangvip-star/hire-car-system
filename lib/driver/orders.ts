@@ -20,8 +20,8 @@ export const tripStatusLabels: Record<TripState, string> = {
 };
 export const tripActions: Partial<Record<TripState, { state: Exclude<TripState, "assigned">; label: string }>> = {
   assigned: { state: "acknowledged", label: "确认接单" },
-  acknowledged: { state: "en_route", label: "出发前往上车地点" },
-  en_route: { state: "arrived", label: "已到达上车地点" },
+  acknowledged: { state: "en_route", label: "出发前往上車地点" },
+  en_route: { state: "arrived", label: "已到达上車地点" },
   arrived: { state: "in_service", label: "开始服务" },
   in_service: { state: "completed", label: "完成行程" },
 };

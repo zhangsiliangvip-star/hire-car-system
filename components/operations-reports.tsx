@@ -130,7 +130,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
             }
             markDirty();
           }}>
-          <option value="">未关联（保留原车牌，请人工确认）</option>
+          <option value="">未关联（保留原車牌，请人工确认）</option>
           {r.header?.assignmentId && !r.orderOptions?.some(item => item.assignmentId === r.header?.assignmentId) &&
             <option value={r.header.assignmentId}>原关联訂単（历史派单）</option>}
           {r.orderOptions?.map(item => <option key={item.assignmentId} value={item.assignmentId}>
@@ -139,8 +139,8 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
         </select>
         <input type="hidden" name="vehicleBaseline" defaultValue={r.header?.vehicleNumber ?? ""} />
         <span className="mt-1 block text-amber-800">{r.header?.assignmentId
-          ? "关联车牌跟随訂単最新選択；在此修改并保存，也会同步该日訂単及其他页面。"
-          : "尚未确认訂単关联，原车牌保持不变；選択并保存后开启同步。"}</span>
+          ? "关联車牌跟随訂単最新選択；在此修改并保存，也会同步该日訂単及其他页面。"
+          : "尚未确认訂単关联，原車牌保持不变；選択并保存后开启同步。"}</span>
         <span className="mt-1 block text-gray-600">修改日报日期会清除关联；先保存日期，再重新選択该日訂単。</span>
       </label>}
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -278,7 +278,7 @@ test("historical claims show their source, submit with the history flag and excl
   h.states[2].trips[0].historical = true;
   const html = h.render();
   assert.match(html, /历史訂単/);
-  assert.equal(h.buttons.find(button => button.children === "保存燃油费并提交").disabled, true);
+  assert.equal(h.buttons.find(button => button.children === "保存燃油費并提交").disabled, true);
   h.buttons.find(button => button.children === "保存社报立替并提交")
     .onClick({ currentTarget: { value: "company" } });
   await new Promise(resolve => setImmediate(resolve));
@@ -303,7 +303,7 @@ test("top buttons switch exclusive views while preserving the claim draft", () =
 });
 test("date then order then categories precede the final all-order driver advance summary", () => {
   const h = renderFinance();
-  const markers = ["用车日期", "選択当天訂単", "<h2>社报立替</h2>", "<h2>旅报立替</h2>", "司机立替汇总"];
+  const markers = ["用車日期", "選択当天訂単", "<h2>社报立替</h2>", "<h2>旅报立替</h2>", "司机立替汇总"];
   let position = -1;
   for (const marker of markers) {
     const next = h.html.indexOf(marker, position + 1);
@@ -350,17 +350,17 @@ test("fuel remains daily when changing orders and does not enter advance/payable
   // Appended fuel draft state: amount, receipts, and explicitly chosen order.
   h.states[13] = "6000"; h.states[14] = []; h.states[15] = id;
   const html = h.render();
-  assert.ok(html.indexOf("当日燃油费") > html.indexOf("超时申报"));
-  assert.ok(html.indexOf("司机立替汇总") > html.indexOf("当日燃油费"));
+  assert.ok(html.indexOf("当日燃油費") > html.indexOf("超时申报"));
+  assert.ok(html.indexOf("司机立替汇总") > html.indexOf("当日燃油費"));
   assert.ok(html.includes("¥3,500")); // company 1500 + trip 2000, excludes fuel 6000
-  h.buttons.find(button => button.children === "保存燃油费并提交").onClick();
+  h.buttons.find(button => button.children === "保存燃油費并提交").onClick();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls[0].assignmentId, id); assert.equal(calls[0].amount, 6000);
   assert.equal(h.states[2].fuelClaims.length, 1);
   h.states[3] = id.replace(/1$/, "2");
   h.render();
   assert.equal(h.states[15], id);
-  assert.equal(h.buttons.some(button => button.children === "保存燃油费并提交"), false);
+  assert.equal(h.buttons.some(button => button.children === "保存燃油費并提交"), false);
   h.buttons.find(button => button.children === "月工资").onClick();
   assert.match(h.render(), /<span>应发金额<\/span><strong>¥14,500<\/strong>/);
 });

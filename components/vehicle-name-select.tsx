@@ -32,7 +32,7 @@ function readOptions() {
     console.error("Failed to read local vehicle name options.", error);
     return {
       options: DEFAULT_VEHICLE_NAME_OPTIONS,
-      error: "无法读取本浏览器的车名设置，请点击“恢复默认”重试。",
+      error: "无法读取本浏览器的車名设置，请点击“恢复默认”重试。",
     };
   }
 }
@@ -61,7 +61,7 @@ export function VehicleNameSelect({
       console.error("Failed to save local vehicle name options.", error);
       setSettings((current) => ({
         ...current,
-        error: "车名设置保存失败，请检查浏览器是否允许本地存储。此次更改未生效。",
+        error: "車名设置保存失败，请检查浏览器是否允许本地存储。此次更改未生效。",
       }));
       return false;
     }
@@ -70,7 +70,7 @@ export function VehicleNameSelect({
   }
 
   function deleteOption(name: string) {
-    if (!window.confirm(`从本浏览器的车名列表删除「${name}」？已有車両和訂単不会改变。`)) return;
+    if (!window.confirm(`从本浏览器的車名列表删除「${name}」？已有車両和訂単不会改变。`)) return;
     if (saveOptions(settings.options.filter((option) => option !== name)) && value === name) {
       onDeleteSelected();
     }
@@ -92,7 +92,7 @@ export function VehicleNameSelect({
           onClick={() => setIsManaging((current) => !current)}
           className="text-sm text-blue-700 hover:underline"
         >
-          {isManaging ? "收起管理" : "管理车名"}
+          {isManaging ? "收起管理" : "管理車名"}
         </button>
       </div>
       <select
@@ -122,12 +122,12 @@ export function VehicleNameSelect({
       {isManaging && (
         <div id="vehicle-name-options-manager" className="mt-2 rounded border bg-gray-50 p-3">
           <p className="mb-2 text-xs text-gray-600">仅影响本浏览器的下拉选项，不删除車両或訂単。</p>
-          {settings.options.length === 0 && <p className="text-sm text-gray-600">已无预设车名，仍可手动输入。</p>}
+          {settings.options.length === 0 && <p className="text-sm text-gray-600">已无预设車名，仍可手动输入。</p>}
           <ul className="space-y-2">
             {settings.options.map((name) => (
               <li key={name} className="flex items-center justify-between gap-2 text-sm">
                 <span>{name}</span>
-                <button type="button" aria-label={`删除车名 ${name}`}
+                <button type="button" aria-label={`删除車名 ${name}`}
                   onClick={() => deleteOption(name)} className="text-rose-700 hover:underline">
                   删除
                 </button>

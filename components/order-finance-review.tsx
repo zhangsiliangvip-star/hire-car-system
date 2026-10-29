@@ -18,7 +18,7 @@ type ReviewContext = {
 };
 const Context = createContext<ReviewContext | null>(null);
 function label(row: OrderReviewRow) {
-  return row.kind === "fuel" ? "燃油费" : financeCategoryLabels[row.claim.category];
+  return row.kind === "fuel" ? "燃油費" : financeCategoryLabels[row.claim.category];
 }
 function PendingPhotos({ row }: { row: OrderReviewRow }) {
   const [receipts, setReceipts] = useState<Receipt[] | null>(null);
@@ -31,7 +31,7 @@ function PendingPhotos({ row }: { row: OrderReviewRow }) {
     async function load() {
       try {
         const bucket = row.kind === "fuel" ? "driver-fuel-receipts" : "driver-finance-receipts";
-        const items = row.kind === "fuel" ? row.claim.receipts.map(path => ({ path, detail: "燃油费" })) :
+        const items = row.kind === "fuel" ? row.claim.receipts.map(path => ({ path, detail: "燃油費" })) :
           row.claim.expenses.flatMap(item => item.receipts.map(path => ({ path, detail: item.detail })));
         const paths = [...new Set(items.map(item => item.path))];
         const signed = paths.length ? await createClient().storage.from(bucket).createSignedUrls(paths, 300) : null;
@@ -119,7 +119,7 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
             </div>)}
           {row.kind === "finance" && row.claim.category === "overtime" &&
             <p className="mt-1 text-xs text-gray-600">批准后替换该日超时小时数，按后台单价重算金额。</p>}
-          {row.kind === "fuel" && <p className="mt-1 text-xs text-gray-600">批准后追加到该訂単当天燃油费，不计司机立替或应发工资。</p>}
+          {row.kind === "fuel" && <p className="mt-1 text-xs text-gray-600">批准后追加到该訂単当天燃油費，不计司机立替或应发工资。</p>}
           {(row.kind === "fuel" || row.claim.category !== "overtime") && <PendingPhotos key={`${key}-${row.claim.version}`} row={row} />}
           <label className="mt-3 block text-xs">审核备注（驳回必填）
             <input aria-label={`${row.date} ${label(row)}审核备注`} maxLength={500} disabled={busy || blocked}

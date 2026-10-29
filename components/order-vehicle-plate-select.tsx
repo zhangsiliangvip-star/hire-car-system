@@ -66,7 +66,7 @@ export function OrderVehiclePlateSelect({
       {!financeMode && <p className="mt-1 text-xs text-gray-500">選択番号会同步切换上方車両；未登记番号的車両请在上方選択。</p>}
       {!selected && sameNameCount > 1 && (
         <p role="alert" className="mt-1 text-xs text-amber-800">
-          车名「{vehicleName}」有多台車両，请選択具体的車両番号。
+          車名「{vehicleName}」有多台車両，请選択具体的車両番号。
         </p>
       )}
     </div>

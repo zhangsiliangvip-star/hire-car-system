@@ -42,7 +42,7 @@ test("finance dialog groups driver selection and wage quick entry below daily fa
   const start = source.indexOf('<div className="md:col-span-2 grid gap-3 rounded border border-blue-200');
   const end = source.indexOf("<OrderVehiclePlateSelect", start);
   const block = source.slice(start, end).trim();
-  assert.ok(block.indexOf("当日车费") < block.indexOf("<FinanceDriverSelect"));
+  assert.ok(block.indexOf("当日車費") < block.indexOf("<FinanceDriverSelect"));
   assert.ok(block.indexOf("<FinanceDriverSelect") < block.indexOf("司机工资快捷入力"));
   assert.equal((source.slice(start).match(/<FinanceDriverSelect/g) || []).length, 1);
   const context = {
@@ -73,7 +73,7 @@ test("finance dialog groups driver selection and wage quick entry below daily fa
   assert.equal(context.finance.driverWage, 0);
   context.finance.driverPaymentType = "company_advance";
   const externalInput = nodes(context.render()).find(node =>
-    node.props?.["aria-label"] === "2026-10-27 外注司机费用");
+    node.props?.["aria-label"] === "2026-10-27 外注司机費用");
   assert.equal(externalInput.props.disabled, false);
   assert.equal(externalInput.props.value, "");
   externalInput.props.onChange({ target: { value: "15000" } });
@@ -88,7 +88,7 @@ test("finance dialog groups driver selection and wage quick entry below daily fa
     node.props?.["aria-label"] === "2026-10-27 外注司机出金状态");
   status.props.onChange({ target: { value: "已完成" } });
   assert.equal(context.finance.companyAdvancePaymentStatus, "已完成");
-  assert.match(source, /\{ key: "externalDriverFee", label: "外注司机费用", unit: "JPY", readOnly: true \}/);
+  assert.match(source, /\{ key: "externalDriverFee", label: "外注司机費用", unit: "JPY", readOnly: true \}/);
   assert.match(source, /外注司机出金方式[\s\S]*?disabled/);
   assert.match(source, /外注司机出金状态[\s\S]*?disabled/);
   assert.match(source, /外注司机备注[\s\S]*?readOnly/);
@@ -259,7 +259,7 @@ test("accounting driver autosave submits only persisted finances, preserves unsa
     context.accountingForm[key].driverPaymentType = "company_advance";
     await context.saveAccountingDrivers([key], "Blocked");
     assert.equal(writes, 1);
-    assert.match(alerts.at(-1), /费用类型尚未保存/);
+    assert.match(alerts.at(-1), /費用类型尚未保存/);
   }
 });
 
@@ -1064,7 +1064,7 @@ test("A4 report exports omit signature fields and preserve report content", () =
     }), "経理統計月度财务表", "月份：2026-10"],
     [expenses.buildOrderExpensePrintHtml({
       name: "Test Order", period: "2026-10-01", note: "Keep this note", rows: [],
-    }), "团务费用明细", "行程日期：2026-10-01"],
+    }), "团务費用明细", "行程日期：2026-10-01"],
     [balance.buildBalancePrintHtml({
       ...base, summary: summarizeBalance("", [], [], []),
     }), "收支平衡月度报表", "服务月份：2026-10"],
@@ -1611,8 +1611,8 @@ test("orders link vehicles by plate so vehicle names may repeat, while plates st
   assert.ok(source.includes("getVehicleSegments(order, dates.filter"));
   assert.ok(source.includes("車両番号不能重复"));
   assert.ok(source.includes("車両番号不能重复："));
-  assert.ok(!source.includes("车名重复"));
-  assert.ok(!source.includes("同一地域已有车名"));
+  assert.ok(!source.includes("車名重复"));
+  assert.ok(!source.includes("同一地域已有車名"));
   assert.ok(!source.includes("同一地域内車名不能重复"));
 });
 
@@ -2133,18 +2133,18 @@ test("vehicle-name options persist deletions, preserve selected names and restor
     assert.ok(found, label);
     found.props.onClick();
   }
-  button("管理车名");
+  button("管理車名");
   confirmed = false;
-  button("删除车名 Alphard");
+  button("删除車名 Alphard");
   assert.equal(saved, null);
   confirmed = true;
   failWrite = true;
-  button("删除车名 Alphard");
+  button("删除車名 Alphard");
   assert.equal(selectedDeleted, 0);
   assert.equal(saved, null);
   assert.ok(nodes(render()).some((node) => node.props?.role === "alert"));
   failWrite = false;
-  button("删除车名 Alphard");
+  button("删除車名 Alphard");
   assert.equal(selectedDeleted, 1);
   assert.ok(!JSON.parse(saved).includes("Alphard"));
   states.length = 0; // Reopening the dialog reads the persisted list.
@@ -2152,8 +2152,8 @@ test("vehicle-name options persist deletions, preserve selected names and restor
   assert.equal(tree.find((node) => node.type === "select").props.value, MANUAL_VEHICLE_NAME);
   assert.equal(tree.find((node) => node.type === "input").props.value, "Alphard");
   assert.ok(!tree.some((node) => node.type === "option" && node.props.value === "Alphard"));
-  button("管理车名");
-  for (const name of JSON.parse(saved)) button(`删除车名 ${name}`);
+  button("管理車名");
+  for (const name of JSON.parse(saved)) button(`删除車名 ${name}`);
   assert.deepEqual(JSON.parse(saved), []);
   assert.ok(nodes(render()).some((node) => node.type === "option" && node.props.value === MANUAL_VEHICLE_NAME));
   button("恢复默认");
@@ -2197,10 +2197,10 @@ test("reservation daily summary and fares share accounting data and preserve leg
   assert.equal(shifted["2026-10-29"].tripSummary, "Airport → Hotel");
   assert.equal(shifted["2026-10-29"].fuelCost, 1500);
   assert.deepEqual(plain(context.getOrderDateKeys(old)), ["2026-10-26", "2026-10-27", "2026-10-28"]);
-  const legend = source.indexOf(">每日行程与车费</legend>");
+  const legend = source.indexOf(">每日行程与車費</legend>");
   const start = source.lastIndexOf("<fieldset", legend);
   const form = source.slice(start, source.indexOf("</fieldset>", legend));
-  assert.ok(form.includes("每日行程与车费") && form.includes("行程簡概") && form.includes("当日车费（JPY）"));
+  assert.ok(form.includes("每日行程与車費") && form.includes("行程簡概") && form.includes("当日車費（JPY）"));
   assert.match(form, /getOrderDateKeys\(form\)\.map/);
   assert.match(source, /financeByDate: getReservationFinance\(order\)/);
   assert.match(source, /financeByDate: shiftFinanceDates\(form\.financeByDate, dateOffset\)/);
@@ -2212,11 +2212,11 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   const defaults = source.match(/const emptyOrderFinance: OrderFinance = \{[\s\S]*?\n\};/)[0];
   const amounts = source.slice(source.indexOf("function getOrderFinanceAmount("), source.indexOf("function getDriverOvertimeFee("));
   const helpers = source.slice(source.indexOf("function getOrderDateKeys("), source.indexOf("function getOrderFinanceForOrder("));
-  const legend = source.indexOf(">每日行程与车费</legend>");
+  const legend = source.indexOf(">每日行程与車費</legend>");
   const first = source.lastIndexOf("<fieldset", legend), last = source.indexOf("</fieldset>", legend) + "</fieldset>".length;
   const sourceField = source.indexOf("{/* 来源 */}");
   const statusField = source.indexOf("{/* 予約状態 */}", sourceField);
-  const vehicleField = source.indexOf("{/* 车両 */}", statusField);
+  const vehicleField = source.indexOf("{/* 車両 */}", statusField);
   const plateField = source.indexOf("<OrderVehiclePlateSelect", vehicleField);
   const driverField = source.indexOf("{/* 運転士 */}", plateField);
   const startDate = source.indexOf("{/* 开始日期 */}");
@@ -2227,10 +2227,10 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   assert.ok(customerField < startDate && startDate < endDate && endDate < offDate &&
     offDate < sourceField && sourceField < statusField && statusField < vehicleField &&
     vehicleField < plateField && plateField < driverField && driverField < first &&
-    last < departureTime && departureTime < source.indexOf("{/* 上车地点 */}", departureTime));
+    last < departureTime && departureTime < source.indexOf("{/* 上車地点 */}", departureTime));
   assert.equal((source.match(/htmlFor="order-off-date"/g) || []).length, 1);
-  assert.ok(last < source.indexOf("{/* 上车地点 */}", last));
-  assert.doesNotMatch(source, /每日司机费用快捷输入/);
+  assert.ok(last < source.indexOf("{/* 上車地点 */}", last));
+  assert.doesNotMatch(source, /每日司机費用快捷输入/);
   const markup = source.slice(first, last);
   const context = {
     ...payment, ...load("lib\\order-drivers.ts"), require: nodeRequire, exports: {},
@@ -2255,10 +2255,10 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   assert.equal(driver(0).props.value, "External A");
   assert.equal(driver(1).props.value, "External A");
   assert.equal(driver(2), undefined, "off day has no driver selector");
-  assert.equal(input("2026-10-28 司机费用类型"), undefined);
+  assert.equal(input("2026-10-28 司机費用类型"), undefined);
   assert.equal(input("2026-10-26 司机工资").props.disabled, true);
-  input("2026-10-26 司机费用类型").props.onChange({ target: { value: "company_advance" } });
-  input("2026-10-26 外注司机费用").props.onChange({ target: { value: "15000" } });
+  input("2026-10-26 司机費用类型").props.onChange({ target: { value: "company_advance" } });
+  input("2026-10-26 外注司机費用").props.onChange({ target: { value: "15000" } });
   assert.equal(context.form.orderPrice, 30000, "legacy first-day fare survives choosing a payment type");
   const external = context.form.financeByDate["2026-10-26"];
   assert.equal(external.driver, "");
@@ -2267,21 +2267,21 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   assert.equal(external.companyAdvancePaymentNote, "外注司机：External A");
   assert.equal(payment.isDriverWageEntry(external), false);
   assert.equal(input("2026-10-26 司机工资").props.disabled, true);
-  assert.equal(input("2026-10-26 外注司机费用").props.disabled, false);
-  input("2026-10-27 司机费用类型").props.onChange({ target: { value: "wage" } });
+  assert.equal(input("2026-10-26 外注司机費用").props.disabled, false);
+  input("2026-10-27 司机費用类型").props.onChange({ target: { value: "wage" } });
   input("2026-10-27 司机工资").props.onChange({ target: { value: "8000" } });
   assert.equal(context.form.financeByDate["2026-10-27"].driverWage, 8000);
   assert.equal(context.form.financeByDate["2026-10-27"].driver, "External A");
   assert.equal(payment.isDriverWageEntry(context.form.financeByDate["2026-10-27"]), true);
   assert.equal(external.companyAdvanceCompanyReport, 0);
   assert.equal(external.externalDriverFee, 15000);
-  input("2026-10-26 外注司机备注").props.onChange({ target: { value: "外注司机：External A\n停车费已含" } });
+  input("2026-10-26 外注司机备注").props.onChange({ target: { value: "外注司机：External A\n停車費已含" } });
   context.form = context.updateReservationDriver(context.form, "External B");
-  assert.equal(context.form.financeByDate["2026-10-26"].companyAdvancePaymentNote, "外注司机：External A\n停车费已含");
+  assert.equal(context.form.financeByDate["2026-10-26"].companyAdvancePaymentNote, "外注司机：External A\n停車費已含");
   assert.equal(context.form.financeByDate["2026-10-27"].driver, "External B");
   context.form = context.updateReservationDriver(context.form, "External B");
   assert.equal((context.form.financeByDate["2026-10-26"].companyAdvancePaymentNote.match(/External A/g) || []).length, 1);
-  input("2026-10-26 司机费用类型").props.onChange({ target: { value: "wage" } });
+  input("2026-10-26 司机費用类型").props.onChange({ target: { value: "wage" } });
   assert.equal(context.form.financeByDate["2026-10-26"].externalDriverFee, 0);
   assert.equal(context.form.financeByDate["2026-10-26"].driver, "");
   driver(1).props.onChange("Daily C");
@@ -2292,7 +2292,7 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   driver(1).props.onChange("");
   assert.equal(driver(1).props.value, "", "clearing a daily wage driver stays unassigned");
   driver(1).props.onChange("Daily C");
-  input("2026-10-27 司机费用类型").props.onChange({ target: { value: "company_advance" } });
+  input("2026-10-27 司机費用类型").props.onChange({ target: { value: "company_advance" } });
   assert.equal(context.form.financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注司机：Daily C");
   driver(1).props.onChange("Daily D");
   assert.equal(driver(1).props.value, "");
@@ -2564,7 +2564,7 @@ test("reservation table centers fields and shows order and request status in the
   const table = source.slice(start, source.indexOf("</table>", start));
   const headers = [...table.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1]);
   assert.deepEqual(headers, [
-    "用车日期", "配車時間", "手配状態", "予約情報", "訂単状态",
+    "用車日期", "配車時間", "手配状態", "予約情報", "訂単状态",
     "車両", "運転士", "来源", "請求書状态", "操作",
   ]);
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
@@ -2658,7 +2658,7 @@ test("overtime editor has five fields and recalculates both read-only totals on 
   assert.match(source, /<fieldset disabled=\{finance.driverPaymentType === "company_advance"\} className="min-w-0 rounded border p-3 md:col-span-2 md:row-start-3/);
   assert.match(source, /lg:grid-cols-4" : "lg:grid-cols-3"/);
   assert.deepEqual(plain(labels().map((label) => label.props.children.props.children[0])), [
-    "超时时间", "超时费用（旅报）", "超时请求（旅报）", "超时费用（工资）", "超时工资",
+    "超时时间", "超时費用（旅报）", "超时请求（旅报）", "超时費用（工资）", "超时工资",
   ]);
   assert.match(grid().props.className, /grid-cols-2/);
   assert.match(labels()[0].props.className, /col-span-2 mx-auto/);

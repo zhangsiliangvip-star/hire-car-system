@@ -73,7 +73,7 @@ export default function LoginForm({
             </div>
             <div className="relative z-10 mt-12 hidden border-t border-white/15 pt-6 lg:block">
               <p className="text-xs tracking-widest text-slate-400">東京 · 大阪 · 北海道</p>
-              <p className="mt-3 text-sm leading-7 text-slate-300">预约排车、财务核算与业务协作，<br />在一个清晰的工作台中完成。</p>
+              <p className="mt-3 text-sm leading-7 text-slate-300">预约排車、财务核算与业务协作，<br />在一个清晰的工作台中完成。</p>
             </div>
           </section>
           <form onSubmit={signIn} aria-label="账号登录" aria-busy={isSubmitting}

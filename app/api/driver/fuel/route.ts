@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = fuelSubmissionSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "请检查日期、关联訂単、燃油费和油票。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "请检查日期、关联訂単、燃油費和油票。" }, { status: 400 });
     const { date, assignmentId, expectedVersion, requestId, amount, receipts } = parsed.data;
     const { data, error } = await identity.supabase.rpc("submit_driver_daily_fuel", {
       target_date: date, expected_version: expectedVersion, target_request: requestId, amount, receipts,
@@ -25,12 +25,12 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver daily fuel rejected.", { code: error.code });
-      return jsonResponse({ error: "燃油费申报未确认：请核对当天行程、油票及申报状态，刷新后重试。" },
+      return jsonResponse({ error: "燃油費申报未确认：请核对当天行程、油票及申报状态，刷新后重试。" },
         { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : error.code === "22023" ? 422 : 503 });
     }
     return jsonResponse({ claim: fuelClaimSchema.parse(data) });
   } catch (error) {
     console.error("Driver daily fuel failed.", error);
-    return jsonResponse({ error: "燃油费申报失败，请刷新核对。" }, { status: 500 });
+    return jsonResponse({ error: "燃油費申报失败，请刷新核对。" }, { status: 500 });
   }
 }

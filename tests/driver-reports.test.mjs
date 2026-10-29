@@ -583,7 +583,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.ok(html.includes("累计休息"));
     assert.ok(html.includes("当日公里数"));
     assert.doesNotMatch(html, /出库至归库总时长|行驶公里数/);
-    assert.doesNotMatch(html, /开始休息|结束休息|休息记录|停车或等候不会自动计为休息/);
+    assert.doesNotMatch(html, /开始休息|结束休息|休息记录|停車或等候不会自动计为休息/);
     assert.doesNotMatch(html, /休息自动按各经由地到着至出发的时长累计/);
     assert.doesNotMatch(html, /归库打卡/);
     assert.equal(html.includes("42.5 km"), closed);
