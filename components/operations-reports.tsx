@@ -23,7 +23,7 @@ async function submitCommand(command: Command, signal: AbortSignal) {
   if (result.action !== command.action || (result.action === "edit" ? result.report.id : result.deletedId) !== id)
     throw new Error("操作返回不一致，请刷新核对。");
   if (result.action === "edit" && command.action === "edit" && result.report.version <= command.report.version)
-    throw new Error("日报保存版本未获确认，请刷新核对。");
+    throw new Error("日報保存版本未获确认，请刷新核对。");
   return result;
 }
 
@@ -50,7 +50,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
   }, []);
   function markDirty() { unsaved.current = true; setDirty(true); }
   function close() {
-    if (!lock.current && (!dirty || window.confirm("放弃尚未保存的日报修改？"))) onClose();
+    if (!lock.current && (!dirty || window.confirm("放弃尚未保存的日報修改？"))) onClose();
   }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,7 +97,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
       if (controller.current?.signal.aborted) return;
       console.error("Operations report edit failed.", cause instanceof Error ? cause.name : "UnknownError");
       setError(cause instanceof Error && cause.name !== "ZodError" ? cause.message :
-        "请检查日期时间、点呼先后、公里数、每个经由地的配对字段和修改原因。");
+        "请检查日期時間、点呼先后、公里数、每个经由地的配对字段和修改原因。");
     } finally { lock.current = false; setBusy(false); }
   }
   const input = (name: string, label: string, value: string | number | null | undefined,
@@ -109,9 +109,9 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
   return <dialog ref={dialog} aria-labelledby="operation-editor-title"
     className="m-auto max-h-[92dvh] w-[min(1100px,96vw)] overflow-y-auto rounded-lg p-4 shadow-xl backdrop:bg-black/40"
     onCancel={event => { event.preventDefault(); close(); }}>
-    <h2 id="operation-editor-title" className="mb-2 text-lg font-bold">编辑运行日报 · {row.driverName}</h2>
-    <p className="mb-3 text-sm text-gray-600">全部日期时间为日本时间。修改不改变司机归属；出库日期须与日报日期一致。归库后经由地须填写完整。
-      旧日报点呼日期会预填，请核对后保存。切换到其他应用／标签页会清除未保存的编辑。</p>
+    <h2 id="operation-editor-title" className="mb-2 text-lg font-bold">编辑运行日報 · {row.driverName}</h2>
+    <p className="mb-3 text-sm text-gray-600">全部日期時間为日本時間。修改不改变司机归属；出库日期须与日報日期一致。归库后经由地须填写完整。
+      旧日報点呼日期会预填，请核对后保存。切换到其他应用／标签页会清除未保存的编辑。</p>
     <form onSubmit={save} onInput={markDirty} className="space-y-4" onChange={event => {
       if (event.target instanceof HTMLInputElement && event.target.name === "serviceDate") {
         const link = event.currentTarget.elements.namedItem("assignmentId");
@@ -119,7 +119,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
       }
     }}>
       {r.orderOptions && <label className="block text-sm">关联当天訂単
-        <select name="assignmentId" aria-label="日报关联訂単" className={`${fieldClass} ml-2 max-w-full`} disabled={busy}
+        <select name="assignmentId" aria-label="日報关联訂単" className={`${fieldClass} ml-2 max-w-full`} disabled={busy}
           defaultValue={r.header?.assignmentId ?? ""} onChange={event => {
             const option = r.orderOptions?.find(item => item.assignmentId === event.target.value);
             const form = event.currentTarget.form;
@@ -141,7 +141,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
         <span className="mt-1 block text-amber-800">{r.header?.assignmentId
           ? "关联車牌跟随訂単最新選択；在此修改并保存，也会同步该日訂単及其他页面。"
           : "尚未确认訂単关联，原車牌保持不变；選択并保存后开启同步。"}</span>
-        <span className="mt-1 block text-gray-600">修改日报日期会清除关联；先保存日期，再重新選択该日訂単。</span>
+        <span className="mt-1 block text-gray-600">修改日報日期会清除关联；先保存日期，再重新選択该日訂単。</span>
       </label>}
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <legend className="mb-2 font-semibold">基本信息与点呼</legend>
@@ -155,7 +155,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
         <legend className="mb-2 font-semibold">出库</legend>
         {input("departureAddress", "出库地点", r.departureAddress, "text", true)}
         {input("departureKm", "出库公里表", r.departureKm, "number", true)}
-        {input("departedAt", "出发日期时间", toJapanInput(r.departedAt), "datetime-local", true)}
+        {input("departedAt", "出発日期時間", toJapanInput(r.departedAt), "datetime-local", true)}
       </fieldset>
       <fieldset disabled={busy} className="space-y-3"><legend className="mb-2 font-semibold">全部经由地</legend>
         {stops.map((stop, i) => <div key={stop.id} className="rounded border p-3">
@@ -167,8 +167,8 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
             {input(`${stop.id}.address`, `经由地 ${i + 1} 地点`, stop.address)}
             {input(`${stop.id}.arrivedAt`, `经由地 ${i + 1} 到着`, toJapanInput(stop.arrivedAt), "datetime-local")}
             {input(`${stop.id}.arrivedKm`, `经由地 ${i + 1} 到着公里表`, stop.arrivedKm, "number")}
-            {input(`${stop.id}.departedAt`, `经由地 ${i + 1} 出发`, toJapanInput(stop.departedAt), "datetime-local")}
-            {input(`${stop.id}.departedKm`, `经由地 ${i + 1} 出发公里表`, stop.departedKm, "number")}
+            {input(`${stop.id}.departedAt`, `经由地 ${i + 1} 出発`, toJapanInput(stop.departedAt), "datetime-local")}
+            {input(`${stop.id}.departedKm`, `经由地 ${i + 1} 出発公里表`, stop.departedKm, "number")}
             {input(`${stop.id}.plannedKm`, `经由地 ${i + 1} 计划公里表`, stop.plannedKm, "number")}
           </div>
         </div>)}
@@ -177,12 +177,12 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
             arrivedKm: null, departedKm: null, plannedKm: null }]); markDirty();
         }}>＋ 经由地</button>
       </fieldset>
-      <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-3"><legend className="mb-2 font-semibold">归库（未归库时三项全空）</legend>
+      <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-3"><legend className="mb-2 font-semibold">归库（未归库時三项全空）</legend>
         {input("returnAddress", "归库地点", r.returnAddress)}
         {input("returnKm", "归库公里表", r.returnKm, "number")}
-        {input("returnedAt", "到着日期时间", toJapanInput(r.returnedAt), "datetime-local")}
+        {input("returnedAt", "到着日期時間", toJapanInput(r.returnedAt), "datetime-local")}
       </fieldset>
-      <fieldset disabled={busy} className="space-y-2"><legend className="mb-2 font-semibold">休息记录（不从工作总时长中扣除）</legend>
+      <fieldset disabled={busy} className="space-y-2"><legend className="mb-2 font-semibold">休息记录（不从工作总時长中扣除）</legend>
         {rests.map((rest, i) => <div key={rest.key} className="grid items-end gap-3 sm:grid-cols-3">
           {input(`${rest.key}.startedAt`, `休息 ${i + 1} 开始`, toJapanInput(rest.startedAt), "datetime-local", true)}
           {input(`${rest.key}.endedAt`, `休息 ${i + 1} 结束`, toJapanInput(rest.endedAt), "datetime-local")}
@@ -225,17 +225,17 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
       try {
         const query = new URLSearchParams({ month }); if (region) query.set("region", region);
         const response = await fetch(`/api/operations-reports?${query}`, { cache: "no-store", signal: current.signal });
-        if (!response.ok) throw new Error("无法读取运行日报，请刷新重试。");
+        if (!response.ok) throw new Error("无法读取运行日報，请刷新重试。");
         const result = operationDataSchema.parse(await response.json());
         if (!active || current.signal.aborted || document.visibilityState !== "visible") return;
         if (result.rows.some(row => !row.report.serviceDate.startsWith(`${month}-`) || (region && row.regionId !== region)) ||
-          new Set(result.rows.map(row => row.report.id)).size !== result.rows.length) throw new Error("日报日期或地域不一致，请刷新。");
+          new Set(result.rows.map(row => row.report.id)).size !== result.rows.length) throw new Error("日報日期或地域不一致，请刷新。");
         setData(result); setError("");
         if (result.enabled) timer = setTimeout(() => void load(), 10000);
       } catch (cause) {
         if (!active || current.signal.aborted) return;
         console.error("Operations report refresh failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setData(null); setError(cause instanceof Error ? cause.message : "运行日报读取失败。");
+        setData(null); setError(cause instanceof Error ? cause.message : "运行日報读取失败。");
         timer = setTimeout(() => void load(), 10000);
       }
     }
@@ -246,7 +246,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
     function visibility() {
       clear();
       if (active && document.visibilityState === "visible") {
-        setNotice("正在重新读取日报；未保存修改已清除，刚提交的操作请核对结果。");
+        setNotice("正在重新读取日報；未保存修改已清除，刚提交的操作请核对结果。");
         void load();
       }
     }
@@ -270,14 +270,14 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
   const vehicles = [...new Set([...(vehicle ? [vehicle] : []), ...rows.filter(row => !company || row.company === company).flatMap(row =>
     row.report.header?.vehicleNumber ? [row.report.header.vehicleNumber] : [])])].sort();
   async function remove(row: OperationRow) {
-    if (lock.current || !window.confirm(`永久删除 ${operationDateLabel(row.report.serviceDate)} · ${row.driverName} 的日报？\n司机端的日报、所有经由地和修改历史将全部清除，不留删除日志，无法恢复。`)) return;
+    if (lock.current || !window.confirm(`永久删除 ${operationDateLabel(row.report.serviceDate)} · ${row.driverName} 的日報？\n司机端的日報、所有经由地和修改历史将全部清除，不留删除日志，无法恢复。`)) return;
     lock.current = true; setBusy(true); setNotice(""); setError("");
     const current = new AbortController(); write.current = current;
     try {
       await submitCommand({ action: "delete", reportId: row.report.id, expectedVersion: row.report.version }, current.signal);
       if (current.signal.aborted) return;
       setData(old => old ? { ...old, rows: old.rows.filter(item => item.report.id !== row.report.id) } : old);
-      setNotice("日报及其历史已永久删除。"); setRevision(v => v + 1);
+      setNotice("日報及其历史已永久删除。"); setRevision(v => v + 1);
     } catch (cause) {
       if (!current.signal.aborted) {
         console.error("Operations report deletion failed.", cause instanceof Error ? cause.name : "UnknownError");
@@ -314,18 +314,18 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
         disabled={busy || Boolean(editing)} onChange={e => setDate(e.target.value)} /></label>
       <button className={buttonClass} disabled={busy || Boolean(editing)} onClick={() => { setData(null); setRevision(v => v + 1); }}>刷新</button>
       <button className={buttonClass} disabled={busy || Boolean(editing) || !filtered.length}
-        onClick={() => void output(filtered, `${month.slice(5)}月 运行日报`)}>月批量打印（{filtered.length}份）</button>
+        onClick={() => void output(filtered, `${month.slice(5)}月 运行日報`)}>月批量打印（{filtered.length}份）</button>
     </div>
-    <p className="text-xs text-gray-600">日本时间 · 每10秒同步。工时＝退勤点呼－出勤点呼；日期或时间缺失时不计算。
-      月批量打印遵循当前会社、車両番号和日期筛选，每份日报一页；清空日期可打印整月。导出PDF时在打印窗口選択“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
+    <p className="text-xs text-gray-600">日本時間 · 每10秒同步。工時＝退勤点呼－出勤点呼；日期或時間缺失時不计算。
+      月批量打印遵循当前会社、車両番号和日期筛选，每份日報一页；清空日期可打印整月。导出PDF時在打印窗口選択“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
     {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-    {!data && !error && <p role="status">正在读取司机日报…</p>}
+    {!data && !error && <p role="status">正在读取司机日報…</p>}
     {data && !data.enabled && <p role="status">运行管理尚未在此环境启用，目前仅在隔离测试版开放。</p>}
-    {data?.enabled && <><p className="text-sm text-gray-600">共 {filtered.length} 份日报（含出库中）</p>
+    {data?.enabled && <><p className="text-sm text-gray-600">共 {filtered.length} 份日報（含出库中）</p>
       <div className="overflow-x-auto rounded border bg-white"><table className="w-full min-w-[1700px] border-collapse text-sm">
-        <thead className="bg-gray-50"><tr>{["日期", "車両番号", "運転手", "出勤点呼时间", "出库地点", "出发时间",
-          "接客地点", "下客地点", "归库地点", "到着时间", "退勤点呼时间", "工作总时长", "操作"].map(label =>
+        <thead className="bg-gray-50"><tr>{["日期", "車両番号", "運転手", "出勤点呼時間", "出库地点", "出発時間",
+          "接客地点", "下客地点", "归库地点", "到着時間", "退勤点呼時間", "工作总時长", "操作"].map(label =>
           <th key={label} className="whitespace-nowrap border-b p-2 text-center">{label}</th>)}</tr></thead>
         <tbody>{filtered.map(row => {
           const r = row.report; const stops = r.stops.filter(stop => stop.address.trim()); const hours = dutyDuration(r);
@@ -340,12 +340,12 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
             <td className="border-b p-2 text-center"><div className="flex justify-center gap-2 whitespace-nowrap">
               <button className={buttonClass} disabled={busy} onClick={() => setEditing(row)}>编辑</button>
               <button className={`${buttonClass} text-red-700`} disabled={busy} onClick={() => void remove(row)}>删除</button>
-              <button className={buttonClass} disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 运行日报`)}>导出PDF</button>
+              <button className={buttonClass} disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 运行日報`)}>导出PDF</button>
             </div></td></tr>;
-        })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有司机日报。</td></tr>}</tbody>
+        })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有司机日報。</td></tr>}</tbody>
       </table></div></>}
     {editing && <OperationReportEditor key={editing.report.id} row={editing} onClose={() => setEditing(null)}
-      onSaved={() => { setEditing(null); setNotice("日报已保存，修改记录已保留。"); setData(null); setRevision(v => v + 1); }} />}
+      onSaved={() => { setEditing(null); setNotice("日報已保存，修改记录已保留。"); setData(null); setRevision(v => v + 1); }} />}
   </div>;
 }
 

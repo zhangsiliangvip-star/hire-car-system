@@ -57,7 +57,7 @@ function inspectionForm(operationsManager: string | null) {
     </div></div>`;
 }
 export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
-  if (!rows.length) throw new Error("没有可打印的日报。");
+  if (!rows.length) throw new Error("没有可打印的日報。");
   const time = (value: string | null) => escape(operationTimeLabel(value));
   const km = (value: number | null | undefined) => value === null || value === undefined ? "—" : value.toFixed(1);
   const pages = [...rows].sort((a, b) => a.report.serviceDate.localeCompare(b.report.serviceDate) ||
@@ -74,11 +74,11 @@ export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
     return `<section class="sheet"><article class="content">
       <table class="report-header"><colgroup>${Array(8).fill('<col style="width:12.5%">').join("")}</colgroup><tbody>
       <tr><th colspan="8" class="report-title">乗　務　日　報</th></tr>
-      <tr><td colspan="2">${escape(operationDateLabel(r.serviceDate))} · 日本时间</td><th>運転士</th><td colspan="3">${escape(h?.driverName || row.driverName)}</td>
+      <tr><td colspan="2">${escape(operationDateLabel(r.serviceDate))} · 日本時間</td><th>運転士</th><td colspan="3">${escape(h?.driverName || row.driverName)}</td>
         <td colspan="2">${r.returnedAt ? "已归库" : "出库中（未完成）"}</td></tr>
       <tr><th>所属</th><td colspan="3">${escape(row.company || "未匹配")}</td><th>車両番号</th><td colspan="3">${escape(h?.vehicleNumber || "未填写")}</td></tr>
       <tr><th>乗車人数</th><td>${h?.passengerCount ?? "未填写"}</td><th colspan="2">出勤時間（始業点呼）</th><td colspan="4">${duty(h?.dutyStartTime)}</td></tr>
-      <tr><th colspan="2">工作总时长</th><td colspan="2">${hours === null ? "点呼日期／时间未完整，无法计算" : durationLabel(hours)}</td>
+      <tr><th colspan="2">工作总時长</th><td colspan="2">${hours === null ? "点呼日期／時間未完整，无法计算" : durationLabel(hours)}</td>
         <th colspan="2">退勤時間（終業点呼）</th><td colspan="2">${duty(h?.dutyEndTime)}</td></tr>
       </tbody></table>
       <table class="journey"><colgroup><col style="width:6%"><col style="width:34%"><col style="width:24%"><col style="width:5%"><col style="width:17%"><col style="width:14%"></colgroup>
@@ -89,11 +89,11 @@ export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
       </table>
       <table class="totals"><tbody><tr><th>メーター数<br>運行開始前</th><td>${km(r.departureKm)} km</td>
         <th>メーター数<br>運行終了後</th><td>${km(r.returnKm)} km</td><th>差引全走行距離</th><td>${km(totals.distance)} km</td></tr>
-        <tr><th>累计休息</th><td colspan="5">${durationLabel(totals.restMs)}（经由地到着至出发）</td></tr></tbody></table>
+        <tr><th>累计休息</th><td colspan="5">${durationLabel(totals.restMs)}（经由地到着至出発）</td></tr></tbody></table>
       ${r.rests.length ? `<table class="rest-records"><thead><tr><th colspan="2">休息记录（另存的休息打卡）</th></tr><tr><th>开始</th><th>结束</th></tr></thead><tbody>${r.rests.map(rest =>
         `<tr><td>${time(rest.startedAt)}</td><td>${time(rest.endedAt)}</td></tr>`).join("")}</tbody></table>` : ""}
       ${inspectionForm(row.operationsManager)}
-      <footer>工时＝退勤点呼－出勤点呼；不扣除休息。公里表为累计读数。運行管理者取車両所属会社资料；其他点检、确认及给油栏未采集，留空手填。○为原表印刷符号，不代表已通过。日报版本 ${r.version}。</footer>
+      <footer>工時＝退勤点呼－出勤点呼；不扣除休息。公里表为累计读数。運行管理者取車両所属会社資料；其他点检、确认及给油栏未采集，留空手填。○为原表印刷符号，不代表已通过。日報版本 ${r.version}。</footer>
       </article></section>`;
   }).join("");
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escape(title)}</title>
@@ -131,7 +131,7 @@ export async function printOperationsReports(rows: OperationRow[], title: string
     await doc.fonts.ready;
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
     const pages = doc.querySelectorAll<HTMLElement>(".sheet");
-    if (pages.length !== rows.length) throw new Error("打印日报数量不一致。");
+    if (pages.length !== rows.length) throw new Error("打印日報数量不一致。");
     for (const sheet of pages) {
       const content = sheet.querySelector<HTMLElement>(".content");
       if (!content) throw new Error("打印版式加载失败。");

@@ -27,7 +27,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
     [row.requestAmount, row.bankRequestAmount, row.cashRequestAmount, row.unassignedRequestAmount, row.incomeTotal, row.expenseTotal].map((value) =>
       `<td class="number">${yen(value)}</td>`).join("") +
     `<td class="number ${row.net < 0 ? "loss" : "profit"}">${yen(row.net)}</td>`;
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>收支平衡月度报表</title><style>
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>收支平衡月度報表</title><style>
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; color: #172033; }
@@ -52,7 +52,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   .result { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; border: 2px solid #263b53; padding: 14px; font-size: 19px; font-weight: bold; }
   .notes { margin-top: 14px; line-height: 1.8; }
   </style></head><body><div class="sheet"><article class="content">
-  <header><h1>收支平衡月度报表</h1><div class="meta">
+  <header><h1>收支平衡月度報表</h1><div class="meta">
   <span>服务月份：${escapeHtml(data.month)}</span><span>分区：${escapeHtml(data.region)}</span>
   <span>所属会社：${escapeHtml(data.company)}</span><span>单位：JPY</span></div></header>
   <div class="summary"><div>请求总和<strong>${yen(requestAmount)}</strong>
@@ -79,17 +79,17 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
     : '<tr><td colspan="3">暂无支出项目</td></tr>'}</tbody>
   <tfoot><tr><td colspan="2">手动支出合计</td><td class="number">${yen(expenseTotal)}</td></tr></tfoot></table>
   <div class="result ${resultClass}"><span>${resultLabel}</span><span>${yen(net)}</span></div>
-  <p class="notes">当月利润／亏损＝请求总金额＋手动其他收入总和－手动支出总和。不自动扣除車両費用、司机工资、立替或其他运营支出。<br>
-  整单请求金额＝訂単价格＋全日期ETC旅报＋司机立替旅报＋会社立替旅报＋超时请求（旅报），全部归首个服务日所在月份（排除休运日），跨月不分摊。<br>
-  请求按訂単所属会社归集，手动收入和支出按项目所属会社及录入月份归集；其他统计和工资算法不变。<br>
+  <p class="notes">当月利润／亏损＝请求总金额＋手动其他收入总和－手动支出总和。不自动扣除車両費用、司机工資、立替或其他运营支出。<br>
+  整单请求金额＝訂単价格＋全日期ETC旅報＋司机立替旅報＋会社立替旅報＋超時请求（旅報），全部归首个服务日所在月份（排除休运日），跨月不分摊。<br>
+  请求按訂単所属会社归集，手动收入和支出按项目所属会社及录入月份归集；其他统计和工資算法不变。<br>
   请求按訂単入金方式细分为口座入金、现金入金及未设置入金方式，不以入金日期判断实收；三项之和等于请求总和，不重复计入利润。<br>
   本表沿用页面所选月份、分区与所属会社范围。收入和支出金额采用当前页面输入值，空白按0计算，导出不会自动保存。<br>
-  内部财务资料，请妥善保管。</p>
+  内部财务資料，请妥善保管。</p>
   </article></div></body></html>`;
 }
 
 export async function printBalance(data: BalancePrintData) {
-  await printA4Html(buildBalancePrintHtml(data), "收支平衡月度报表打印");
+  await printA4Html(buildBalancePrintHtml(data), "收支平衡月度報表打印");
 }
 
 export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
@@ -124,7 +124,7 @@ export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
   ${methods.map((method) => {
     const entries = payments.filter((row) => row.method === method);
     return `<section><h2>${method || "未设置出金方式"}明细</h2><table>
-    <thead><tr><th>日期</th><th>訂単名称</th><th>所属会社</th><th>外注司机出金状态</th><th>外注司机备注</th><th class="number">金额（JPY）</th></tr></thead>
+    <thead><tr><th>日期</th><th>訂単名称</th><th>所属会社</th><th>外注司机出金状態</th><th>外注司机备注</th><th class="number">金额（JPY）</th></tr></thead>
     <tbody>${entries.length ? entries.map((row) =>
       `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer)}</td><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.status || "未選択")}</td><td style="white-space:pre-wrap">${escapeHtml(row.note || "")}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
       : '<tr><td colspan="6">暂无出金记录</td></tr>'}</tbody>

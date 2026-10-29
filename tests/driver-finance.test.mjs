@@ -257,10 +257,10 @@ function renderFinance({ status = null, withEffects = false, fetch: fetchMock, v
 }
 test("mobile finance renders both categories, all-order daily totals and complete monthly wages", () => {
   const { html } = renderFinance();
-  for (const text of ["社报", "旅报", "¥1,500", "¥2,000", "最多5张", 'multiple=""', "刷新财务"])
+  for (const text of ["社報", "旅報", "¥1,500", "¥2,000", "最多5张", 'multiple=""', "刷新财务"])
     assert.ok(html.includes(text), text);
   const wages = renderFinance({ view: "wages" }).html;
-  for (const text of ["¥14,500", "Synthetic adjustment", "本月工资"]) assert.ok(wages.includes(text), text);
+  for (const text of ["¥14,500", "Synthetic adjustment", "本月工資"]) assert.ok(wages.includes(text), text);
   if (process.env.DRIVER_FINANCE_LAYOUT_FILE) {
     const css = ["app/driver/driver.css", "app/driver/finance/finance.css"].map(path =>
       readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), "utf8")).join("\n");
@@ -279,7 +279,7 @@ test("historical claims show their source, submit with the history flag and excl
   const html = h.render();
   assert.match(html, /历史訂単/);
   assert.equal(h.buttons.find(button => button.children === "保存燃油費并提交").disabled, true);
-  h.buttons.find(button => button.children === "保存社报立替并提交")
+  h.buttons.find(button => button.children === "保存社報立替并提交")
     .onClick({ currentTarget: { value: "company" } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls[0].historical, true);
@@ -287,23 +287,23 @@ test("historical claims show their source, submit with the history flag and excl
 test("top buttons switch exclusive views while preserving the claim draft", () => {
   const h = renderFinance();
   assert.ok(h.html.includes("司机立替汇总"));
-  assert.equal(h.html.includes("<span>应发金额</span>"), false);
-  h.buttons.find(button => button.children === "月工资").onClick();
+  assert.equal(h.html.includes("<span>应発金额</span>"), false);
+  h.buttons.find(button => button.children === "月工資").onClick();
   const wages = h.render();
-  assert.ok(wages.includes("应发金额"));
+  assert.ok(wages.includes("应発金额"));
   assert.equal(wages.includes("司机立替汇总"), false);
   assert.equal(wages.includes("提交后台确认"), false);
-  assert.match(wages, /aria-pressed="true">月工资/);
-  h.buttons.find(button => button.children === "立替申报").onClick();
+  assert.match(wages, /aria-pressed="true">月工資/);
+  h.buttons.find(button => button.children === "立替申報").onClick();
   const claims = h.render();
   assert.ok(claims.includes('value="Parking"'));
   assert.ok(claims.includes('value="1.5"'));
-  assert.match(claims, /aria-pressed="true">立替申报/);
+  assert.match(claims, /aria-pressed="true">立替申報/);
   assert.equal(h.states[3], id);
 });
 test("date then order then categories precede the final all-order driver advance summary", () => {
   const h = renderFinance();
-  const markers = ["用車日期", "選択当天訂単", "<h2>社报立替</h2>", "<h2>旅报立替</h2>", "司机立替汇总"];
+  const markers = ["用車日期", "選択当天訂単", "<h2>社報立替</h2>", "<h2>旅報立替</h2>", "司机立替汇总"];
   let position = -1;
   for (const marker of markers) {
     const next = h.html.indexOf(marker, position + 1);
@@ -313,9 +313,9 @@ test("date then order then categories precede the final all-order driver advance
   assert.ok(h.html.includes("¥3,500"));
   h.states[3] = "";
   const blank = h.render();
-  assert.equal(blank.includes("<h2>社报立替</h2>"), false);
-  assert.equal(blank.includes("<h2>旅报立替</h2>"), false);
-  assert.equal(blank.includes("保存社报立替并提交"), false);
+  assert.equal(blank.includes("<h2>社報立替</h2>"), false);
+  assert.equal(blank.includes("<h2>旅報立替</h2>"), false);
+  assert.equal(blank.includes("保存社報立替并提交"), false);
 });
 test("today shortcut crosses months safely and resets date-dependent drafts", () => {
   const h = renderFinance();
@@ -350,7 +350,7 @@ test("fuel remains daily when changing orders and does not enter advance/payable
   // Appended fuel draft state: amount, receipts, and explicitly chosen order.
   h.states[13] = "6000"; h.states[14] = []; h.states[15] = id;
   const html = h.render();
-  assert.ok(html.indexOf("当日燃油費") > html.indexOf("超时申报"));
+  assert.ok(html.indexOf("当日燃油費") > html.indexOf("超時申報"));
   assert.ok(html.indexOf("司机立替汇总") > html.indexOf("当日燃油費"));
   assert.ok(html.includes("¥3,500")); // company 1500 + trip 2000, excludes fuel 6000
   h.buttons.find(button => button.children === "保存燃油費并提交").onClick();
@@ -361,8 +361,8 @@ test("fuel remains daily when changing orders and does not enter advance/payable
   h.render();
   assert.equal(h.states[15], id);
   assert.equal(h.buttons.some(button => button.children === "保存燃油費并提交"), false);
-  h.buttons.find(button => button.children === "月工资").onClick();
-  assert.match(h.render(), /<span>应发金额<\/span><strong>¥14,500<\/strong>/);
+  h.buttons.find(button => button.children === "月工資").onClick();
+  assert.match(h.render(), /<span>应発金额<\/span><strong>¥14,500<\/strong>/);
 });
 test("expense detail and amount share a compact left-to-right row", () => {
   const { html } = renderFinance();
@@ -370,14 +370,14 @@ test("expense detail and amount share a compact left-to-right row", () => {
 });
 test("advance categories render as separate simultaneous cards with their own entry controls", () => {
   const h = renderFinance();
-  for (const label of ["社报立替", "旅报立替"]) {
+  for (const label of ["社報立替", "旅報立替"]) {
     const card = h.html.split(`aria-label="${label}"`)[1].split("</section>")[0];
     assert.ok(card.includes(`<h2>${label}</h2>`));
     assert.ok(card.includes(`＋添加${label}明细`));
     assert.ok(card.includes(`保存${label}并提交`));
   }
-  assert.equal(h.buttons.some(button => ["社报立替", "旅报立替"].includes(button.children)), false);
-  h.buttons.find(button => Array.isArray(button.children) && button.children.join("") === "＋添加旅报立替明细").onClick();
+  assert.equal(h.buttons.some(button => ["社報立替", "旅報立替"].includes(button.children)), false);
+  h.buttons.find(button => Array.isArray(button.children) && button.children.join("") === "＋添加旅報立替明细").onClick();
   assert.equal(h.states[4][1].type, "trip");
   h.render();
   assert.equal(h.inputs.filter(input => input.type === "file").length, 3);
@@ -385,11 +385,11 @@ test("advance categories render as separate simultaneous cards with their own en
 });
 test("monthly wages separate bonus and overtime and include booked advances exactly once in payable totals", () => {
   const { html } = renderFinance({ view: "wages" });
-  assert.match(html, /<span>奖励工资<\/span><strong>¥500<\/strong>/);
-  assert.match(html, /<span>超时工资<\/span><strong>¥3,000<\/strong>/);
+  assert.match(html, /<span>奖励工資<\/span><strong>¥500<\/strong>/);
+  assert.match(html, /<span>超時工資<\/span><strong>¥3,000<\/strong>/);
   assert.match(html, /<span>后台已记司机立替<\/span><strong>¥1,500<\/strong>/);
   assert.match(html, /<span>2026-10-27<\/span><strong>¥15,000<\/strong>/);
-  assert.match(html, /<span>应发金额<\/span><strong>¥14,500<\/strong><\/div><\/section><\/main>$/);
+  assert.match(html, /<span>应発金额<\/span><strong>¥14,500<\/strong><\/div><\/section><\/main>$/);
 });
 test("each advance category saves its own payload without locking or losing the other draft", async () => {
   const calls = [];
@@ -400,7 +400,7 @@ test("each advance category saves its own payload without locking or losing the 
   const tripExpense = { ...expense, id: id.replace(/1$/, "3"), type: "trip", detail: "Trip draft", amount: 800 };
   h.states[4] = [expense, tripExpense];
   h.render();
-  h.buttons.find(button => button.children === "保存社报立替并提交").onClick({ currentTarget: { value: "company" } });
+  h.buttons.find(button => button.children === "保存社報立替并提交").onClick({ currentTarget: { value: "company" } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.length, 1);
   assert.equal(calls[0].category, "company");
@@ -412,19 +412,19 @@ test("each advance category saves its own payload without locking or losing the 
   h.render();
   const tripHtml = h.render();
   assert.ok(tripHtml.includes('value="Trip draft"'));
-  const companyCard = tripHtml.split('aria-label="社报立替"')[1].split("</section>")[0];
-  const tripCard = tripHtml.split('aria-label="旅报立替"')[1].split("</section>")[0];
+  const companyCard = tripHtml.split('aria-label="社報立替"')[1].split("</section>")[0];
+  const tripCard = tripHtml.split('aria-label="旅報立替"')[1].split("</section>")[0];
   assert.ok(companyCard.includes('<fieldset disabled=""'));
   assert.equal(tripCard.includes('<fieldset disabled=""'), false);
-  assert.equal(h.buttons.some(button => button.children === "保存社报立替并提交"), false);
-  h.buttons.find(button => button.children === "保存旅报立替并提交").onClick({ currentTarget: { value: "trip" } });
+  assert.equal(h.buttons.some(button => button.children === "保存社報立替并提交"), false);
+  h.buttons.find(button => button.children === "保存旅報立替并提交").onClick({ currentTarget: { value: "trip" } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls[1].category, "trip");
   assert.equal(calls[1].expectedVersion, 0);
   assert.deepEqual(calls[1].expenses, [tripExpense]);
   assert.equal(h.states[2].trips[0].claims.length, 2);
   h.render();
-  h.buttons.find(button => button.children === "保存超时并提交").onClick();
+  h.buttons.find(button => button.children === "保存超時并提交").onClick();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls[2].category, "overtime");
   assert.equal(calls[2].expenses.length, 0);
@@ -466,7 +466,7 @@ test("pending and approved claims cannot be edited or submitted; rejected claims
   for (const status of ["pending", "approved", "rejected"]) {
     const { html } = renderFinance({ status });
     assert.equal(html.includes('<fieldset disabled=""'), status !== "rejected");
-    assert.equal(html.includes("保存社报立替并提交"), status === "rejected");
+    assert.equal(html.includes("保存社報立替并提交"), status === "rejected");
   }
 });
 test("wheel scrolling monetary and overtime inputs blurs without changing values", () => {
@@ -519,7 +519,7 @@ test("late finance submit cannot repopulate private state after page hides", asy
   const h = renderFinance({ withEffects: true, fetch: async (_url, init) => init?.method === "POST"
     ? pendingResponse : Response.json(data) });
   const cleanup = h.effects[0]();
-  const submit = h.buttons.find(button => button.children === "保存社报立替并提交");
+  const submit = h.buttons.find(button => button.children === "保存社報立替并提交");
   assert.ok(submit);
   const work = submit.onClick({ currentTarget: { value: "company" } });
   // The actual handler returns void from the button; let the async request reach its await.

@@ -123,7 +123,7 @@ test("staff edits and permanent deletion use versioned strict commands with requ
 });
 test("dated duty hours preserve >24h and year rollover without subtracting rests or guessing legacy dates", () => {
   assert.equal(reportLib.dutyDuration(report), 26.5 * 3600000);
-  assert.equal(reportLib.durationLabel(reportLib.dutyDuration(report)), "26小时30分");
+  assert.equal(reportLib.durationLabel(reportLib.dutyDuration(report)), "26小時30分");
   assert.equal(reportLib.dutyDuration({ ...report, header: { ...report.header, dutyStartDate: null } }), null);
   assert.equal(reportLib.dutyDuration({ ...report, header: { ...report.header, dutyEndTime: null } }), null);
   assert.equal(reportLib.dutyDuration({ ...report, header: { ...report.header, dutyEndDate: "2026-10-24" } }), null);
@@ -174,12 +174,12 @@ test("operation list includes required columns, first/last stops, open reports a
   let tree = h.render();
   const html = renderToStaticMarkup(tree);
   writeLayout("list", html);
-  for (const label of ["会社", "車両番号", "日期", "出勤点呼时间", "出库地点", "出发时间", "接客地点", "下客地点",
-    "归库地点", "到着时间", "退勤点呼时间", "工作总时长", "编辑", "删除", "导出PDF", "月批量打印", "26小时30分"])
+  for (const label of ["会社", "車両番号", "日期", "出勤点呼時間", "出库地点", "出発時間", "接客地点", "下客地点",
+    "归库地点", "到着時間", "退勤点呼時間", "工作总時长", "编辑", "删除", "导出PDF", "月批量打印", "26小時30分"])
     assert.ok(html.includes(label), label);
   assert.ok(html.includes("第一经由地")); assert.ok(html.includes("最后经由地"));
   assert.doesNotMatch(html, /第一个经由地|最后一个经由地/);
-  assert.doesNotMatch(html, />状态<|>已归库<|>出库中</);
+  assert.doesNotMatch(html, />状態<|>已归库<|>出库中</);
   const headings = elements(tree).filter(e => e.type === "th");
   assert.equal(headings.length, 13);
   for (const cell of elements(tree).filter(e => e.type === "th" || e.type === "td"))
@@ -202,7 +202,7 @@ test("operation list includes required columns, first/last stops, open reports a
   h.states[0] = { enabled: true, rows: [{ ...row, report: { ...report, returnedAt: null, returnAddress: null, returnKm: null } }] };
   tree = h.render();
   assert.match(renderToStaticMarkup(tree), /出库中/);
-  assert.doesNotMatch(renderToStaticMarkup(tree), />状态<|>已归库<|>出库中</);
+  assert.doesNotMatch(renderToStaticMarkup(tree), />状態<|>已归库<|>出库中</);
   assert.ok(renderToStaticMarkup(tree).includes("第一经由地"));
   const source = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(source, /id: "orders", label: "予約管理"[^]*?id: "operations", label: "运行管理"/);
@@ -319,7 +319,7 @@ test("PDF and monthly print contain one complete escaped sheet per report in ser
   for (const value of ["08:00", "09:00", "10:00", "11:00", "18:00", "10:30"])
     assert.ok(html.includes(value), value);
   assert.doesNotMatch(html, /\d{2}\/\d{2} \d{2}:\d{2}/);
-  assert.match(html, /26小时30分/); assert.match(html, /休息记录/);
+  assert.match(html, /26小時30分/); assert.match(html, /休息记录/);
   assert.match(html, /80\.0 km/); assert.match(html, /&lt;img/); assert.doesNotMatch(html, /<img src=x/);
   assert.match(html, /break-after:page/);
   assert.throws(() => printing.buildOperationsPrintHtml([], "empty"), /没有可打印/);

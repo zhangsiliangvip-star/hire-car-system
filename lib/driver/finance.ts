@@ -3,7 +3,7 @@ import { fuelClaimSchema } from "./fuel";
 
 export const financeCategorySchema = z.enum(["company", "trip", "overtime"]);
 export type FinanceCategory = z.infer<typeof financeCategorySchema>;
-export const financeCategoryLabels = { company: "社报立替", trip: "旅报立替", overtime: "超时申报" };
+export const financeCategoryLabels = { company: "社報立替", trip: "旅報立替", overtime: "超時申報" };
 export const receiptPath = z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/(?:(?:company|trip)\/)?[0-9a-f-]{36}\.(jpg|png|webp)$/);
 export const expenseSchema = z.object({
   id: z.uuid(), type: z.enum(["company", "trip"]),

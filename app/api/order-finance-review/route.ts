@@ -16,11 +16,11 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.rpc("admin_order_finance_pending", { target_month: month.data });
     if (error) {
       console.error("Order finance pending read rejected.", { code: error.code });
-      return jsonResponse({ error: "无法读取訂単待审核申报，请刷新重试。" }, { status: 503 });
+      return jsonResponse({ error: "无法读取訂単待审核申報，请刷新重试。" }, { status: 503 });
     }
     return jsonResponse({ enabled: true, rows: z.array(orderReviewRowSchema).parse(data) });
   } catch (error) {
     console.error("Order finance pending read failed.", error instanceof Error ? error.name : "UnknownError");
-    return jsonResponse({ error: "无法读取訂単待审核申报，请重试。" }, { status: 503 });
+    return jsonResponse({ error: "无法读取訂単待审核申報，请重试。" }, { status: 503 });
   }
 }

@@ -56,10 +56,10 @@ test("shared top navigation has four routes, highlights each section and guards 
     const tree = Navigation({ active });
     const links = tree.props.children;
     assert.deepEqual(plain(links.map(link => link.props.href)), ["/driver", "/driver/report", "/driver/finance", "/driver/shifts"]);
-    assert.deepEqual(plain(links.map(link => link.props.children)), ["行程", "日报", "财务", "シフト"]);
+    assert.deepEqual(plain(links.map(link => link.props.children)), ["行程", "日報", "财务", "シフト"]);
     assert.equal(links.filter(link => link.props["aria-current"] === "page").length, 1);
     assert.equal(links.find(link => link.props["aria-current"] === "page").props.children,
-      { trips: "行程", report: "日报", finance: "财务", shifts: "シフト" }[active]);
+      { trips: "行程", report: "日報", finance: "财务", shifts: "シフト" }[active]);
   }
   for (const settings of [{ busy: true }, { canLeave: () => false }, { canLeave: () => true }]) {
     let prevented = false;

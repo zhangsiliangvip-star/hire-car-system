@@ -4,7 +4,7 @@ import Link from "next/link";
 
 const sections = [
   { id: "trips", label: "行程", href: "/driver" },
-  { id: "report", label: "日报", href: "/driver/report" },
+  { id: "report", label: "日報", href: "/driver/report" },
   { id: "finance", label: "财务", href: "/driver/finance" },
   { id: "shifts", label: "シフト", href: "/driver/shifts" },
 ] as const;

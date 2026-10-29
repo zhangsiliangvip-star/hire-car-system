@@ -15,12 +15,12 @@ export const tripEventSchema = acknowledgeSchema.extend({
 export const tripStates = ["assigned", "acknowledged", "en_route", "arrived", "in_service", "completed"] as const;
 export type TripState = typeof tripStates[number];
 export const tripStatusLabels: Record<TripState, string> = {
-  assigned: "待确认", acknowledged: "已确认", en_route: "已出发",
+  assigned: "待确认", acknowledged: "已确认", en_route: "已出発",
   arrived: "已到达", in_service: "服务中", completed: "已完成",
 };
 export const tripActions: Partial<Record<TripState, { state: Exclude<TripState, "assigned">; label: string }>> = {
   assigned: { state: "acknowledged", label: "确认接单" },
-  acknowledged: { state: "en_route", label: "出发前往上車地点" },
+  acknowledged: { state: "en_route", label: "出発前往上車地点" },
   en_route: { state: "arrived", label: "已到达上車地点" },
   arrived: { state: "in_service", label: "开始服务" },
   in_service: { state: "completed", label: "完成行程" },

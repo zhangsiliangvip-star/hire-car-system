@@ -25,12 +25,12 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver daily fuel rejected.", { code: error.code });
-      return jsonResponse({ error: "燃油費申报未确认：请核对当天行程、油票及申报状态，刷新后重试。" },
+      return jsonResponse({ error: "燃油費申報未确认：请核对当天行程、油票及申報状態，刷新后重试。" },
         { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : error.code === "22023" ? 422 : 503 });
     }
     return jsonResponse({ claim: fuelClaimSchema.parse(data) });
   } catch (error) {
     console.error("Driver daily fuel failed.", error);
-    return jsonResponse({ error: "燃油費申报失败，请刷新核对。" }, { status: 500 });
+    return jsonResponse({ error: "燃油費申報失败，请刷新核对。" }, { status: 500 });
   }
 }

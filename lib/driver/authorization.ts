@@ -11,7 +11,7 @@ export async function requireDriver() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError && authError.name !== "AuthSessionMissingError") {
     console.error("Driver session verification failed.", { code: authError.code });
-    return { response: jsonResponse({ error: "无法核验登录状态。" }, { status: 503 }) };
+    return { response: jsonResponse({ error: "无法核验登录状態。" }, { status: 503 }) };
   }
   if (!user) return { response: jsonResponse({ error: "请先登录。" }, { status: 401 }) };
   const { data, error } = await supabase.rpc("driver_identity");

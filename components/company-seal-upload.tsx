@@ -68,7 +68,7 @@ export function CompanySealUpload({ value, onChange, onBusyChange, standalone = 
         <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={upload}
           className="mt-2 block w-full text-sm" />
       </label>
-      <p className="mt-2 text-xs text-gray-500">建议使用透明背景 PNG；原图最大2MB，保存时缩小至512像素以内。{standalone ? "点击保存印章后用于請求書" : "保存会社后用于請求書"}，未上传时不显示印章。</p>
+      <p className="mt-2 text-xs text-gray-500">建议使用透明背景 PNG；原图最大2MB，保存時缩小至512像素以内。{standalone ? "点击保存印章后用于請求書" : "保存会社后用于請求書"}，未上传時不显示印章。</p>
       {busy && <p role="status" className="mt-2 text-sm text-blue-700">正在处理印章…</p>}
       {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
       {value && (

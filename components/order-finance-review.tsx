@@ -49,7 +49,7 @@ function PendingPhotos({ row }: { row: OrderReviewRow }) {
       } catch (cause) {
         if (!active) return;
         console.error("Pending receipt read failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setError("无法读取申报小票，请刷新小票后再核对。");
+        setError("无法读取申報小票，请刷新小票后再核对。");
       }
     }
     void load();
@@ -96,14 +96,14 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
     onClick={event => { if (event.target === event.currentTarget) dismiss(); }}>
     <div className="p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="min-w-0 break-words font-semibold">{name} · 司机申报审核</h2>
+        <h2 className="min-w-0 break-words font-semibold">{name} · 司机申報审核</h2>
         <button type="button" disabled={busy} onClick={dismiss} className="rounded border px-3 py-1">关闭</button>
       </div>
-      <p className="mb-3 text-xs text-gray-600">仅审核待审核申报。批准才入账；驳回相当于从訂単待审核区删除，不计入金额，但保留记录并允许司机重报。已批准申报不能在此撤销。</p>
+      <p className="mb-3 text-xs text-gray-600">仅审核待审核申報。批准才入账；驳回相当于从訂単待审核区删除，不计入金额，但保留记录并允许司机重報。已批准申報不能在此撤销。</p>
       {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mb-3 text-sm text-emerald-800">{notice}</p>}
       {blocked && <p role="alert" className="mb-3 text-sm text-red-700">訂単有未完成保存或保存错误，请先处理后再审核。</p>}
-      {!rows.length && <p className="py-4 text-sm text-gray-500">本訂単本月没有待审核申报。</p>}
+      {!rows.length && <p className="py-4 text-sm text-gray-500">本訂単本月没有待审核申報。</p>}
       <div className="space-y-3">{rows.map(row => {
         const key = orderReviewKey(row);
         const amount = row.kind === "fuel" ? row.claim.amount :
@@ -111,15 +111,15 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
         return <section key={key} className="rounded border p-3" aria-label={`${row.date} ${label(row)}待审核`}>
           <div className="flex flex-wrap justify-between gap-2 text-sm font-semibold">
             <h3 className="min-w-0 break-words">{row.date} · {row.driverName} · {label(row)}</h3>
-            <span>{amount === null && row.kind === "finance" ? `${row.claim.overtimeHours} 小时` : `${amount?.toLocaleString("ja-JP")} JPY`}</span>
+            <span>{amount === null && row.kind === "finance" ? `${row.claim.overtimeHours} 小時` : `${amount?.toLocaleString("ja-JP")} JPY`}</span>
           </div>
           {row.kind === "finance" && row.claim.expenses.map(item =>
             <div key={item.id} className="mt-1 flex justify-between gap-3 text-sm">
               <span className="min-w-0 break-words">{item.detail}</span><span className="shrink-0">{item.amount.toLocaleString("ja-JP")} JPY</span>
             </div>)}
           {row.kind === "finance" && row.claim.category === "overtime" &&
-            <p className="mt-1 text-xs text-gray-600">批准后替换该日超时小时数，按后台单价重算金额。</p>}
-          {row.kind === "fuel" && <p className="mt-1 text-xs text-gray-600">批准后追加到该訂単当天燃油費，不计司机立替或应发工资。</p>}
+            <p className="mt-1 text-xs text-gray-600">批准后替换该日超時小時数，按后台单价重算金额。</p>}
+          {row.kind === "fuel" && <p className="mt-1 text-xs text-gray-600">批准后追加到该訂単当天燃油費，不计司机立替或应発工資。</p>}
           {(row.kind === "fuel" || row.claim.category !== "overtime") && <PendingPhotos key={`${key}-${row.claim.version}`} row={row} />}
           <label className="mt-3 block text-xs">审核备注（驳回必填）
             <input aria-label={`${row.date} ${label(row)}审核备注`} maxLength={500} disabled={busy || blocked}
@@ -164,12 +164,12 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
           { cache: "no-store", signal: request.signal });
         const result = await response.json();
         if (!active || request.signal.aborted) return;
-        if (!response.ok) throw new Error(result.error || "无法读取訂単待审核申报。");
+        if (!response.ok) throw new Error(result.error || "无法读取訂単待审核申報。");
         setData(orderReviewDataSchema.parse(result));
       } catch (cause) {
         if (!active || request.signal.aborted) return;
         console.error("Order finance review load failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setError("无法读取待审核申报，请点“刷新待审核”重试。");
+        setError("无法读取待审核申報，请点“刷新待审核”重试。");
       }
     }
     function clear() {
@@ -189,9 +189,9 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
   }, [month, enabled, revision]);
   async function review(row: OrderReviewRow, decision: "approved" | "rejected", note: string) {
     if (lock.current || blocked) return;
-    if (decision === "rejected" && !note.trim()) { setError("驳回时请填写原因，便于司机重新申报。"); return; }
+    if (decision === "rejected" && !note.trim()) { setError("驳回時请填写原因，便于司机重新申報。"); return; }
     if (!window.confirm(decision === "approved" ? `确认${row.date}的${label(row)}入账？请核对是否已手工录入相同数据。` :
-      "确认驳回并从待审核区移除？不计入金额，保留审核记录，司机可重新申报。")) return;
+      "确认驳回并从待审核区移除？不计入金额，保留审核记录，司机可重新申報。")) return;
     const current = generation.current;
     const controller = new AbortController();
     writeController.current = controller;
@@ -211,7 +211,7 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
         (row.kind === "fuel" ? !("id" in saved) || saved.id !== row.claim.id :
           !("category" in saved) || saved.category !== row.claim.category)) throw new Error("审核返回结果不匹配，请刷新核对。");
       setData(previous => previous ? { ...previous, rows: previous.rows.filter(item => orderReviewKey(item) !== orderReviewKey(row)) } : previous);
-      setNotice(decision === "approved" ? "已批准入账。" : "已驳回并移出待审核区，未计入金额；记录保留，司机可重新申报。");
+      setNotice(decision === "approved" ? "已批准入账。" : "已驳回并移出待审核区，未计入金额；记录保留，司机可重新申報。");
       if (decision === "approved") {
         try { await onApproved(controller.signal); }
         catch (cause) {
@@ -234,7 +234,7 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
       <button type="button" disabled={busy} className="text-blue-700 disabled:opacity-50" onClick={() => {
         setData(null); setSelected(null); setError(""); setNotice(""); setRevision(value => value + 1);
       }}>刷新待审核</button>
-      {!data && !error && <span className="ml-3 text-gray-500" role="status">读取待审核申报中…</span>}
+      {!data && !error && <span className="ml-3 text-gray-500" role="status">读取待审核申報中…</span>}
       {error && <p role="alert" className="mt-1 text-red-700">{error}</p>}
       {notice && <p role="status" className="mt-1 text-emerald-800">{notice}</p>}
     </div>}
@@ -251,5 +251,5 @@ export function OrderFinanceReviewButton({ orderId, name }: { orderId: string; n
   const count = context.data.rows.filter(row => row.orderId === orderId).length;
   return <button type="button" disabled={context.busy || context.blocked || !count} aria-haspopup="dialog"
     className={`mt-1 block text-left text-xs ${count ? "font-semibold text-amber-700 hover:underline" : "text-gray-400"} disabled:cursor-default`}
-    onClick={() => context.open(orderId, name)}>{count ? `司机申报待审核 ${count} 项` : "无待审核申报"}</button>;
+    onClick={() => context.open(orderId, name)}>{count ? `司机申報待审核 ${count} 项` : "无待审核申報"}</button>;
 }

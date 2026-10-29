@@ -120,7 +120,7 @@ export function usePersistedCollection<T extends Identified>(
       })
       .catch((error: unknown) => {
         const message =
-          error instanceof Error ? error.message : `保存${collection}时发生未知错误。`;
+          error instanceof Error ? error.message : `保存${collection}時発生未知错误。`;
         console.error(`Failed to persist ${collection}.`, error);
         persistenceFailed.current = true;
         reportError(message);

@@ -190,10 +190,10 @@ export default function DriverFinance() {
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed.data) });
       const result = await response.json();
       if (current !== generation.current) return;
-      if (!response.ok) throw new Error(result.error || "燃油費申报未确认。");
+      if (!response.ok) throw new Error(result.error || "燃油費申報未确认。");
       const saved = fuelClaimSchema.parse(result.claim);
       setData(value => value ? { ...value, fuelClaims: [...value.fuelClaims.filter(item => item.date !== saved.date), saved] } : null);
-      pending.current = null; setNotice("燃油費已提交；后台确认后追加到关联訂単当天燃油費，不加入司机立替和应发金额。");
+      pending.current = null; setNotice("燃油費已提交；后台确认后追加到关联訂単当天燃油費，不加入司机立替和应発金额。");
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver fuel submission failed.", cause);
@@ -209,7 +209,7 @@ export default function DriverFinance() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = financeSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请填写每条費用明细及正整数金额；超时为0–999小时，最多两位小数。"); return; }
+    if (!parsed.success) { setError("请填写每条費用明细及正整数金额；超時为0–999小時，最多两位小数。"); return; }
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -239,12 +239,12 @@ export default function DriverFinance() {
   }), { base: 0, bonus: 0, overtime: 0, advances: 0 });
   return <main className="driver-main driver-finance">
     <DriverNavigation active="finance" busy={busy} canLeave={canLeave} />
-    <h1>财务工资</h1>
+    <h1>财务工資</h1>
     <div className="driver-tabs" aria-label="财务界面">
-      <button type="button" aria-pressed={view === "claims"} onClick={() => { setView("claims"); setReceipt(""); }}>立替申报</button>
-      <button type="button" aria-pressed={view === "wages"} onClick={() => { setView("wages"); setReceipt(""); }}>月工资</button>
+      <button type="button" aria-pressed={view === "claims"} onClick={() => { setView("claims"); setReceipt(""); }}>立替申報</button>
+      <button type="button" aria-pressed={view === "wages"} onClick={() => { setView("wages"); setReceipt(""); }}>月工資</button>
     </div>
-    <p className="driver-muted">本人有效行程可申报社报／旅报、超时和燃油費；历史訂単可补录社报／旅报及超时。后台审核后入账。切后台会清除未提交草稿，请先提交。</p>
+    <p className="driver-muted">本人有效行程可申報社報／旅報、超時和燃油費；历史訂単可补录社報／旅報及超時。后台审核后入账。切后台会清除未提交草稿，请先提交。</p>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy}
       onChange={event => { if (event.target.value && canLeave()) {
         setLoading(true); setData(null); setSelected(""); setExpenses([]); setHours(""); setError(""); setNotice(""); setReceipt("");
@@ -261,16 +261,16 @@ export default function DriverFinance() {
     {error && <p className="driver-error" role="alert">{error}</p>}
     {notice && <p className="driver-notice" role="status">{notice}</p>}
     {loading ? <p className="driver-empty">正在读取财务…</p> : data && <>
-      {view === "wages" ? <section className="driver-card"><h2>本月工资</h2>
-        <p className="driver-muted">只读，应发金额包含基本、奖励、超时工资、手动加减及后台已记司机立替。待审申报不计入，不代表已支付；尚未核算的数据可能继续调整。</p>
-        <div className="driver-row"><span>基本工资</span><strong>{yen(wages!.base)}</strong></div>
-        <div className="driver-row"><span>奖励工资</span><strong>{yen(wages!.bonus)}</strong></div>
-        <div className="driver-row"><span>超时工资</span><strong>{yen(wages!.overtime)}</strong></div>
+      {view === "wages" ? <section className="driver-card"><h2>本月工資</h2>
+        <p className="driver-muted">只读，应発金额包含基本、奖励、超時工資、手动加减及后台已记司机立替。待审申報不计入，不代表已支付；尚未核算的数据可能继续调整。</p>
+        <div className="driver-row"><span>基本工資</span><strong>{yen(wages!.base)}</strong></div>
+        <div className="driver-row"><span>奖励工資</span><strong>{yen(wages!.bonus)}</strong></div>
+        <div className="driver-row"><span>超時工資</span><strong>{yen(wages!.overtime)}</strong></div>
         {data.manualItems.map((item, index) => <div className="driver-row" key={`manual-${index}`}><span>{item.name}</span><strong>{yen(item.amount)}</strong></div>)}
         <div className="driver-row"><span>后台已记司机立替</span><strong>{yen(wages!.advances)}</strong></div>
-        <details><summary>按日工资及立替明细</summary>{data.wages.map((row, index) =>
+        <details><summary>按日工資及立替明细</summary>{data.wages.map((row, index) =>
           <div className="driver-row" key={`${row.date}-${index}`}><span>{row.date}</span><strong>{yen(row.base + row.bonus + row.overtime + row.advances)}</strong></div>)}</details>
-        <div className="driver-row"><span>应发金额</span><strong>{yen(wages!.base + wages!.bonus + wages!.overtime + wages!.advances +
+        <div className="driver-row"><span>应発金额</span><strong>{yen(wages!.base + wages!.bonus + wages!.overtime + wages!.advances +
           data.manualItems.reduce((sum, item) => sum + item.amount, 0))}</strong></div>
       </section> : <>
       <div className="finance-date-row"><label className="driver-field">用車日期<input type="date" value={date} min={`${month}-01`}
@@ -281,7 +281,7 @@ export default function DriverFinance() {
         <option value="">请選択当天訂単</option>{dayTrips.map(item =>
           <option key={item.assignmentId} value={item.assignmentId}>{item.historical ? "历史訂単 · " : ""}{item.pickup} → {item.destination}</option>)}
       </select></label>
-      {!dayTrips.length && <p className="driver-empty">当天暂无本人可申报的行程。</p>}
+      {!dayTrips.length && <p className="driver-empty">当天暂无本人可申報的行程。</p>}
       {trip && advanceSections.map(({ category, claim, readOnly }) =>
         <section className="driver-card" key={category} aria-label={financeCategoryLabels[category]}>
         <h2>{financeCategoryLabels[category]}{trip.historical ? " · 历史訂単" : ""}</h2>
@@ -291,7 +291,7 @@ export default function DriverFinance() {
             { id: createDriverRequestId(), type: category, detail: "", amount: 0, receipts: [] }])}
             disabled={expenses.filter(item => item.type === category).length >= 50 || busy || readOnly}>＋添加{financeCategoryLabels[category]}明细</button>
           {expenses.filter(item => item.type === category).map((item, index) => <div className="finance-expense" key={item.id}>
-            <h3>{index + 1}. {item.type === "company" ? "社报" : "旅报"}</h3>
+            <h3>{index + 1}. {item.type === "company" ? "社報" : "旅報"}</h3>
             <div className="finance-expense-row">
             <label className="driver-field">明细<input maxLength={200} value={item.detail} onChange={event => edit(item.id, { detail: event.target.value })} /></label>
             <label className="driver-field">金额（JPY）<input type="number" min="1" max="99999999999999" step="1" inputMode="numeric"
@@ -314,16 +314,16 @@ export default function DriverFinance() {
         {!readOnly && <button className="driver-button" disabled={busy} value={category} onClick={handleAdvanceSubmit}>{busy ? "正在处理…" : `保存${financeCategoryLabels[category]}并提交`}</button>}
       </section>)}
       {trip && <section className="driver-card">
-        <h2>超时申报{trip.historical ? " · 历史訂単" : ""}</h2>
+        <h2>超時申報{trip.historical ? " · 历史訂単" : ""}</h2>
         {overtimeClaim && <p className="driver-muted">{labels[overtimeClaim.status]} {overtimeClaim.reviewNote}</p>}
-          <label className="driver-field">超时小时数<input type="number" min="0" max="999" step="0.01" inputMode="decimal"
+          <label className="driver-field">超時小時数<input type="number" min="0" max="999" step="0.01" inputMode="decimal"
             disabled={busy || overtimeReadOnly}
             onWheel={event => event.currentTarget.blur()}
             placeholder="例：1.5" value={hours} onChange={event => setHours(event.target.value)} /></label>
-        {!overtimeReadOnly && <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超时并提交</button>}
+        {!overtimeReadOnly && <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超時并提交</button>}
       </section>}
       <section className="driver-card"><h2>当日燃油費</h2>
-        <p className="driver-muted">公司支付／油卡。每天统一申报一次，指定当天一张訂単；审核后追加到该訂単当天燃油費，不计司机立替及应发金额。请勿重复手工录入。</p>
+        <p className="driver-muted">公司支付／油卡。每天统一申報一次，指定当天一张訂単；审核后追加到该訂単当天燃油費，不计司机立替及应発金额。请勿重复手工录入。</p>
         {fuelClaim && <p className="driver-muted">{labels[fuelClaim.status]} {fuelClaim.reviewNote}</p>}
         <fieldset className="finance-fields" disabled={busy || fuelReadOnly || !fuelTrips.length}>
           <label className="driver-field">燃油費关联訂単<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
@@ -346,10 +346,10 @@ export default function DriverFinance() {
         {!fuelReadOnly && <button className="driver-button" disabled={busy || !fuelTrips.length} onClick={() => void submitFuel()}>保存燃油費并提交</button>}
       </section>
       <section className="driver-card"><h2>司机立替汇总</h2>
-        <div className="driver-row"><span>社报立替</span><strong>{yen(dayTotals.company)}</strong></div>
-        <div className="driver-row"><span>旅报立替</span><strong>{yen(dayTotals.trip)}</strong></div>
+        <div className="driver-row"><span>社報立替</span><strong>{yen(dayTotals.company)}</strong></div>
+        <div className="driver-row"><span>旅報立替</span><strong>{yen(dayTotals.trip)}</strong></div>
         <div className="driver-row"><span>司机立替合计</span><strong>{yen(dayTotals.company + dayTotals.trip)}</strong></div>
-        <p className="driver-muted">所选日期全部訂単，包含待审、已确认、退回及当前草稿，不代表已报销金额。</p>
+        <p className="driver-muted">所选日期全部訂単，包含待审、已确认、退回及当前草稿，不代表已報销金额。</p>
       </section>
       </>}
     </>}

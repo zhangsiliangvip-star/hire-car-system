@@ -67,7 +67,7 @@ test("calendar labels show all driver steps only on their exact service day", ()
   for (const status of schemas.activeExecutionStates) {
     const html = renderToStaticMarkup(React.createElement(Badge, { row: { ...result.rows[0], status }, date }));
     const label = status === "assigned" ? "未确认" : orders.tripStatusLabels[status];
-    assert.ok(html.includes(`司机状态：${label}`));
+    assert.ok(html.includes(`司机状態：${label}`));
     assert.ok(html.includes(`>${label}</span>`));
   }
   assert.equal(renderToStaticMarkup(React.createElement(Badge, { row: undefined, date })), "");
@@ -137,7 +137,7 @@ test("poll failures are explicit, clear stale labels and retry; disabled feature
   h.interval.fn();
   await h.respond({}, 503);
   assert.equal(h.states[0], null);
-  assert.match(h.states[1], /暂时不可用.*重试/);
+  assert.match(h.states[1], /暂時不可用.*重试/);
   assert.equal(h.interval.delay, 3000);
   h.interval.fn();
   await h.respond({ enabled: false, date, rows: [] });
@@ -149,7 +149,7 @@ test("inconsistent days and duplicate orders are rejected rather than shown on t
     const h = hook();
     await h.respond({ enabled: true, date, rows });
     assert.equal(h.states[0], null);
-    assert.match(h.states[1], /暂时不可用/);
+    assert.match(h.states[1], /暂時不可用/);
     h.cleanup();
   }
 });
@@ -201,6 +201,6 @@ test("yesterday's in-flight status cannot reappear after midnight", async () => 
   h.setDay("2026-10-28");
   await h.respond({ enabled: true, ...result });
   assert.equal(h.states[0], null);
-  assert.match(h.states[1], /暂时不可用/);
+  assert.match(h.states[1], /暂時不可用/);
   h.cleanup();
 });

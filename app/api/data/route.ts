@@ -1010,7 +1010,7 @@ export async function POST(request: Request) {
         parsed.data.collection === "balanceExpenseItems" ||
         parsed.data.collection === "driverWageItems")
     ) {
-      return jsonResponse({ error: "仅管理员可以管理車両统计、收支平衡及司机工资手动项目。" }, { status: 403 });
+      return jsonResponse({ error: "仅管理员可以管理車両统计、收支平衡及司机工資手动项目。" }, { status: 403 });
     }
     if (parsed.data.deleteIds.length > 0) {
       const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);

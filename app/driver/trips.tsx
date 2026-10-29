@@ -92,7 +92,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
     if (savingRef.current || refreshing) return;
     const state = backwards ? tripPreviousStates[trip.status] : tripActions[trip.status]?.state;
     if (!state) return;
-    if (backwards && !window.confirm(`将行程状态从“${tripStatusLabels[trip.status]}”退回“${tripStatusLabels[state]}”？已有记录会保留。`)) return;
+    if (backwards && !window.confirm(`将行程状態从“${tripStatusLabels[trip.status]}”退回“${tripStatusLabels[state]}”？已有记录会保留。`)) return;
     savingRef.current = true; setSaving(true); setError(""); setNotice("");
     try {
       if (pendingRequest.current?.assignmentId !== trip.assignmentId || pendingRequest.current.version !== trip.version || pendingRequest.current.state !== state) {
@@ -108,9 +108,9 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
         const failure: { error?: unknown } = await response.json();
         if ([401,403,404,409].includes(response.status)) { pendingRequest.current = null; refresh(); }
         throw new Error(typeof failure.error === "string" ? failure.error :
-          response.status === 409 ? "派单状态已变化，正在刷新，请核对后重试。" : `行程更新未获确认（${response.status}），请重试或联系调度。`);
+          response.status === 409 ? "派单状態已变化，正在刷新，请核对后重试。" : `行程更新未获确认（${response.status}），请重试或联系调度。`);
       }
-      pendingRequest.current = null; setNotice("操作已记录，正在刷新最新行程状态。"); refresh();
+      pendingRequest.current = null; setNotice("操作已记录，正在刷新最新行程状態。"); refresh();
     } catch (cause) {
       console.error("Driver trip action failed.", cause);
       setError(cause instanceof Error ? cause.message : "无法更新行程。");

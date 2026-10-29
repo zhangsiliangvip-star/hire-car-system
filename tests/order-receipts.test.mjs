@@ -109,7 +109,7 @@ test("gallery renders compact categorized thumbnails and opens a large native mo
   function render() { cursor = 0; effects.length = 0; return renderToStaticMarkup(React.createElement(Component, { orderId: id, date: "2026-10-27" })); }
   let html = render();
   assert.equal((html.match(/class="thumbnail"/g) ?? []).length, 3);
-  for (const label of ["社报立替", "旅报立替", "燃油費"]) assert.ok(html.includes(label));
+  for (const label of ["社報立替", "旅報立替", "燃油費"]) assert.ok(html.includes(label));
   assert.doesNotMatch(html, /待审核|已驳回|<dialog/);
   assert.equal((html.match(/type="button"/g) ?? []).length, 4);
   thumbnail.onClick();
@@ -155,7 +155,7 @@ test("receipt gallery is mounted for each exact order and service date including
   const note = source.indexOf("                                    外注司机备注");
   const gallery = source.indexOf("<OrderReceipts ");
   assert.ok(note > source.indexOf('{section.title === "立替費用" && ('));
-  assert.ok(gallery > note && gallery < source.indexOf('<legend className="px-1 text-sm font-semibold">司机工资'));
+  assert.ok(gallery > note && gallery < source.indexOf('<legend className="px-1 text-sm font-semibold">司机工資'));
   const textarea = source.slice(note, source.indexOf("/>", note));
   assert.match(textarea, /rows=\{2\}/);
   assert.match(textarea, /className="[^"]*\bh-12\b[^"]*"/);

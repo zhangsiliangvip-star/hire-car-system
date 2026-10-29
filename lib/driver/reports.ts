@@ -19,7 +19,7 @@ export const reportHeaderSchema = z.object({ serviceDate: z.iso.date(), ...heade
   if ((h.dutyStartDate && !h.dutyStartTime) || (h.dutyEndDate && !h.dutyEndTime) ||
     (h.dutyStartDate && h.dutyEndDate && h.dutyStartTime && h.dutyEndTime &&
       `${h.dutyEndDate}T${h.dutyEndTime}` < `${h.dutyStartDate}T${h.dutyStartTime}`)) {
-    ctx.addIssue({ code: "custom", message: "请检查点呼日期和时间先后。" });
+    ctx.addIssue({ code: "custom", message: "请检查点呼日期和時間先后。" });
   }
 });
 export const reportStopSchema = z.object({
@@ -42,11 +42,11 @@ export const reportSchema = z.object({
 export type DailyReport = z.infer<typeof reportSchema>;
 export const reportTimeErrors: Record<string, string> = {
   PVS01: "訂単关联与司机或服务日不一致，请重新選択关联訂単。",
-  PVS02: "请填写本地域已登记且唯一的車両番号；关联日报保存后会同步訂単。",
-  PDT01: "出勤点呼时间不能晚于出库时间，请检查日期和时间。",
-  PDT02: "退勤点呼时间不能早于出库时间，请检查日期和时间。",
-  PDT03: "退勤点呼时间不能早于归库时间，请检查日期和时间。",
-  PDT04: "退勤点呼时间不能早于出勤点呼时间。",
+  PVS02: "请填写本地域已登记且唯一的車両番号；关联日報保存后会同步訂単。",
+  PDT01: "出勤点呼時間不能晚于出库時間，请检查日期和時間。",
+  PDT02: "退勤点呼時間不能早于出库時間，请检查日期和時間。",
+  PDT03: "退勤点呼時間不能早于归库時間，请检查日期和時間。",
+  PDT04: "退勤点呼時間不能早于出勤点呼時間。",
 };
 
 export function reportTimeOrderError(report: Pick<DailyReport, "header" | "departedAt" | "returnedAt">): string | null {
@@ -131,7 +131,7 @@ export function reportOnDate(report: DailyReport, serviceDate: string): DailyRep
 export function stopTime(value: string, previous: string, original: string | null = null): string | null {
   if (!value) return null;
   if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) || !Number.isFinite(Date.parse(previous)))
-    throw new Error("请填写有效时间（HH:mm）。");
+    throw new Error("请填写有效時間（HH:mm）。");
   if (original && value === toJapanInput(original).slice(11, 16) && Date.parse(original) >= Date.parse(previous))
     return original;
   let time = Date.parse(fromJapanInput(`${toJapanInput(previous).slice(0, 10)}T${value}`)!);
@@ -141,7 +141,7 @@ export function stopTime(value: string, previous: string, original: string | nul
 
 export function departureFromForm(report: DailyReport, data: Pick<FormData, "get">) {
   const time = String(data.get("departedAt") ?? "");
-  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error("请填写有效出库时间（HH:mm）。");
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error("请填写有效出库時間（HH:mm）。");
   return { address: String(data.get("address") ?? ""), km: data.get("km") === "" ? NaN : Number(data.get("km")),
     departedAt: time === toJapanInput(report.departedAt).slice(11, 16) ? report.departedAt :
       fromJapanInput(`${toJapanInput(report.departedAt).slice(0, 10)}T${time}`)! };
@@ -152,10 +152,10 @@ export function returnFromForm(report: DailyReport, data: Pick<FormData, "get">,
   const km = String(data.get("km") ?? "");
   const time = String(data.get("returnedAt") ?? "");
   if (!time && !km && (!address || address === report.returnAddress)) {
-    if (report.returnedAt) throw new Error("已归库时间不能清空，请填写归库信息。");
+    if (report.returnedAt) throw new Error("已归库時間不能清空，请填写归库信息。");
     return undefined;
   }
-  if (!address || !km || !time) throw new Error("请同时填写归库地点、公里数和时间；尚未归库时可全部留空。");
+  if (!address || !km || !time) throw new Error("请同時填写归库地点、公里数和時間；尚未归库時可全部留空。");
   return { address, km: Number(km), returnedAt: stopTime(time, previous, report.returnedAt)! };
 }
 
@@ -184,7 +184,7 @@ export function reportTotals(report: DailyReport, now = Date.now()) {
 }
 export function durationLabel(ms: number) {
   const minutes = Math.floor(ms / 60000);
-  return `${Math.floor(minutes / 60)}小时${minutes % 60}分`;
+  return `${Math.floor(minutes / 60)}小時${minutes % 60}分`;
 }
 export function defaultDutyEndDate(date: string, start: string, end: string) {
   return start && end && end < start

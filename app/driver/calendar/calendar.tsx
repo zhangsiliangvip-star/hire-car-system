@@ -133,7 +133,7 @@ export default function DriverCalendar() {
               className={`driver-calendar-order ${statusClasses[segment.status] ?? ""}`}
               style={{ gridColumn: `${segment.start + 2} / ${segment.end + 2}`, gridRow: segment.lane + 1 }}>
               <strong>{segment.orderName || "訂単内容未填写"}</strong>
-              <span>{segment.time || "时间待定"}</span>
+              <span>{segment.time || "時間待定"}</span>
               {segment.summaries.some(Boolean) && <div className="driver-calendar-summaries"
                 style={{ gridTemplateColumns: `repeat(${segment.end - segment.start}, minmax(0, 1fr))` }}>
                 {segment.summaries.map((summary, index) => <span key={index}>{summary}</span>)}

@@ -41,20 +41,20 @@ export async function POST(request: Request) {
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     if (typeof body === "object" && body !== null && "fuelId" in body) {
       const fuel = fuelReviewSchema.safeParse(body);
-      if (!fuel.success) return jsonResponse({ error: "燃油費审核无效，退回时请填写原因。" }, { status: 400 });
+      if (!fuel.success) return jsonResponse({ error: "燃油費审核无效，退回時请填写原因。" }, { status: 400 });
       const { fuelId, expectedVersion, decision, note } = fuel.data;
       const { data, error } = await supabase.rpc("review_driver_daily_fuel", {
         target_fuel: fuelId, expected_version: expectedVersion, decision, note,
       });
       if (error) {
         console.error("Daily fuel review rejected.", { code: error.code });
-        return jsonResponse({ error: "燃油費审核未完成，訂単燃油費或申报状态可能已变化，请刷新核对或退回重提。" },
+        return jsonResponse({ error: "燃油費审核未完成，訂単燃油費或申報状態可能已变化，请刷新核对或退回重提。" },
           { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : 503 });
       }
       return jsonResponse({ fuelClaim: fuelClaimSchema.parse(data) });
     }
     const parsed = financeReviewSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "审核内容无效，退回时请填写原因。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "审核内容无效，退回時请填写原因。" }, { status: 400 });
     const { assignmentId, category, expectedVersion, decision, note } = parsed.data;
     const { data, error } = await supabase.rpc("review_driver_finance", {
       target_assignment: assignmentId, expected_version: expectedVersion, decision, note,
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver finance review rejected.", { code: error.code });
-      return jsonResponse({ error: "审核未完成：訂単、司机或财务已变化，或申报已处理。请刷新；财务冲突请退回后重新申报。" }, { status: 409 });
+      return jsonResponse({ error: "审核未完成：訂単、司机或财务已变化，或申報已处理。请刷新；财务冲突请退回后重新申報。" }, { status: 409 });
     }
     return jsonResponse({ claim: financeClaimSchema.parse(data) });
   } catch (error) {

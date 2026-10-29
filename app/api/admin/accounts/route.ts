@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     }
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonResponse({ error: "请填写有效的账号资料；设置密码时需为 8 至 128 个字符。" }, { status: 400 });
+      return jsonResponse({ error: "请填写有效的账号資料；设置密码時需为 8 至 128 个字符。" }, { status: 400 });
     }
 
     const admin = createAdminClient();
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
       }
       if (error?.message.includes("Database error saving new user")) {
         return jsonResponse(
-          { error: "认证服务保存新用户时发生数据库错误。请管理员检查 Supabase 的 Auth／Postgres 日志、用户资料触发器及数据库迁移。" },
+          { error: "认证服务保存新用户時発生数据库错误。请管理员检查 Supabase 的 Auth／Postgres 日志、用户資料触発器及数据库迁移。" },
           { status: 500 },
         );
       }
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
     if (profileError || !savedProfile) {
       console.error("Account created but profile setup failed.", { code: profileError?.code });
       return jsonResponse(
-        { error: "认证账号已创建，但用户资料配置失败。请勿重复新增；修复 profiles 权限或触发器后，在账号列表核对地域和角色。", userId: data.user.id },
+        { error: "认证账号已创建，但用户資料配置失败。请勿重复新增；修复 profiles 权限或触発器后，在账号列表核对地域和角色。", userId: data.user.id },
         { status: 500 },
       );
     }
@@ -195,7 +195,7 @@ export async function PUT(request: Request) {
       return jsonResponse(
         { error: targetError.code === "42501"
           ? "设置密码未执行：服务端没有 profiles 表的读取权限（42501）。请在 Supabase SQL Editor 应用 20261029000000_account_profile_service_permissions.sql 后重试。"
-          : "设置密码未执行：无法读取目标用户资料，请管理员检查数据库日志。" },
+          : "设置密码未执行：无法读取目标用户資料，请管理员检查数据库日志。" },
         { status: 500 },
       );
     }
@@ -216,7 +216,7 @@ export async function PUT(request: Request) {
     return jsonResponse({ ok: true });
   } catch (error) {
     console.error("Failed to set user password.", { name: error instanceof Error ? error.name : "UnknownError" });
-    return jsonResponse({ error: "设置密码失败，请检查账号资料权限及认证服务。" }, { status: 500 });
+    return jsonResponse({ error: "设置密码失败，请检查账号資料权限及认证服务。" }, { status: 500 });
   }
 }
 
@@ -236,7 +236,7 @@ export async function PATCH(request: Request) {
     }
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonResponse({ error: "提交的账号资料不完整。" }, { status: 400 });
+      return jsonResponse({ error: "提交的账号資料不完整。" }, { status: 400 });
     }
     if (parsed.data.userId === identity.profile.id && parsed.data.role !== "admin") {
       return jsonResponse({ error: "不能移除当前登录账号的管理员权限。" }, { status: 400 });
@@ -263,7 +263,7 @@ export async function PATCH(request: Request) {
     return jsonResponse({ ok: true });
   } catch (error) {
     console.error("Failed to update user profile.", error);
-    return jsonResponse({ error: "保存账号资料失败。" }, { status: 500 });
+    return jsonResponse({ error: "保存账号資料失败。" }, { status: 500 });
   }
 }
 

@@ -74,7 +74,7 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
     if (mode === "late-dirty") {
       const walk = node => !React.isValidElement(node) ? [] :
         [node, ...React.Children.toArray(node.props.children).flatMap(walk)];
-      walk(tree).find(node => node.props["aria-label"] === "日报基本信息").props.onInput();
+      walk(tree).find(node => node.props["aria-label"] === "日報基本信息").props.onInput();
     }
     resolve(Response.json({ ...data, reports: [{ ...data.reports[0],
       header: { ...data.reports[0].header, vehicleNumber: "NEW" } }] }));
@@ -82,7 +82,7 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
     assert.equal(states[0].reports[0].header.vehicleNumber, mode === "clean" ? "NEW" : "BASE");
     cleanup(); assert.equal(signal.aborted, true); assert.equal(cleared, true);
     const html = renderToStaticMarkup(tree);
-    assert.match(html, /日报关联訂単/);
+    assert.match(html, /日報关联訂単/);
     assert.match(html, /修改并保存也会更新訂単/);
   }
 });
@@ -267,7 +267,7 @@ test("manual return is optional until filled, rolls past midnight and remains ed
   const open = { ...fixture, returnedAt: null, returnAddress: null, returnKm: null };
   assert.equal(reports.returnFromForm(open, form({}), fixture.departedAt), undefined);
   for (const fields of [{ address: "Depot" }, { km: "120" }, { returnedAt: "00:20" }])
-    assert.throws(() => reports.returnFromForm(open, form(fields), fixture.departedAt), /同时填写/);
+    assert.throws(() => reports.returnFromForm(open, form(fields), fixture.departedAt), /同時填写/);
   const returned = reports.returnFromForm(open, form({ address: "Depot", km: "120", returnedAt: "00:20" }), fixture.departedAt);
   assert.equal(returned.returnedAt, "2026-10-27T15:20:00.000Z");
   assert.equal(reports.returnFromForm(fixture, form({ address: "Edited", km: "150", returnedAt: "02:30" }), fixture.departedAt).returnedAt, fixture.returnedAt);
@@ -286,7 +286,7 @@ test("departure editing keeps its original Japan date, preserves seconds and val
   const original = { ...fixture, departedAt: "2026-10-27T23:00:12.123456+09:00" };
   assert.equal(reports.departureFromForm(original, form({ ...fields, departedAt: "23:00" })).departedAt, original.departedAt);
   for (const departedAt of ["", "24:00", "bad"])
-    assert.throws(() => reports.departureFromForm(fixture, form({ ...fields, departedAt })), /有效出库时间/);
+    assert.throws(() => reports.departureFromForm(fixture, form({ ...fields, departedAt })), /有效出库時間/);
   const command = { reportId: id, expectedVersion: 1, requestId: id, action: "edit_stops", payload: { stops: [], departure: value } };
   assert.equal(reports.reportCommandSchema.safeParse(command).success, true);
   for (const departure of [{ ...value, km: -1 }, { ...value, driverId: id },
@@ -371,8 +371,8 @@ test("daily totals sum stop dwell times across midnight and ignore legacy manual
   assert.equal(reports.reportTotals({ ...r, stops: [] }).restMs, 0);
   assert.equal(reports.reportTotals({ ...r, stops: [r.stops[0], { ...r.stops[1], departedAt: "2026-10-28T01:30:00+09:00" }] }).restMs, 60 * 60000);
   assert.equal(totals.distance, 42.5);
-  assert.equal(reports.durationLabel(totals.elapsedMs), "3小时30分");
-  assert.equal(reports.durationLabel(27 * 3600000), "27小时0分");
+  assert.equal(reports.durationLabel(totals.elapsedMs), "3小時30分");
+  assert.equal(reports.durationLabel(27 * 3600000), "27小時0分");
   assert.equal(r.serviceDate, "2026-10-27");
 });
 test("ongoing shift and rest totals use current time and return only finalized distance", () => {
@@ -568,23 +568,23 @@ test("mobile report renders departure, stops, rest controls and completed totals
       "@/lib/supabase/browser": {}, "@/lib/driver/orders": {}, "@/lib/driver/reports": reports,
     }).default;
     const html = renderToStaticMarkup(React.createElement(Component));
-    assert.doesNotMatch(html, /<h1>|class="driver-notice"|日本时间 · 跨午夜归出库当天/);
-    for (const label of ["日期", "出勤点呼时间", "退勤点呼时间", "車両番号", "運転手", "客数"]) assert.ok(html.includes(`aria-label="${label}"`));
-    const headerMarkup = html.match(/<form[^>]*aria-label="日报基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
+    assert.doesNotMatch(html, /<h1>|class="driver-notice"|日本時間 · 跨午夜归出库当天/);
+    for (const label of ["日期", "出勤点呼時間", "退勤点呼時間", "車両番号", "運転手", "客数"]) assert.ok(html.includes(`aria-label="${label}"`));
+    const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
     assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-      ["日期", "客数", "車両番号", "運転手", "出勤点呼日期", "退勤点呼日期", "出勤点呼时间", "退勤点呼时间"]);
-    assert.ok(html.indexOf('aria-label="出勤点呼时间"') < html.indexOf('aria-label="退勤点呼时间"'));
-    assert.ok(html.indexOf('aria-label="運転手"') < html.indexOf('aria-label="出勤点呼时间"'));
-    assert.match(html, /<details[^>]*><summary>历史日报<\/summary>/);
-    assert.ok(html.indexOf('aria-label="日报基本信息"') < html.indexOf('<table'));
-    assert.ok(html.indexOf('<summary>历史日报') > html.indexOf('</table>'));
+      ["日期", "客数", "車両番号", "運転手", "出勤点呼日期", "退勤点呼日期", "出勤点呼時間", "退勤点呼時間"]);
+    assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('aria-label="退勤点呼時間"'));
+    assert.ok(html.indexOf('aria-label="運転手"') < html.indexOf('aria-label="出勤点呼時間"'));
+    assert.match(html, /<details[^>]*><summary>历史日報<\/summary>/);
+    assert.ok(html.indexOf('aria-label="日報基本信息"') < html.indexOf('<table'));
+    assert.ok(html.indexOf('<summary>历史日報') > html.indexOf('</table>'));
     assert.ok(html.includes('class="driver-main driver-report"'));
-    assert.ok(html.includes("拘束时间"));
+    assert.ok(html.includes("拘束時間"));
     assert.ok(html.includes("累计休息"));
     assert.ok(html.includes("当日公里数"));
-    assert.doesNotMatch(html, /出库至归库总时长|行驶公里数/);
+    assert.doesNotMatch(html, /出库至归库总時长|行驶公里数/);
     assert.doesNotMatch(html, /开始休息|结束休息|休息记录|停車或等候不会自动计为休息/);
-    assert.doesNotMatch(html, /休息自动按各经由地到着至出发的时长累计/);
+    assert.doesNotMatch(html, /休息自动按各经由地到着至出発的時长累计/);
     assert.doesNotMatch(html, /归库打卡/);
     assert.equal(html.includes("42.5 km"), closed);
     assert.ok(html.includes("不采集定位"));
@@ -607,29 +607,29 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.match(departureHtml, /data-departure/);
     assert.match(departureHtml, /aria-label="出库地点地址"/);
     assert.match(departureHtml, /aria-label="出库公里表"/);
-    assert.match(departureHtml, /aria-label="出库时间"/);
+    assert.match(departureHtml, /aria-label="出库時間"/);
     assert.match(departureHtml, /type="time"[^>]*value="23:00"/);
     for (const label of ["归库"]) {
       const locationHtml = html.match(new RegExp(`<tbody aria-label="${label}记录">([\\s\\S]*?)</tbody>`))[1];
       assert.equal((locationHtml.match(/<tr\b/g) ?? []).length, 1);
       assert.equal((locationHtml.match(/<td\b/g) ?? []).length, 4);
-      assert.match(locationHtml, /aria-label="归库时间" type="time"/);
+      assert.match(locationHtml, /aria-label="归库時間" type="time"/);
       assert.match(locationHtml, /data-return/);
-      assert.doesNotMatch(locationHtml, /scope="row">时间|>\d{4}-\d{2}-\d{2}/);
+      assert.doesNotMatch(locationHtml, /scope="row">時間|>\d{4}-\d{2}-\d{2}/);
     }
-    assert.match(html, /scope="col">地址<\/th><th scope="col">公里数<\/th><th scope="col">到着<\/th><th scope="col">出发/);
+    assert.match(html, /scope="col">地址<\/th><th scope="col">公里数<\/th><th scope="col">到着<\/th><th scope="col">出発/);
     assert.match(html, /class="driver-sheet-location"><th scope="row">经由1<\/th><td><form[^>]*>[\s\S]*?name="address"[\s\S]*?<\/form><\/td><td class="driver-stop-km">/);
     assert.match(html, /<input(?=[^>]*name="arrivedAt")(?=[^>]*type="time")(?=[^>]*step="60")[^>]*>/);
     assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*type="time")(?=[^>]*step="60")[^>]*>/);
     const stopHtml = html.match(/<tbody aria-label="经由地 1">([\s\S]*?)<\/tbody>/)[1];
     assert.equal((stopHtml.match(/type="number"/g) ?? []).length, 1);
     assert.match(stopHtml, /<input(?=[^>]*name="km")(?=[^>]*type="number")(?=[^>]*value="120")[^>]*>/);
-    assert.doesNotMatch(stopHtml, /name="arrivedKm"|name="departedKm"|到着 km|出发 km/);
+    assert.doesNotMatch(stopHtml, /name="arrivedKm"|name="departedKm"|到着 km|出発 km/);
     assert.ok(html.includes('value="00:00"'));
     assert.doesNotMatch(routeSection, /type="(?:date|datetime-local)"/);
     assert.doesNotMatch(html.replace(/<[^>]*>/g, ""), /(?:\s|T)\d{2}:\d{2}:\d{2}/);
-    assert.doesNotMatch(html, /时间打卡|本次记录：/);
-    assert.doesNotMatch(html, /一键到达打卡|一键出发打卡/);
+    assert.doesNotMatch(html, /時間打卡|本次记录：/);
+    assert.doesNotMatch(html, /一键到达打卡|一键出発打卡/);
     assert.ok(html.includes("保存修改"));
     assert.equal((html.match(/>保存修改<\/button>/g) ?? []).length, 1);
     assert.equal(html.includes('value="clock"'), false);
@@ -780,7 +780,7 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   assert.ok(html.includes(">出库打卡</button>"));
   assert.ok(html.includes("出库后，在表格内继续添加经由地。"));
   assert.doesNotMatch(html, /aria-label="出库记录"|新经由地地址/);
-  if (history) assert.ok(html.includes("新日报 · 待出库"));
+  if (history) assert.ok(html.includes("新日報 · 待出库"));
   if (!history && process.env.DRIVER_REPORT_DEFAULTS_LAYOUT_FILE) {
     const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8").replace('@import "tailwindcss";', "");
     const reportCss = readFileSync(new URL("../app/driver/report/report.module.css", import.meta.url), "utf8")
@@ -870,7 +870,7 @@ test("compact stop form uses shared save and preserves seconds and distinct odom
   let currentStop = stop;
   async function submit() {
       try { await save("edit_stop", reports.stopFromForm(currentStop, { get: name => fields[name] ?? "" }, fixture.departedAt)); }
-      catch { errors.push("日期时间无效"); }
+      catch { errors.push("日期時間无效"); }
   }
   await submit();
   assert.equal(calls[0].action, "edit_stop");
@@ -881,7 +881,7 @@ test("compact stop form uses shared save and preserves seconds and distinct odom
   fields.departedAt = "invalid";
   await submit();
   assert.equal(calls.length, 1);
-  assert.match(errors.at(-1), /日期时间无效/);
+  assert.match(errors.at(-1), /日期時間无效/);
   fields.departedAt = "01:02";
   await submit();
   assert.equal(calls[1].payload.departedAt, "2026-10-27T16:02:00.000Z");
@@ -889,7 +889,7 @@ test("compact stop form uses shared save and preserves seconds and distinct odom
   assert.equal(calls[1].payload.departedKm, 120);
   rows = stopComponent({ ...stopProps, stop: { ...stop, arrivedAt: null, arrivedKm: null }, save });
   const arrivalHtml = renderToStaticMarkup(rows);
-  assert.doesNotMatch(arrivalHtml, /时间打卡|本次记录：/);
+  assert.doesNotMatch(arrivalHtml, /時間打卡|本次记录：/);
   assert.equal((arrivalHtml.match(/<tr\b/g) ?? []).length, 1);
   rows = stopComponent({ ...stopProps, stop: { ...stop, departedAt: fixture.returnedAt, departedKm: 125 }, save });
   currentStop = { ...stop, departedAt: fixture.returnedAt, departedKm: 125 };

@@ -14,11 +14,11 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.rpc("staff_driver_execution_status");
     if (error) {
       console.error("Driver execution status rejected.", { code: error.code });
-      return jsonResponse({ error: "司机状态读取失败，请重试。" }, { status: 503 });
+      return jsonResponse({ error: "司机状態读取失败，请重试。" }, { status: 503 });
     }
     return jsonResponse(executionStatusDataSchema.parse({ enabled: true, ...executionStatusDataSchema.omit({ enabled: true }).parse(data) }));
   } catch (error) {
     console.error("Driver execution status failed.", error instanceof Error ? error.name : "UnknownError");
-    return jsonResponse({ error: "司机状态读取失败，请重试。" }, { status: 503 });
+    return jsonResponse({ error: "司机状態读取失败，请重试。" }, { status: 503 });
   }
 }

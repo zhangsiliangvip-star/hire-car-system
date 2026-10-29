@@ -19,12 +19,12 @@ export function ReportDutyFields({ header, serviceDate, disabled, inputClassName
       }} /></label>
     <label className="flex min-w-0 flex-col gap-1 text-sm">退勤点呼日期<input className={inputClassName} name="dutyEndDate" aria-label="退勤点呼日期" type="date" required={Boolean(end)}
       disabled={disabled} value={endDate} onChange={e => { setEndDate(e.target.value); setManualEnd(true); }} /></label>
-    <label className="flex min-w-0 flex-col gap-1 text-sm">出勤点呼时间<input className={inputClassName} name="dutyStartTime" aria-label="出勤点呼时间" type="time" step="60"
+    <label className="flex min-w-0 flex-col gap-1 text-sm">出勤点呼時間<input className={inputClassName} name="dutyStartTime" aria-label="出勤点呼時間" type="time" step="60"
       disabled={disabled} value={start} onChange={e => {
         setStart(e.target.value);
         if (!manualEnd && startDate) setEndDate(defaultDutyEndDate(startDate, e.target.value, end));
       }} /></label>
-    <label className="flex min-w-0 flex-col gap-1 text-sm">退勤点呼时间<input className={inputClassName} name="dutyEndTime" aria-label="退勤点呼时间" type="time" step="60"
+    <label className="flex min-w-0 flex-col gap-1 text-sm">退勤点呼時間<input className={inputClassName} name="dutyEndTime" aria-label="退勤点呼時間" type="time" step="60"
       disabled={disabled} value={end} onChange={e => {
         setEnd(e.target.value);
         if (!manualEnd && startDate) setEndDate(defaultDutyEndDate(startDate, start, e.target.value));

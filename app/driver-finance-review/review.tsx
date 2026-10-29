@@ -62,7 +62,7 @@ export default function Review() {
   async function review(row: Row, decision: "approved" | "rejected") {
     if (lock.current) return;
     const note = notes[`${row.claim.assignmentId}-${row.claim.category}`] || "";
-    if (decision === "rejected" && !note.trim()) { setError("退回时请填写原因。"); return; }
+    if (decision === "rejected" && !note.trim()) { setError("退回時请填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
       `确认${financeCategoryLabels[row.claim.category]}入账？仅处理此分类；请核对是否已手工录入相同費用。` : "确认退回给司机修改？")) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
@@ -85,9 +85,9 @@ export default function Review() {
   async function reviewFuel(row: z.infer<typeof fuelReviewRowSchema>, decision: "approved" | "rejected") {
     if (lock.current) return;
     const note = notes[row.claim.id] || "";
-    if (decision === "rejected" && !note.trim()) { setError("退回时请填写原因。"); return; }
+    if (decision === "rejected" && !note.trim()) { setError("退回時请填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      "确认将燃油費追加到指定訂単当天的燃油費？公司支付／油卡，不加到司机立替和应发金额。请核对是否已手工录入。" : "确认退回燃油費？")) return;
+      "确认将燃油費追加到指定訂単当天的燃油費？公司支付／油卡，不加到司机立替和应発金额。请核对是否已手工录入。" : "确认退回燃油費？")) return;
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -126,21 +126,21 @@ export default function Review() {
       setBusy(true); setRows([]); setError(""); setReceipt(""); setNotes({}); setRevision(value => value + 1);
       setFuelRows([]);
     }}>刷新</button>
-    <p className="driver-muted">立替金额作为新增費用追加；超时小时数替换当日原值，单价仍由后台设定。确认前请核对重复票据。司机月工资只读，包含后台手动加减项目。</p>
+    <p className="driver-muted">立替金额作为新增費用追加；超時小時数替换当日原值，单价仍由后台设定。确认前请核对重复票据。司机月工資只读，包含后台手动加减项目。</p>
     {error && <p role="alert" className="driver-error">{error}</p>}
     {notice && <p role="status" className="driver-notice">{notice}</p>}
     {busy && <p className="driver-muted">正在处理…</p>}
-    {!busy && !rows.length && !fuelRows.length && <p className="driver-empty">本月暂无申报。</p>}
+    {!busy && !rows.length && !fuelRows.length && <p className="driver-empty">本月暂无申報。</p>}
     {rows.map(row => {
       const totals = expenseTotals(row.claim.expenses);
       const key = `${row.claim.assignmentId}-${row.claim.category}`;
       return <section className="driver-card" key={key}>
         <h2>{row.date} · {row.driverName}{row.claim.historical ? " · 历史訂単" : ""}</h2><p>{row.pickup} → {row.destination}</p>
         <h3>{financeCategoryLabels[row.claim.category]}</h3>
-        <p>{row.claim.category === "overtime" ? `超时 ${row.claim.overtimeHours} 小时` :
+        <p>{row.claim.category === "overtime" ? `超時 ${row.claim.overtimeHours} 小時` :
           `¥${(totals.company + totals.trip).toLocaleString()}`} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已入账" : "已退回"}</p>
         {row.claim.expenses.map(item => <div key={item.id} className="finance-expense">
-          <p>{item.type === "company" ? "社报" : "旅报"} · {item.detail} · ¥{item.amount.toLocaleString()}</p>
+          <p>{item.type === "company" ? "社報" : "旅報"} · {item.detail} · ¥{item.amount.toLocaleString()}</p>
           {item.receipts.map((path, index) => <button key={path} className="driver-link" onClick={() => void viewReceipt(path)}>票据 {index + 1}　</button>)}
         </div>)}
         {row.claim.status === "pending" ? <>
@@ -156,7 +156,7 @@ export default function Review() {
       <h2>{row.claim.date} · {row.driverName} · 燃油費</h2>
       <p>关联訂単：{row.pickup} → {row.destination}</p>
       <p>¥{row.claim.amount.toLocaleString()} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已计入訂単燃油費" : "已退回"}</p>
-      <p className="driver-muted">每天一笔，全部关联指定訂単当日燃油費；不计司机立替及应发金额。</p>
+      <p className="driver-muted">每天一笔，全部关联指定訂単当日燃油費；不计司机立替及应発金额。</p>
       {row.claim.receipts.map((path, index) => <button className="driver-link" key={path}
         onClick={() => void viewReceipt(path, "driver-fuel-receipts")}>油票 {index + 1}　</button>)}
       {row.claim.status === "pending" ? <>

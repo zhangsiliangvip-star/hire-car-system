@@ -20,18 +20,18 @@ export async function GET(request: Request) {
     });
     if (error) {
       console.error("Operations report read rejected.", { code: error.code });
-      return jsonResponse({ error: "无法读取运行日报，请刷新重试。" }, { status: error.code === "42501" ? 403 : 503 });
+      return jsonResponse({ error: "无法读取运行日報，请刷新重试。" }, { status: error.code === "42501" ? 403 : 503 });
     }
     return jsonResponse(operationDataSchema.parse({ enabled: true, rows: data }));
   } catch (error) {
     console.error("Operations report read failed.", error instanceof Error ? error.name : "UnknownError");
-    return jsonResponse({ error: "运行日报读取失败。" }, { status: 503 });
+    return jsonResponse({ error: "运行日報读取失败。" }, { status: 503 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    if (!isDriverPwaEnabled()) return jsonResponse({ error: "运行日报尚未启用。" }, { status: 403 });
+    if (!isDriverPwaEnabled()) return jsonResponse({ error: "运行日報尚未启用。" }, { status: 403 });
     const { supabase, profile } = await getAuthenticatedProfile();
     if (!profile) return jsonResponse({ error: "需要后台账号。" }, { status: 403 });
     if (new URL(request.url).search) return jsonResponse({ error: "不支持查询参数。" }, { status: 400 });
@@ -53,10 +53,10 @@ export async function POST(request: Request) {
       const status = error.code === "42501" ? 403 : error.code === "P0002" ? 404 :
         ["40001", "23505"].includes(error.code) ? 409 :
         ["22023", "22007", "22008", "22P02", "23514"].includes(error.code) ? 422 : 503;
-      return jsonResponse({ error: status === 409 ? "日报已被司机或后台修改，请关闭后刷新核对。" :
-        status === 404 ? "日报已不存在，请刷新列表。" :
-        status === 422 ? "保存失败：请检查时间先后、公里数倒退及未完成的经由地／休息；允许提前填写，但顺序必须正确。" :
-        "日报操作未获确认，请刷新核对后重试。" }, { status });
+      return jsonResponse({ error: status === 409 ? "日報已被司机或后台修改，请关闭后刷新核对。" :
+        status === 404 ? "日報已不存在，请刷新列表。" :
+        status === 422 ? "保存失败：请检查時間先后、公里数倒退及未完成的经由地／休息；允许提前填写，但顺序必须正确。" :
+        "日報操作未获确认，请刷新核对后重试。" }, { status });
     }
     const result = operationResultSchema.parse(data);
     const expectedId = parsed.data.action === "edit" ? parsed.data.report.id : parsed.data.reportId;

@@ -11,4 +11,4 @@ export const orderReceiptDataSchema = z.object({
   enabled: z.boolean(),
   receipts: z.array(orderReceiptSchema.extend({ url: z.url() }).strict()),
 }).strict();
-export const orderReceiptLabels = { company: "社报立替", trip: "旅报立替", fuel: "燃油費" };
+export const orderReceiptLabels = { company: "社報立替", trip: "旅報立替", fuel: "燃油費" };

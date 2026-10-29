@@ -43,12 +43,12 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     <div class="day-heading"><strong>${escapeHtml(row.date)}${row.offDate ? "（休运）" : ""}</strong>
     <span>司机：${escapeHtml(row.driver || "—")}</span><span>車両番号：${escapeHtml(row.vehicleNumber || "—")}</span></div>
     <table><tbody><tr>
-    ${detail("ETC（社报）", number(row.etcCompany))}${detail("ETC（旅报）", number(row.etcTrip))}
+    ${detail("ETC（社報）", number(row.etcCompany))}${detail("ETC（旅報）", number(row.etcTrip))}
     ${detail("燃油費", number(row.fuelCost))}${detail("燃油消耗（L）", number(row.fuelLiters))}
-    ${detail("油价（JPY/L）", unitPrice(row.fuelCost, row.fuelLiters))}${detail("超时工资（工资内数）", number(row.overtime))}
-    </tr><tr>${detail("司机立替（社报）", number(row.driverAdvanceCompany))}${detail("司机立替（旅报）", number(row.driverAdvanceTrip))}
-    ${detail("会社立替（社报）", number(row.companyAdvanceCompany))}${detail("会社立替（旅报）", number(row.companyAdvanceTrip))}
-    ${detail("司机工资（含超时及奖励）", number(row.wages), 2)}
+    ${detail("油价（JPY/L）", unitPrice(row.fuelCost, row.fuelLiters))}${detail("超時工資（工資内数）", number(row.overtime))}
+    </tr><tr>${detail("司机立替（社報）", number(row.driverAdvanceCompany))}${detail("司机立替（旅報）", number(row.driverAdvanceTrip))}
+    ${detail("会社立替（社報）", number(row.companyAdvanceCompany))}${detail("会社立替（旅報）", number(row.companyAdvanceTrip))}
+    ${detail("司机工資（含超時及奖励）", number(row.wages), 2)}
     </tr></tbody></table></section>`).join("");
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
     <title>团务費用明细</title><style>
@@ -80,20 +80,20 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     <h2>每日司机与成本明细</h2>${dailyRows}
     <h2>整单費用汇总</h2>
     <table><tbody><tr>
-    ${detail("ETC（社报）合计", number(sum("etcCompany")))}${detail("ETC（旅报）合计", number(sum("etcTrip")))}
+    ${detail("ETC（社報）合计", number(sum("etcCompany")))}${detail("ETC（旅報）合计", number(sum("etcTrip")))}
     ${detail("燃油費合计", number(sum("fuelCost")))}${detail("燃油消耗合计（L）", number(sum("fuelLiters")))}
-    ${detail("平均油价（JPY/L）", unitPrice(sum("fuelCost"), sum("fuelLiters")))}${detail("超时工资合计（工资内数）", number(sum("overtime")))}
-    </tr><tr>${detail("司机立替（社报）合计", number(sum("driverAdvanceCompany")))}${detail("司机立替（旅报）合计", number(sum("driverAdvanceTrip")))}
-    ${detail("会社立替（社报）合计", number(sum("companyAdvanceCompany")))}${detail("会社立替（旅报）合计", number(sum("companyAdvanceTrip")))}
-    ${detail("司机工资合计（含超时及奖励）", number(sum("wages")), 2)}</tr></tbody></table>
+    ${detail("平均油价（JPY/L）", unitPrice(sum("fuelCost"), sum("fuelLiters")))}${detail("超時工資合计（工資内数）", number(sum("overtime")))}
+    </tr><tr>${detail("司机立替（社報）合计", number(sum("driverAdvanceCompany")))}${detail("司机立替（旅報）合计", number(sum("driverAdvanceTrip")))}
+    ${detail("会社立替（社報）合计", number(sum("companyAdvanceCompany")))}${detail("会社立替（旅報）合计", number(sum("companyAdvanceTrip")))}
+    ${detail("司机工資合计（含超時及奖励）", number(sum("wages")), 2)}</tr></tbody></table>
     <div class="cards">
     <div class="card">ETC 总额<strong>${number(sum("etcCompany") + sum("etcTrip"))}</strong></div>
     <div class="card">燃油費合计<strong>${number(sum("fuelCost"))}</strong></div>
     <div class="card">司机立替合计<strong>${number(sum("driverAdvanceCompany") + sum("driverAdvanceTrip"))}</strong></div>
     <div class="card">会社立替合计<strong>${number(sum("companyAdvanceCompany") + sum("companyAdvanceTrip"))}</strong></div>
-    <div class="card">司机工资合计<strong>${number(sum("wages"))}</strong></div></div>
+    <div class="card">司机工資合计<strong>${number(sum("wages"))}</strong></div></div>
     <h2>备注</h2><div class="note">${escapeHtml(data.note)}</div>
-    <footer>按当前财务编辑内容生成（未自动保存）。油价合计按总燃油費 ÷ 总消耗计算。超时工资已包含在司机工资中，请勿重复计入。</footer>
+    <footer>按当前财务编辑内容生成（未自动保存）。油价合计按总燃油費 ÷ 总消耗计算。超時工資已包含在司机工資中，请勿重复计入。</footer>
     </article></div></body></html>`;
 }
 

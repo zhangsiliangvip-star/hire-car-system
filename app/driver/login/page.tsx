@@ -24,18 +24,18 @@ export default function DriverLogin() {
         console.error("Driver sign-in rejected.", { code: authError.code });
         setError(authError.status === 429 ? "登录过于频繁，请稍后重试。" :
           authError.code === "invalid_credentials" ? "邮箱或密码不正确，请使用管理员绑定的司机账号。" :
-          "无法登录，请检查网络、邮箱验证状态或联系管理员。");
+          "无法登录，请检查网络、邮箱验证状態或联系管理员。");
         return;
       }
       const response = await fetch("/api/driver/me", { cache: "no-store" });
       if (!response.ok) {
         const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
         if (signOutError) throw signOutError;
-        setError("账号未启用为司机、已挂起或暂时无法验证，请联系管理员。");
+        setError("账号未启用为司机、已挂起或暂時无法验证，请联系管理员。");
         return;
       }
       const profileResponse = await fetch("/api/driver/profile", { cache: "no-store" });
-      if (!profileResponse.ok) throw new Error("无法核验首次登录资料状态。");
+      if (!profileResponse.ok) throw new Error("无法核验首次登录資料状態。");
       const profile = driverProfileSchema.parse(await profileResponse.json());
       router.replace(profile.prompted ? "/driver" : "/driver/profile");
     } catch (cause) {

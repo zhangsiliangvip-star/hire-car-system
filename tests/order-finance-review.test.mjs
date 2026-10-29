@@ -121,7 +121,7 @@ function controller({ mode = "ok", blocked = false } = {}) {
       const row = body.fuelId ? rows[2] : rows.find(item => item.kind === "finance" &&
         item.claim.assignmentId === body.assignmentId && item.claim.category === body.category);
       const claim = { ...row.claim, status: body.decision, version: mode === "mismatch" ? 99 : row.claim.version + 1 };
-      const response = mode === "conflict" ? Response.json({ error: "状态已变化，请刷新。" }, { status: 409 }) :
+      const response = mode === "conflict" ? Response.json({ error: "状態已变化，请刷新。" }, { status: 409 }) :
         Response.json(row.kind === "fuel" ? { fuelClaim: claim } : { claim });
       if (mode === "late") return new Promise(done => { resolve = () => done(response); });
       return response;
@@ -222,7 +222,7 @@ test("drawer shows dates, drivers, details, amounts, overtime and compact photos
   cursor = 6;
   const html = renderToStaticMarkup(React.createElement(drawer, drawerProps));
   for (const text of ["訂単财务审核", "2026-10-25", "2026-10-26", "Test driver", "Parking", "1,000 JPY", "2,000 JPY",
-    "1.5 小时", "批准入账", "驳回移除", "保留记录", "Review error"]) assert.ok(html.includes(text), text);
+    "1.5 小時", "批准入账", "驳回移除", "保留记录", "Review error"]) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /Other driver|Other order/);
   assert.equal((html.match(/>批准入账<\/button>/g) ?? []).length, 3);
   assert.equal((html.match(/>驳回移除<\/button>/g) ?? []).length, 3);

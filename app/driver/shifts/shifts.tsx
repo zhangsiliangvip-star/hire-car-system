@@ -118,7 +118,7 @@ export default function DriverShifts() {
         </div>
         <p className="driver-muted">已选 {dates.length} 天{dates.length ? `：${[...dates].sort().map(date => date.slice(5)).join("、")}` : "（本月无希望休可直接提交）"}</p>
         <label className="driver-field">备注<textarea rows={3} maxLength={1000} value={note} disabled={busy}
-          placeholder="例：希望连休、时间安排等" onChange={event => { setNote(event.target.value); setNotice(""); }} /></label>
+          placeholder="例：希望连休、時間安排等" onChange={event => { setNote(event.target.value); setNotice(""); }} /></label>
         <p className="driver-muted">{saved.version ? "已提交，可修改后重新提交；重新提交会替换本月原選択。" : "尚未提交"}{dirty ? " · 有未提交修改" : ""}</p>
         <button className="driver-button" disabled={busy} onClick={() => void submit()}>{busy ? "正在提交…" : "提交シフト"}</button>
       </section>

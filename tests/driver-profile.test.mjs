@@ -181,7 +181,7 @@ test("driver list exposes email and write-only password fields; inputs clear on 
   assert.match(source, /manageableRegionId === regionId/);
   assert.match(page, /regionId=\{driver\.regionId\}/);
   const profileSource = readFileSync(fileURLToPath(new URL("../app/driver/profile/page.tsx", import.meta.url)), "utf8");
-  assert.match(profileSource, /暂时跳过，进入行程/);
+  assert.match(profileSource, /暂時跳过，进入行程/);
   assert.doesNotMatch(profileSource, / required[ >]/);
 });
 test("driver profile displays four optional fields and skipping posts no contact changes", async () => {
@@ -208,7 +208,7 @@ test("driver profile displays four optional fields and skipping posts no contact
     writeFileSync(process.env.DRIVER_PROFILE_LAYOUT_FILE,
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${css}</style><div class="driver-app">${html}</div>`);
   }
-  buttons.find(button => button.children === "暂时跳过，进入行程").onClick();
+  buttons.find(button => button.children === "暂時跳过，进入行程").onClick();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(calls, [{ action: "skip", expectedVersion: 0 }]);
   assert.equal(destination, "/driver");

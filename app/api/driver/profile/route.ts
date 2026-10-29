@@ -13,7 +13,7 @@ export async function GET() {
     return jsonResponse(driverProfileSchema.parse(data));
   } catch (error) {
     console.error("Driver profile read failed.", error);
-    return jsonResponse({ error: "无法读取本人资料，请重试。" }, { status: 503 });
+    return jsonResponse({ error: "无法读取本人資料，请重试。" }, { status: 503 });
   }
 }
 export async function POST(request: Request) {
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     const text = await request.text();
-    if (text.length > 8192) return jsonResponse({ error: "资料过长。" }, { status: 413 });
+    if (text.length > 8192) return jsonResponse({ error: "資料过长。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = driverProfileCommandSchema.safeParse(body);
@@ -37,12 +37,12 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver profile update rejected.", { code: error.code });
-      return jsonResponse({ error: error.code === "40001" ? "资料已变化，请刷新后核对再保存。" : "资料未保存，请重试。" },
+      return jsonResponse({ error: error.code === "40001" ? "資料已变化，请刷新后核对再保存。" : "資料未保存，请重试。" },
         { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : 503 });
     }
     return jsonResponse(driverProfileSchema.parse(data));
   } catch (error) {
     console.error("Driver profile update failed.", error);
-    return jsonResponse({ error: "资料保存失败。" }, { status: 503 });
+    return jsonResponse({ error: "資料保存失败。" }, { status: 503 });
   }
 }

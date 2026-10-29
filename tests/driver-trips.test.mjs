@@ -198,7 +198,7 @@ test("phone detail renders only the current legal action and never financial fie
       assert.equal(html.includes(`>${action.label}</button>`), source === status);
     }
     assert.doesNotMatch(html, /finance_by_date|99999|order_price|secret/);
-    assert.doesNotMatch(html, /仅在安全停車|行程状态不直接入账|驾驶中请勿操作手机/);
+    assert.doesNotMatch(html, /仅在安全停車|行程状態不直接入账|驾驶中请勿操作手机/);
   }
 });
 test("Japan service date handles midnight and year rollover", () => {
@@ -257,7 +257,7 @@ test("historical trip cards stay read-only without explanatory clutter", () => {
     }).default;
     const html = renderToStaticMarkup(React.createElement(Component, detail ? { orderId: trip.orderId } : {}));
     assert.match(html, /历史訂単（只读）/);
-    assert.doesNotMatch(html, /历史记录仅供查看|仅在安全停車|行程状态不直接入账|驾驶中请勿操作手机/);
+    assert.doesNotMatch(html, /历史记录仅供查看|仅在安全停車|行程状態不直接入账|驾驶中请勿操作手机/);
     assert.doesNotMatch(html, /查看行程 ›|退回上一步/);
     for (const action of Object.values(orders.tripActions)) {
       assert.equal(html.includes(`>${action.label}</button>`), false);
@@ -267,7 +267,7 @@ test("historical trip cards stay read-only without explanatory clutter", () => {
 test("driver portal slogans replace the home banner and personalized name greeting", () => {
   let cursor = 0;
   const values = ["2026-10-27",
-    { name: "Driver", globalSlogan: "一路平安", personalSlogan: "安全驾驶，准时抵达" },
+    { name: "Driver", globalSlogan: "一路平安", personalSlogan: "安全驾驶，准時抵达" },
     [], false, "", "", 0, false];
   const Component = load("app/driver/trips.tsx", {
     react: { ...React, useEffect() {}, useRef: value => ({ current: value }), useState: () => [values[cursor++], () => {}] },
@@ -275,8 +275,8 @@ test("driver portal slogans replace the home banner and personalized name greeti
   }).default;
   const html = renderToStaticMarkup(React.createElement(Component, {}));
   assert.match(html, /一路平安/);
-  assert.match(html, /安全驾驶，准时抵达/);
-  assert.doesNotMatch(html, /仅显示本人有效派单|日本时间/);
+  assert.match(html, /安全驾驶，准時抵达/);
+  assert.doesNotMatch(html, /仅显示本人有效派单|日本時間/);
   assert.doesNotMatch(html, /平安出行，美好的一天|Driver，你好/);
 });
 test("phone rollback asks for confirmation, posts only the preceding state and locks double taps", async () => {

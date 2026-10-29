@@ -31,13 +31,13 @@ export default function LoginForm({
       if (error) {
         console.error("Sign-in rejected.", { code: error.code, status: error.status });
         if (error.code === "invalid_credentials") {
-          setErrorMessage("登录邮箱或密码不正确。请确认使用的是本地开发环境的密码；如忘记密码，请点击下方“忘记密码？”。");
+          setErrorMessage("登录邮箱或密码不正确。请确认使用的是本地开発环境的密码；如忘记密码，请点击下方“忘记密码？”。");
         } else if (error.code === "email_not_confirmed") {
           setErrorMessage("邮箱尚未验证，请先完成邀请邮件中的验证。");
         } else if (error.status === 429) {
           setErrorMessage("登录请求过于频繁，请稍后再试。");
         } else if (!error.status || error.status >= 500) {
-          setErrorMessage("暂时无法连接登录服务，请检查网络或稍后重试。");
+          setErrorMessage("暂時无法连接登录服务，请检查网络或稍后重试。");
         } else {
           setErrorMessage(`登录服务拒绝了请求（${error.code ?? error.status}），请联系管理员核查。`);
         }
