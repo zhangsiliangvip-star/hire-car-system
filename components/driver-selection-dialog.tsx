@@ -20,7 +20,7 @@ export function DriverSelectionDialog({
   onSelect,
   onClose,
   allowManual = true,
-  emptyLabel = "未安排司机",
+  emptyLabel = "未安排運転士",
   showServiceDays = true,
   serviceDates = [],
 }: Props) {
@@ -47,7 +47,7 @@ export function DriverSelectionDialog({
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Driver rest indicator load failed.", cause);
-        setRestDays(null); setRestError(cause instanceof Error ? cause.message : "休息提示读取失败，不能据此判断司机可出勤。");
+        setRestDays(null); setRestError(cause instanceof Error ? cause.message : "休息提示读取失败，不能据此判断運転士可出勤。");
       }
     }
     void load();
@@ -84,16 +84,16 @@ export function DriverSelectionDialog({
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="driver-selection-title"
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
         <div className="dialog-floating-header mb-3 flex items-center justify-between gap-3">
-          <h2 id="driver-selection-title" className="text-xl font-bold">司机選任</h2>
-          <button type="button" onClick={onClose} aria-label="关闭司机選任" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
+          <h2 id="driver-selection-title" className="text-xl font-bold">運転士選任</h2>
+          <button type="button" onClick={onClose} aria-label="关闭運転士選任" className="rounded px-3 py-1 text-2xl text-gray-500">×</button>
         </div>
         {showServiceDays && (
           <>
-            <p className="mb-4 text-sm text-gray-500">最近30天服务日数由高到低排列，常出勤司机在左上角；同一天多单计1天，同日数按姓名排序。</p>
-            <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务记录中的司机；排除休运日、取消訂単及未来日期，不作为考勤证明。</p>
+            <p className="mb-4 text-sm text-gray-500">最近30天服务日数由高到低排列，常出勤運転士在左上角；同一天多单计1天，同日数按姓名排序。</p>
+            <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务记录中的運転士；排除休运日、取消訂単及未来日期，不作为考勤证明。</p>
           </>
         )}
-        <input aria-label="搜索司机" placeholder="搜索司机姓名" value={search}
+        <input aria-label="搜索運転士" placeholder="搜索運転士姓名" value={search}
           onChange={(event) => setSearch(event.target.value)} className="mb-4 w-full rounded border p-3" />
         {serviceDates.length > 0 && restError && <p role="alert" className="mb-3 text-sm text-red-600">
           {restError} <button type="button" className="underline" onClick={() => setRestRevision(value => value + 1)}>重试休息提示</button>
@@ -117,10 +117,10 @@ export function DriverSelectionDialog({
             </button>
           ); })}
         </div>
-        {matches.length === 0 && <p className="py-5 text-center text-sm text-gray-500">{allowManual ? "暂无匹配司机，可在下方手动输入。" : "暂无匹配司机。"}</p>}
+        {matches.length === 0 && <p className="py-5 text-center text-sm text-gray-500">{allowManual ? "暂无匹配運転士，可在下方手動输入。" : "暂无匹配運転士。"}</p>}
         {allowManual && (
           <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
-            <input aria-label="手动输入司机姓名" placeholder="手动输入新司机" maxLength={120} value={manualName}
+            <input aria-label="手動输入運転士姓名" placeholder="手動输入新運転士" maxLength={120} value={manualName}
               onChange={(event) => setManualName(event.target.value)} className="min-w-0 flex-1 rounded border p-2" />
             <button type="button" disabled={!manualName.trim()} onClick={() => onSelect(manualName.trim(), true)}
               className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">選任</button>

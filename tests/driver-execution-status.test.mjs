@@ -67,7 +67,7 @@ test("calendar labels show all driver steps only on their exact service day", ()
   for (const status of schemas.activeExecutionStates) {
     const html = renderToStaticMarkup(React.createElement(Badge, { row: { ...result.rows[0], status }, date }));
     const label = status === "assigned" ? "未确认" : orders.tripStatusLabels[status];
-    assert.ok(html.includes(`司机状態：${label}`));
+    assert.ok(html.includes(`運転士状態：${label}`));
     assert.ok(html.includes(`>${label}</span>`));
   }
   assert.equal(renderToStaticMarkup(React.createElement(Badge, { row: undefined, date })), "");

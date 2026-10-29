@@ -35,7 +35,7 @@ function LocationRows({ depot, locationKey, disabled, save }: {
     </td><td><input form={formId} name="km" aria-label={`${label}公里表`} placeholder="km" type="number" inputMode="decimal"
         min="0" max="9999999" step="0.1" required /></td>
       <td className="driver-time-cell">—</td>
-      <td className="driver-time-cell" aria-label="出库時間：打卡自动生成">—</td></tr>
+      <td className="driver-time-cell" aria-label="出库時間：打卡自動生成">—</td></tr>
     <tr><td colSpan={5}><div className="driver-stop-actions">
       <button form={formId} className="driver-button" disabled={disabled}>{label}打卡</button>
     </div></td></tr>
@@ -362,8 +362,8 @@ export default function DriverReport() {
             {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
               {order.time} · {order.pickup} → {order.destination} · {order.vehicleNumber || "未填車両番号"}
             </option>)}
-          </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和車库地址请手动填写。</p>)}
-        {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，请手动填写。</p>}
+          </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和車库地址请手動填写。</p>)}
+        {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，请手動填写。</p>}
       </div>}
       <form ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
         aria-label="日報基本信息" onInput={() => setDirty(true)} onSubmit={e => { e.preventDefault(); if (report) void saveChanges(); }}>
@@ -410,7 +410,7 @@ export default function DriverReport() {
           header={report?.header} serviceDate={report?.serviceDate ?? serviceDate} disabled={saving} />
       </form>
       <section className="driver-card driver-stops" aria-label="出库经由地归库"><h2>出库 · 经由地 · 归库</h2>
-        <p className="driver-muted">经由地時間手动填写后统一保存，早于上一项自动顺延至次日。</p>
+        <p className="driver-muted">经由地時間手動填写后统一保存，早于上一项自動顺延至次日。</p>
         <table ref={table} className="driver-stop-table driver-sheet" onInput={e => {
           if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-checkout" || e.target.form?.dataset.stopId || e.target.form?.hasAttribute("data-departure") || e.target.form?.hasAttribute("data-return"))) setDirty(true);
         }}>
@@ -444,7 +444,7 @@ export default function DriverReport() {
       {notice && <p className="driver-muted" role="status">{notice}</p>}
       {report && <>
         <section className="driver-card">
-          <h2>本次汇总</h2>
+          <h2>本次汇総</h2>
           <div className="driver-row"><span>拘束時間{!report.returnedAt && "（进行中）"}</span><strong>{durationLabel(totals!.elapsedMs)}</strong></div>
           <div className="driver-row"><span>累计休息</span><strong>{durationLabel(totals!.restMs)}</strong></div>
           <div className="driver-row"><span>当日公里数</span><strong>{totals!.distance === null ? "归库后计算" : `${totals!.distance} km`}</strong></div>
@@ -459,6 +459,6 @@ export default function DriverReport() {
           {data.reports.map(r => <option key={r.id} value={r.id}>{r.serviceDate} {reportTime(r.departedAt).slice(11, 16)} {r.returnedAt ? "已归库" : "出库中"}</option>)}
         </select></label></details>}
     </>}
-    <p className="driver-muted">请在安全停車后操作。新日報按所选当天訂単带入車両番号、本人姓名及車両所属会社車库地址，均可手动修改；已保存日報不自动覆盖。不采集定位。</p>
+    <p className="driver-muted">请在安全停車后操作。新日報按所选当天訂単带入車両番号、本人姓名及車両所属会社車库地址，均可手動修改；已保存日報不自動覆盖。不采集定位。</p>
   </main>;
 }

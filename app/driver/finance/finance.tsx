@@ -193,7 +193,7 @@ export default function DriverFinance() {
       if (!response.ok) throw new Error(result.error || "燃油費申報未确认。");
       const saved = fuelClaimSchema.parse(result.claim);
       setData(value => value ? { ...value, fuelClaims: [...value.fuelClaims.filter(item => item.date !== saved.date), saved] } : null);
-      pending.current = null; setNotice("燃油費已提交；后台确认后追加到关联訂単当天燃油費，不加入司机立替和应発金额。");
+      pending.current = null; setNotice("燃油費已提交；后台确认后追加到关联訂単当天燃油費，不加入運転士立替和应発金額。");
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver fuel submission failed.", cause);
@@ -209,7 +209,7 @@ export default function DriverFinance() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = financeSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请填写每条費用明細及正整数金额；超時为0–999小時，最多两位小数。"); return; }
+    if (!parsed.success) { setError("请填写每条費用明細及正整数金額；超時为0–999小時，最多两位小数。"); return; }
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -262,15 +262,15 @@ export default function DriverFinance() {
     {notice && <p className="driver-notice" role="status">{notice}</p>}
     {loading ? <p className="driver-empty">正在读取财务…</p> : data && <>
       {view === "wages" ? <section className="driver-card"><h2>本月工資</h2>
-        <p className="driver-muted">只读，应発金额包含基本、奖励、超時工資、手动加减及后台已记司机立替。待审申報不计入，不代表已支付；尚未核算的数据可能继续调整。</p>
+        <p className="driver-muted">只读，应発金額包含基本、奖励、超時工資、手動加减及后台已记運転士立替。待审申報不计入，不代表已支付；尚未核算的数据可能继续调整。</p>
         <div className="driver-row"><span>基本工資</span><strong>{yen(wages!.base)}</strong></div>
         <div className="driver-row"><span>奖励工資</span><strong>{yen(wages!.bonus)}</strong></div>
         <div className="driver-row"><span>超時工資</span><strong>{yen(wages!.overtime)}</strong></div>
         {data.manualItems.map((item, index) => <div className="driver-row" key={`manual-${index}`}><span>{item.name}</span><strong>{yen(item.amount)}</strong></div>)}
-        <div className="driver-row"><span>后台已记司机立替</span><strong>{yen(wages!.advances)}</strong></div>
+        <div className="driver-row"><span>后台已记運転士立替</span><strong>{yen(wages!.advances)}</strong></div>
         <details><summary>按日工資及立替明細</summary>{data.wages.map((row, index) =>
           <div className="driver-row" key={`${row.date}-${index}`}><span>{row.date}</span><strong>{yen(row.base + row.bonus + row.overtime + row.advances)}</strong></div>)}</details>
-        <div className="driver-row"><span>应発金额</span><strong>{yen(wages!.base + wages!.bonus + wages!.overtime + wages!.advances +
+        <div className="driver-row"><span>应発金額</span><strong>{yen(wages!.base + wages!.bonus + wages!.overtime + wages!.advances +
           data.manualItems.reduce((sum, item) => sum + item.amount, 0))}</strong></div>
       </section> : <>
       <div className="finance-date-row"><label className="driver-field">用車日期<input type="date" value={date} min={`${month}-01`}
@@ -294,7 +294,7 @@ export default function DriverFinance() {
             <h3>{index + 1}. {item.type === "company" ? "社報" : "旅報"}</h3>
             <div className="finance-expense-row">
             <label className="driver-field">明細<input maxLength={200} value={item.detail} onChange={event => edit(item.id, { detail: event.target.value })} /></label>
-            <label className="driver-field">金额（JPY）<input type="number" min="1" max="99999999999999" step="1" inputMode="numeric"
+            <label className="driver-field">金額（JPY）<input type="number" min="1" max="99999999999999" step="1" inputMode="numeric"
               onWheel={event => event.currentTarget.blur()}
               value={item.amount || ""} onChange={event => edit(item.id, { amount: Number(event.target.value) })} /></label>
             </div>
@@ -323,7 +323,7 @@ export default function DriverFinance() {
         {!overtimeReadOnly && <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超時并提交</button>}
       </section>}
       <section className="driver-card"><h2>当日燃油費</h2>
-        <p className="driver-muted">公司支付／油卡。每天统一申報一次，指定当天一张訂単；审核后追加到该訂単当天燃油費，不计司机立替及应発金额。请勿重复手工录入。</p>
+        <p className="driver-muted">公司支付／油卡。每天统一申報一次，指定当天一张訂単；审核后追加到该訂単当天燃油費，不计運転士立替及应発金額。请勿重复手工录入。</p>
         {fuelClaim && <p className="driver-muted">{labels[fuelClaim.status]} {fuelClaim.reviewNote}</p>}
         <fieldset className="finance-fields" disabled={busy || fuelReadOnly || !fuelTrips.length}>
           <label className="driver-field">燃油費关联訂単<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
@@ -345,16 +345,16 @@ export default function DriverFinance() {
           onClick={() => void viewReceipt(path, "driver-fuel-receipts")}>查看油票 {index + 1}　</button>)}
         {!fuelReadOnly && <button className="driver-button" disabled={busy || !fuelTrips.length} onClick={() => void submitFuel()}>保存燃油費并提交</button>}
       </section>
-      <section className="driver-card"><h2>司机立替汇总</h2>
+      <section className="driver-card"><h2>運転士立替汇総</h2>
         <div className="driver-row"><span>社報立替</span><strong>{yen(dayTotals.company)}</strong></div>
         <div className="driver-row"><span>旅報立替</span><strong>{yen(dayTotals.trip)}</strong></div>
-        <div className="driver-row"><span>司机立替合计</span><strong>{yen(dayTotals.company + dayTotals.trip)}</strong></div>
-        <p className="driver-muted">所选日期全部訂単，包含待审、已确认、退回及当前草稿，不代表已報销金额。</p>
+        <div className="driver-row"><span>運転士立替合计</span><strong>{yen(dayTotals.company + dayTotals.trip)}</strong></div>
+        <p className="driver-muted">所选日期全部訂単，包含待审、已确认、退回及当前草稿，不代表已報销金額。</p>
       </section>
       </>}
     </>}
     {receipt && <section className="driver-card"><button className="driver-link" onClick={() => setReceipt("")}>关闭票据</button>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={receipt} alt="司机财务票据" className="finance-receipt" /></section>}
+      <img src={receipt} alt="運転士财务票据" className="finance-receipt" /></section>}
   </main>;
 }

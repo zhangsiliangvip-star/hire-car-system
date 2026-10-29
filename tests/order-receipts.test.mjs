@@ -152,10 +152,10 @@ test("receipt gallery is mounted for each exact order and service date including
   const source = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(source, /<OrderReceipts key=\{`receipts-\$\{financeOrder\.id\}-\$\{date\}`\} orderId=\{financeOrder\.id\} date=\{date\}/);
   assert.equal((source.match(/<OrderReceipts /g) || []).length, 1);
-  const note = source.indexOf("                                    外注司机备注");
+  const note = source.indexOf("                                    外注運転士备注");
   const gallery = source.indexOf("<OrderReceipts ");
   assert.ok(note > source.indexOf('{section.title === "立替費用" && ('));
-  assert.ok(gallery > note && gallery < source.indexOf('<legend className="px-1 text-sm font-semibold">司机工資'));
+  assert.ok(gallery > note && gallery < source.indexOf('<legend className="px-1 text-sm font-semibold">運転士工資'));
   const textarea = source.slice(note, source.indexOf("/>", note));
   assert.match(textarea, /rows=\{2\}/);
   assert.match(textarea, /className="[^"]*\bh-12\b[^"]*"/);

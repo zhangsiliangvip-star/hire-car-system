@@ -28,20 +28,20 @@ export async function POST(request: Request) {
     if (new URL(request.url).search) return jsonResponse({ error: "不支持该查询参数。" }, { status: 400 });
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode())) {
       console.error("Driver report origin rejected.");
-      return jsonResponse({ error: "请求来源无效。" }, { status: 403 });
+      return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     }
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     }
     const text = await request.text();
     const limit = 131072;
-    if (text.length > limit) return jsonResponse({ error: "请求过大。" }, { status: 413 });
+    if (text.length > limit) return jsonResponse({ error: "請求过大。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch {
-      return jsonResponse({ error: text.length > 4096 ? "请求过大。" : "JSON格式无效。" }, { status: text.length > 4096 ? 413 : 400 });
+      return jsonResponse({ error: text.length > 4096 ? "請求过大。" : "JSON格式无效。" }, { status: text.length > 4096 ? 413 : 400 });
     }
     if (text.length > 4096 && (typeof body !== "object" || body === null || !("action" in body) || body.action !== "edit_stops"))
-      return jsonResponse({ error: "请求过大。" }, { status: 413 });
+      return jsonResponse({ error: "請求过大。" }, { status: 413 });
     const parsed = reportCommandSchema.safeParse(body);
     if (!parsed.success) return jsonResponse({ error: "请检查地点、公里表和日期時間。" }, { status: 400 });
     const { data, error } = await identity.supabase.rpc("driver_report_command", {

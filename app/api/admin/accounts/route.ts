@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+      return jsonResponse({ error: "請求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
       }
       if (error?.status === 429 || error?.code === "over_request_rate_limit") {
         return jsonResponse(
-          { error: "账号创建请求过于频繁，请勿连续重试，稍后再试。" },
+          { error: "账号创建請求过于频繁，请勿连续重试，稍后再试。" },
           { status: 429 },
         );
       }
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: true, userId: data.user.id }, { status: 201 });
   } catch (error) {
     console.error("Failed to create account.", { name: error instanceof Error ? error.name : "UnknownError" });
-    return jsonResponse({ error: "创建账号请求未完成，请先核对账号列表再重试。" }, { status: 500 });
+    return jsonResponse({ error: "创建账号請求未完成，请先核对账号列表再重试。" }, { status: 500 });
   }
 }
 
@@ -181,7 +181,7 @@ export async function PUT(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+      return jsonResponse({ error: "請求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = passwordSchema.safeParse(body);
     if (!parsed.success) {
@@ -232,7 +232,7 @@ export async function PATCH(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+      return jsonResponse({ error: "請求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
@@ -279,7 +279,7 @@ export async function DELETE(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+      return jsonResponse({ error: "請求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = deleteSchema.safeParse(body);
     if (!parsed.success) {

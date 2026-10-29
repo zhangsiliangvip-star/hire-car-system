@@ -106,13 +106,13 @@ export function VehicleNameSelect({
             <option value={value}>{value}</option>
           )}
         {settings.options.map((name) => <option key={name} value={name}>{name}</option>)}
-        <option value={MANUAL_VEHICLE_NAME}>手动输入車名</option>
+        <option value={MANUAL_VEHICLE_NAME}>手動输入車名</option>
       </select>
       {selectedValue === MANUAL_VEHICLE_NAME && (
         <input
           type="text"
           required
-          aria-label="車名（手动输入）"
+          aria-label="車名（手動输入）"
           className="mt-1 w-full rounded border p-2"
           value={manualName}
           onChange={(event) => onManualNameChange(event.target.value)}
@@ -122,7 +122,7 @@ export function VehicleNameSelect({
       {isManaging && (
         <div id="vehicle-name-options-manager" className="mt-2 rounded border bg-gray-50 p-3">
           <p className="mb-2 text-xs text-gray-600">仅影响本浏览器的下拉选项，不删除車両或訂単。</p>
-          {settings.options.length === 0 && <p className="text-sm text-gray-600">已无预设車名，仍可手动输入。</p>}
+          {settings.options.length === 0 && <p className="text-sm text-gray-600">已无预设車名，仍可手動输入。</p>}
           <ul className="space-y-2">
             {settings.options.map((name) => (
               <li key={name} className="flex items-center justify-between gap-2 text-sm">

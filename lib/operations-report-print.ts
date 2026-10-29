@@ -78,7 +78,7 @@ export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
         <td colspan="2">${r.returnedAt ? "已归库" : "出库中（未完成）"}</td></tr>
       <tr><th>所属</th><td colspan="3">${escape(row.company || "未匹配")}</td><th>車両番号</th><td colspan="3">${escape(h?.vehicleNumber || "未填写")}</td></tr>
       <tr><th>乗車人数</th><td>${h?.passengerCount ?? "未填写"}</td><th colspan="2">出勤時間（始業点呼）</th><td colspan="4">${duty(h?.dutyStartTime)}</td></tr>
-      <tr><th colspan="2">工作总時长</th><td colspan="2">${hours === null ? "点呼日期／時間未完整，无法计算" : durationLabel(hours)}</td>
+      <tr><th colspan="2">工作総時长</th><td colspan="2">${hours === null ? "点呼日期／時間未完整，无法计算" : durationLabel(hours)}</td>
         <th colspan="2">退勤時間（終業点呼）</th><td colspan="2">${duty(h?.dutyEndTime)}</td></tr>
       </tbody></table>
       <table class="journey"><colgroup><col style="width:6%"><col style="width:34%"><col style="width:24%"><col style="width:5%"><col style="width:17%"><col style="width:14%"></colgroup>

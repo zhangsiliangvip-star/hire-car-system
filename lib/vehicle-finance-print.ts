@@ -62,15 +62,15 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
       .filter((supply) => supply.description.trim() || supply.amount.trim())
       .map((supply) => {
         if (!supply.description.trim() || !supply.amount.trim()) {
-          throw new Error("请为每条备品填写名称和非负整数金额后再导出。");
+          throw new Error("请为每条备品填写名称和非负整数金額后再导出。");
         }
         if (supply.description.trim().length > 300) throw new Error("备品名称最多300个字符。");
-        return { description: supply.description.trim(), amount: amount(supply.amount, "备品金额") };
+        return { description: supply.description.trim(), amount: amount(supply.amount, "备品金額") };
       });
     if (supplies.length > 100) throw new Error("备品明細最多100条。");
     const suppliesTotal = supplies.reduce((total, supply) => total + supply.amount, 0);
     const expenses = fees.reduce((total, [, value]) => total + value, suppliesTotal);
-    if (!Number.isSafeInteger(expenses)) throw new Error("月度費用合计超出金额范围。");
+    if (!Number.isSafeInteger(expenses)) throw new Error("月度費用合计超出金額范围。");
     const start = monthly.startOdometer.trim() ? amount(monthly.startOdometer, "月初公里数", 99_999_999_999) : null;
     const end = monthly.endOdometer.trim() ? amount(monthly.endOdometer, "月末公里数", 99_999_999_999) : null;
     if (start !== null && end !== null && end < start) throw new Error("月末公里数不能小于月初公里数。");
@@ -110,21 +110,21 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
   </style></head><body><div class="sheet"><article class="content">
   <header><h1>車両統計月度财务表</h1><div class="meta"><span>月份：${escapeHtml(data.month)}</span>
   <span>車両番号：${escapeHtml(data.vehicleNumber)}</span><span>分区：${escapeHtml(data.region)}</span><span>币种：JPY ／ 里程：km</span></div></header>
-  <div class="summary"><div>请求金额合计<strong>${yen(sum("requestAmount"))}</strong></div>
-  <div>訂単利润总和<strong>${yen(sum("profit"))}</strong></div>${netSummary}</div>
+  <div class="summary"><div>請求金額合计<strong>${yen(sum("requestAmount"))}</strong></div>
+  <div>訂単利润総和<strong>${yen(sum("profit"))}</strong></div>${netSummary}</div>
   <h2>每日运营明細</h2>
   <table><colgroup><col style="width:11%"><col style="width:18%"><col style="width:10%"><col style="width:9%">
   <col style="width:11%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:11%"></colgroup>
-  <thead><tr><th>服务日期</th><th>訂単名称</th><th>車両番号</th><th>司机</th><th>请求金额</th><th>司机立替</th><th>会社支出</th><th>司机工資</th><th>訂単利润</th></tr></thead>
+  <thead><tr><th>服务日期</th><th>訂単名称</th><th>車両番号</th><th>運転士</th><th>請求金額</th><th>運転士立替</th><th>会社支出</th><th>運転士工資</th><th>訂単利润</th></tr></thead>
   <tbody>${data.rows.map((row) => `<tr><td>${escapeHtml(row.serviceDate)}</td><td>${escapeHtml(row.customer)}</td>
   <td>${escapeHtml(row.vehicleNumber)}</td><td>${escapeHtml(row.driver)}</td>${cell(row.requestAmount)}${cell(row.driverAdvances)}
   ${cell(row.companyExpenses)}${cell(row.driverWages)}${cell(row.profit)}</tr>`).join("")}</tbody>
   <tfoot><tr><td colspan="4">合计</td>${cell(sum("requestAmount"))}${cell(sum("driverAdvances"))}${cell(sum("companyExpenses"))}${cell(sum("driverWages"))}${cell(sum("profit"))}</tr></tfoot></table>
   ${monthlyHtml}
   <p class="notes">${data.monthly
-    ? "运营明細采用已保存的日财务记录；月度費用和里程采用当前页面填写内容，导出不会自动保存。扣除費用后利润＝訂単利润总和－月度費用；每公里利润＝扣除費用后利润÷走行公里数。"
-    : "全部車両模式仅汇总运营明細，不包含車両月度固定費用、备品和里程。请筛选具体車両查看完整月度費用及净利润。"}
-  <br>司机立替与工資分别列示，财务口径与車両統計列表一致。内部資料，请妥善保管。</p>
+    ? "运营明細采用已保存的日财务记录；月度費用和里程采用当前页面填写内容，导出不会自動保存。扣除費用后利润＝訂単利润総和－月度費用；每公里利润＝扣除費用后利润÷走行公里数。"
+    : "全部車両模式仅汇総运营明細，不包含車両月度固定費用、备品和里程。请筛选具体車両查看完整月度費用及净利润。"}
+  <br>運転士立替与工資分别列示，财务口径与車両統計列表一致。内部資料，请妥善保管。</p>
   </article></div></body></html>`;
 }
 
@@ -163,15 +163,15 @@ export function buildVehicleSummaryPrintHtml(data: VehicleSummaryPrintData) {
   </style></head><body><div class="sheet"><article class="content">
   <h1>全車両月度统计表</h1><div class="meta"><span>服务月份：${escapeHtml(data.month)}</span>
   <span>分区：${escapeHtml(data.region)}</span><span>車両数：${data.rows.length}</span><span>单位：JPY</span></div>
-  <div class="summary">利润汇总（已扣固定費用与备品）：<strong>¥${number(totals.profit)}</strong></div>
+  <div class="summary">利润汇総（已扣固定費用与备品）：<strong>¥${number(totals.profit)}</strong></div>
   <table><colgroup><col style="width:10%"><col style="width:18%"><col style="width:12%">
   <col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:13%"><col style="width:13%"></colgroup>
-  <thead><tr><th>服务月份</th><th>車両番号</th><th>请求总金额</th><th>司机立替</th><th>会社支付</th><th>司机工資</th><th>固定費用与备品</th><th>訂単利润<br>（扣費后）</th></tr></thead>
+  <thead><tr><th>服务月份</th><th>車両番号</th><th>請求総金額</th><th>運転士立替</th><th>会社支付</th><th>運転士工資</th><th>固定費用与备品</th><th>訂単利润<br>（扣費后）</th></tr></thead>
   <tbody>${data.rows.map((row) => `<tr><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.vehicleNumber)}
   <small>${escapeHtml(data.regionNames[row.regionId || ""] || "未知地域")}</small></td>
   ${cell(row.requestAmount)}${cell(row.driverAdvances)}${cell(row.companyExpenses)}${cell(row.driverWages)}${cell(row.fixedExpenses)}${cell(row.profit)}</tr>`).join("")}</tbody>
-  <tfoot><tr><td colspan="2">合计／利润汇总</td>${cell(totals.requestAmount)}${cell(totals.driverAdvances)}${cell(totals.companyExpenses)}${cell(totals.driverWages)}${cell(totals.fixedExpenses)}${cell(totals.profit)}</tr></tfoot></table>
-  <p class="notes">訂単利润＝请求总金额－司机立替－会社支付－司机工資－固定費用与备品。<br>
+  <tfoot><tr><td colspan="2">合计／利润汇総</td>${cell(totals.requestAmount)}${cell(totals.driverAdvances)}${cell(totals.companyExpenses)}${cell(totals.driverWages)}${cell(totals.fixedExpenses)}${cell(totals.profit)}</tr></tfoot></table>
+  <p class="notes">訂単利润＝請求総金額－運転士立替－会社支付－運転士工資－固定費用与备品。<br>
   月度費用优先采用所选月份已保存的记录；未登记時仅采用車両資料的默认停車场費及保险費。无运营记录車両仍列示固定成本；未匹配到車両資料的历史记录单独标注，固定成本未知，暂记0。<br>
   本表包含外注車両，番号旁标注“外注”；未登记番号時明确提示。按車両及分区归集，未保存的单車費用编辑不计入。内部财务資料，请妥善保管。</p>
   </article></div></body></html>`;

@@ -14,7 +14,7 @@ export default function DriverNavigation({ active, busy = false, canLeave }: {
   busy?: boolean;
   canLeave?: () => boolean;
 }) {
-  return <nav className="driver-navigation" aria-label="司机端板块">
+  return <nav className="driver-navigation" aria-label="運転士端板块">
     {sections.map(section => <Link key={section.id} href={section.href}
       aria-current={active === section.id ? "page" : undefined}
       aria-disabled={busy || active === section.id ? true : undefined}

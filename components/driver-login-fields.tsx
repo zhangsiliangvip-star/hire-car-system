@@ -58,7 +58,7 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
   }, []);
   async function save() {
     if (lock.current) return;
-    if (!window.confirm(account ? `重置${name}的登录密码？保存后无法查看原密码。` : `为${name}创建独立司机登录账号？`)) return;
+    if (!window.confirm(account ? `重置${name}的登录密码？保存后无法查看原密码。` : `为${name}创建独立運転士登录账号？`)) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -70,7 +70,7 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
       if (current !== generation.current) return;
       setPassword(""); setVisible(false);
       if (!response.ok) throw new Error(result.error || "账号操作未确认。");
-      setNotice(account ? "密码已重置，请告知司机。" : "账号已创建并绑定。"); reload();
+      setNotice(account ? "密码已重置，请告知運転士。" : "账号已创建并绑定。"); reload();
     } catch (cause) {
       if (current !== generation.current) return;
       setPassword(""); setVisible(false);
@@ -86,9 +86,9 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
       {!canManageDriver && !loadError && <p className="text-xs text-gray-500">仅管理员或本地域账号可管理</p>}
       {canManageDriver && account ? <><span>{account.email}</span><p className="text-xs text-gray-500">{account.status === "active" ? "已启用" : account.status === "suspended" ? "已暂停" : "已撤销"}</p></>
         : canManageDriver ? <input aria-label={`${name}登录邮箱`} type="email" autoComplete="off" disabled={disabled}
-          className="h-10 w-full rounded-md border px-3 text-sm" value={email} onChange={event => setEmail(event.target.value)} placeholder="司机登录邮箱" /> : null}
+          className="h-10 w-full rounded-md border px-3 text-sm" value={email} onChange={event => setEmail(event.target.value)} placeholder="運転士登录邮箱" /> : null}
       {loadError && <p role="alert" className="text-xs text-red-600">{loadError}<button onClick={reload}>重试</button></p>}
-      {data && !data.enabled && <p className="text-xs text-gray-500">司机登录管理尚未开放</p>}
+      {data && !data.enabled && <p className="text-xs text-gray-500">運転士登录管理尚未开放</p>}
       {data?.enabled && !data.canManage && <p className="max-w-xs text-xs text-amber-700">尚未配置隔离库账号管理密钥，创建／重置暂不可用。</p>}
     </td>
     <td className="px-4 py-3">

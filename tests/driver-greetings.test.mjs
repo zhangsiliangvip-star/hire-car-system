@@ -75,7 +75,7 @@ test("driver mobile identity includes validated portal slogans", async () => {
     "@/lib/api-response": { jsonResponse },
     "@/lib/driver/authorization": { requireDriver: async () => ({
       response: null,
-      identity: { driver_id: "driver-id", region_id: "region-id", driver_name: "司机", version: 2 },
+      identity: { driver_id: "driver-id", region_id: "region-id", driver_name: "運転士", version: 2 },
       supabase: { rpc: async name => {
         calls.push(name);
         return { data: { globalSlogan: "全体标语", personalSlogan: "个人标语" }, error: null };
@@ -85,7 +85,7 @@ test("driver mobile identity includes validated portal slogans", async () => {
   const response = await route.GET();
   assert.equal(response.status, 200);
   assert.deepEqual(plain(response.data), {
-    driverId: "driver-id", regionId: "region-id", name: "司机", version: 2,
+    driverId: "driver-id", regionId: "region-id", name: "運転士", version: 2,
     globalSlogan: "全体标语", personalSlogan: "个人标语",
   });
   assert.deepEqual(calls, ["driver_portal_greetings"]);

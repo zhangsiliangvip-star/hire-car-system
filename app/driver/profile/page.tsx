@@ -70,7 +70,7 @@ export default function DriverProfile() {
   return <main className="driver-main">
     <DriverNavigation busy={busy} canLeave={canLeave} />
     <h1>个人資料</h1>
-    <p className="driver-muted">欢迎使用司机端。以下项目均可不填，也可先跳过，之后从行程页“个人資料”补填。保存后同步到后台運転士记录。切后台会清除未保存内容。</p>
+    <p className="driver-muted">欢迎使用運転士端。以下项目均可不填，也可先跳过，之后从行程页“个人資料”补填。保存后同步到后台運転士记录。切后台会清除未保存内容。</p>
     {error && <p className="driver-error" role="alert">{error}<button className="driver-link" disabled={busy} onClick={() => {
       if (!canLeave()) return;
       setProfile(null); setSaved(null); setError(""); setRevision(value => value + 1);

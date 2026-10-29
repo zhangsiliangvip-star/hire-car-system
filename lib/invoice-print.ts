@@ -52,10 +52,10 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   const overtimeRequest = data.overtimeRequest ?? 0;
   const amounts = [data.orderPrice, data.etcTrip, data.driverAdvanceTrip, data.companyAdvanceTrip, overtimeRequest];
   if (amounts.some((value) => !Number.isSafeInteger(value) || value < 0)) {
-    throw new Error("請求書金额必须是非负日元整数。");
+    throw new Error("請求書金額必须是非负日元整数。");
   }
   const total = amounts.reduce((sum, value) => sum + value, 0);
-  if (!Number.isSafeInteger(total)) throw new Error("請求書合计超出金额范围。");
+  if (!Number.isSafeInteger(total)) throw new Error("請求書合计超出金額范围。");
   const days = data.days ?? [];
   if (days.some((day) => !Number.isSafeInteger(day.fare) || day.fare < 0)) {
     throw new Error("請求書当日車費必须是非负日元整数。");

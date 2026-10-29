@@ -6,7 +6,7 @@ const sloganSchema = z.object({ slogan: z.string().max(100) }).strict();
 
 async function authorize() {
   const { supabase, profile } = await getAuthenticatedProfile();
-  if (!profile) return { response: jsonResponse({ error: "仅后台工作人员可管理司机标语。" }, { status: 403 }) };
+  if (!profile) return { response: jsonResponse({ error: "仅后台工作人员可管理運転士标语。" }, { status: 403 }) };
   return { response: null, supabase, profile };
 }
 

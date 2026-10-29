@@ -160,7 +160,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   select.onChange({ target: { value: defaultsFixture.orders[1].assignmentId } });
   html = render();
   assert.match(html, /value="Second plate"/);
-  assert.match(html, /请手动填写/);
+  assert.match(html, /请手動填写/);
   assert.doesNotMatch(html, /value="Owner garage"/);
   assert.equal(await checkoutProps.save({ useDefault: false, address: "Manual garage", km: 100 }), true);
   assert.equal(sent.payload.useDefault, false);
@@ -582,9 +582,9 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.ok(html.includes("拘束時間"));
     assert.ok(html.includes("累计休息"));
     assert.ok(html.includes("当日公里数"));
-    assert.doesNotMatch(html, /出库至归库总時长|行驶公里数/);
-    assert.doesNotMatch(html, /开始休息|结束休息|休息记录|停車或等候不会自动计为休息/);
-    assert.doesNotMatch(html, /休息自动按各经由地到着至出発的時长累计/);
+    assert.doesNotMatch(html, /出库至归库総時长|行驶公里数/);
+    assert.doesNotMatch(html, /开始休息|结束休息|休息记录|停車或等候不会自動计为休息/);
+    assert.doesNotMatch(html, /休息自動按各经由地到着至出発的時长累计/);
     assert.doesNotMatch(html, /归库打卡/);
     assert.equal(html.includes("42.5 km"), closed);
     assert.ok(html.includes("不采集定位"));

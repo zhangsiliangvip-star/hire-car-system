@@ -286,12 +286,12 @@ test("historical claims show their source, submit with the history flag and excl
 });
 test("top buttons switch exclusive views while preserving the claim draft", () => {
   const h = renderFinance();
-  assert.ok(h.html.includes("司机立替汇总"));
-  assert.equal(h.html.includes("<span>应発金额</span>"), false);
+  assert.ok(h.html.includes("運転士立替汇総"));
+  assert.equal(h.html.includes("<span>应発金額</span>"), false);
   h.buttons.find(button => button.children === "月工資").onClick();
   const wages = h.render();
-  assert.ok(wages.includes("应発金额"));
-  assert.equal(wages.includes("司机立替汇总"), false);
+  assert.ok(wages.includes("应発金額"));
+  assert.equal(wages.includes("運転士立替汇総"), false);
   assert.equal(wages.includes("提交后台确认"), false);
   assert.match(wages, /aria-pressed="true">月工資/);
   h.buttons.find(button => button.children === "立替申報").onClick();
@@ -303,7 +303,7 @@ test("top buttons switch exclusive views while preserving the claim draft", () =
 });
 test("date then order then categories precede the final all-order driver advance summary", () => {
   const h = renderFinance();
-  const markers = ["用車日期", "選択当天訂単", "<h2>社報立替</h2>", "<h2>旅報立替</h2>", "司机立替汇总"];
+  const markers = ["用車日期", "選択当天訂単", "<h2>社報立替</h2>", "<h2>旅報立替</h2>", "運転士立替汇総"];
   let position = -1;
   for (const marker of markers) {
     const next = h.html.indexOf(marker, position + 1);
@@ -351,7 +351,7 @@ test("fuel remains daily when changing orders and does not enter advance/payable
   h.states[13] = "6000"; h.states[14] = []; h.states[15] = id;
   const html = h.render();
   assert.ok(html.indexOf("当日燃油費") > html.indexOf("超時申報"));
-  assert.ok(html.indexOf("司机立替汇总") > html.indexOf("当日燃油費"));
+  assert.ok(html.indexOf("運転士立替汇総") > html.indexOf("当日燃油費"));
   assert.ok(html.includes("¥3,500")); // company 1500 + trip 2000, excludes fuel 6000
   h.buttons.find(button => button.children === "保存燃油費并提交").onClick();
   await new Promise(resolve => setImmediate(resolve));
@@ -362,11 +362,11 @@ test("fuel remains daily when changing orders and does not enter advance/payable
   assert.equal(h.states[15], id);
   assert.equal(h.buttons.some(button => button.children === "保存燃油費并提交"), false);
   h.buttons.find(button => button.children === "月工資").onClick();
-  assert.match(h.render(), /<span>应発金额<\/span><strong>¥14,500<\/strong>/);
+  assert.match(h.render(), /<span>应発金額<\/span><strong>¥14,500<\/strong>/);
 });
 test("expense detail and amount share a compact left-to-right row", () => {
   const { html } = renderFinance();
-  assert.match(html, /class="finance-expense-row"><label[^>]*>明細<input[^>]*><\/label><label[^>]*>金额（JPY）<input[^>]*><\/label><\/div>/);
+  assert.match(html, /class="finance-expense-row"><label[^>]*>明細<input[^>]*><\/label><label[^>]*>金額（JPY）<input[^>]*><\/label><\/div>/);
 });
 test("advance categories render as separate simultaneous cards with their own entry controls", () => {
   const h = renderFinance();
@@ -387,9 +387,9 @@ test("monthly wages separate bonus and overtime and include booked advances exac
   const { html } = renderFinance({ view: "wages" });
   assert.match(html, /<span>奖励工資<\/span><strong>¥500<\/strong>/);
   assert.match(html, /<span>超時工資<\/span><strong>¥3,000<\/strong>/);
-  assert.match(html, /<span>后台已记司机立替<\/span><strong>¥1,500<\/strong>/);
+  assert.match(html, /<span>后台已记運転士立替<\/span><strong>¥1,500<\/strong>/);
   assert.match(html, /<span>2026-10-27<\/span><strong>¥15,000<\/strong>/);
-  assert.match(html, /<span>应発金额<\/span><strong>¥14,500<\/strong><\/div><\/section><\/main>$/);
+  assert.match(html, /<span>应発金額<\/span><strong>¥14,500<\/strong><\/div><\/section><\/main>$/);
 });
 test("each advance category saves its own payload without locking or losing the other draft", async () => {
   const calls = [];

@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+      return jsonResponse({ error: "請求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = schema.safeParse(body);
     if (!parsed.success) return jsonResponse({ error: "訂単或会社编号格式不正确。" }, { status: 400 });

@@ -23,7 +23,7 @@ export default function DriverLogin() {
       if (authError) {
         console.error("Driver sign-in rejected.", { code: authError.code });
         setError(authError.status === 429 ? "登录过于频繁，请稍后重试。" :
-          authError.code === "invalid_credentials" ? "邮箱或密码不正确，请使用管理员绑定的司机账号。" :
+          authError.code === "invalid_credentials" ? "邮箱或密码不正确，请使用管理员绑定的運転士账号。" :
           "无法登录，请检查网络、邮箱验证状態或联系管理员。");
         return;
       }
@@ -31,7 +31,7 @@ export default function DriverLogin() {
       if (!response.ok) {
         const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
         if (signOutError) throw signOutError;
-        setError("账号未启用为司机、已挂起或暂時无法验证，请联系管理员。");
+        setError("账号未启用为運転士、已挂起或暂時无法验证，请联系管理员。");
         return;
       }
       const profileResponse = await fetch("/api/driver/profile", { cache: "no-store" });
@@ -45,13 +45,13 @@ export default function DriverLogin() {
   }
   return <main className="driver-main">
     <p className="driver-muted">一路从容，专注每一程。</p>
-    <h1>司机登录</h1>
-    <p className="driver-muted">请使用管理员绑定的司机账号。<br />司机账号和后台工作人员账号不可混用。</p>
+    <h1>運転士登录</h1>
+    <p className="driver-muted">请使用管理员绑定的運転士账号。<br />運転士账号和后台工作人员账号不可混用。</p>
     <form onSubmit={login} aria-busy={busy}>
       <label className="driver-field">登录邮箱<input name="email" type="email" autoComplete="username" autoCapitalize="none" required /></label>
       <label className="driver-field">密码<input name="password" type="password" autoComplete="current-password" required /></label>
       {error && <p className="driver-error" role="alert">{error}</p>}
-      <button className="driver-button" disabled={busy}>{busy ? "正在核验…" : "登录司机端"}</button>
+      <button className="driver-button" disabled={busy}>{busy ? "正在核验…" : "登录運転士端"}</button>
     </form>
     <p className="driver-muted" style={{ marginTop: 24 }}>支持联网查看本人派单、确认接单和记录执行进度，不提供离线写入或定位。</p>
   </main>;

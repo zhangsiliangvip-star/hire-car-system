@@ -175,7 +175,7 @@ test("operation list includes required columns, first/last stops, open reports a
   const html = renderToStaticMarkup(tree);
   writeLayout("list", html);
   for (const label of ["会社", "車両番号", "日期", "出勤点呼時間", "出库地点", "出発時間", "接客地点", "下客地点",
-    "归库地点", "到着時間", "退勤点呼時間", "工作总時长", "编辑", "删除", "导出PDF", "月批量打印", "26小時30分"])
+    "归库地点", "到着時間", "退勤点呼時間", "工作総時长", "编辑", "删除", "导出PDF", "月批量打印", "26小時30分"])
     assert.ok(html.includes(label), label);
   assert.ok(html.includes("第一经由地")); assert.ok(html.includes("最后经由地"));
   assert.doesNotMatch(html, /第一个经由地|最后一个经由地/);

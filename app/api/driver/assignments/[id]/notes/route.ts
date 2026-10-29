@@ -9,7 +9,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const identity = await requireDriver();
     if (identity.response) return identity.response;
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode()))
-      return jsonResponse({ error: "请求来源无效。" }, { status: 403 });
+      return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json")
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     const { id } = await context.params;

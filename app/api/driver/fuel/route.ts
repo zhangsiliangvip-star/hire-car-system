@@ -9,11 +9,11 @@ export async function POST(request: Request) {
     const identity = await requireDriver();
     if (identity.response) return identity.response;
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode()))
-      return jsonResponse({ error: "请求来源无效。" }, { status: 403 });
+      return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json")
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     const text = await request.text();
-    if (text.length > 4096) return jsonResponse({ error: "请求过大。" }, { status: 413 });
+    if (text.length > 4096) return jsonResponse({ error: "請求过大。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = fuelSubmissionSchema.safeParse(body);

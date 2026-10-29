@@ -452,11 +452,11 @@ const orderFinanceSections: {
   {
     title: "立替費用",
     fields: [
-      { key: "driverAdvanceCompanyReport", label: "司机立替（社報）", unit: "JPY" },
-      { key: "driverAdvanceTripReport", label: "司机立替（旅報）", unit: "JPY" },
+      { key: "driverAdvanceCompanyReport", label: "運転士立替（社報）", unit: "JPY" },
+      { key: "driverAdvanceTripReport", label: "運転士立替（旅報）", unit: "JPY" },
       { key: "companyAdvanceCompanyReport", label: "会社立替（社報）", unit: "JPY" },
       { key: "companyAdvanceTripReport", label: "会社立替（旅報）", unit: "JPY" },
-      { key: "externalDriverFee", label: "外注司机費用", unit: "JPY", readOnly: true },
+      { key: "externalDriverFee", label: "外注運転士費用", unit: "JPY", readOnly: true },
     ],
   },
   {
@@ -464,7 +464,7 @@ const orderFinanceSections: {
     fields: [
       { key: "driverOvertimeHours", label: "超時時間", unit: "h" },
       { key: "overtimeRequestRate", label: "超時費用（旅報）", unit: "JPY/h" },
-      { key: "overtimeRequestAmount", label: "超時请求（旅報）", unit: "JPY", readOnly: true },
+      { key: "overtimeRequestAmount", label: "超時請求（旅報）", unit: "JPY", readOnly: true },
       { key: "driverOvertimeRate", label: "超時費用（工資）", unit: "JPY/h" },
       { key: "driverOvertimeFee", label: "超時工資", unit: "JPY", readOnly: true },
     ],
@@ -895,8 +895,8 @@ function FinanceSummaryPanel({
         </div>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        按每日财务明細日期按月汇总，包含取消訂単及休运日；金额单位为日元（JPY）。
-        訂単总利润 = 请求金额 - 会社总支出 - 司机总立替 - 司机总工資。
+        按每日财务明細日期按月汇総，包含取消訂単及休运日；金額单位为日元（JPY）。
+        訂単総利润 = 請求金額 - 会社総支出 - 運転士総立替 - 運転士総工資。
       </p>
       {children}
     </div>
@@ -1082,7 +1082,7 @@ export default function Home() {
     if (!payload || typeof payload !== "object" || !("orders" in payload) || !Array.isArray(payload.orders))
       throw new Error("訂単财务返回格式无效。");
     if (signal.aborted) return;
-    if (getVersionOrders() !== version) throw new Error("訂単有新的本地修改，请刷新核对已批准金额。");
+    if (getVersionOrders() !== version) throw new Error("訂単有新的本地修改，请刷新核对已批准金額。");
     syncOrders((payload as DashboardData).orders, version);
   }, [getVersionOrders, syncOrders]);
   const {
@@ -1424,10 +1424,10 @@ export default function Home() {
         const response = await fetch("/api/data", { cache: "no-store" });
         const payload = await readJsonSafely(response);
         if (!response.ok) {
-          throw new Error(buildApiErrorMessage(response, payload, "无法载入业务数据。"));
+          throw new Error(buildApiErrorMessage(response, payload, "无法载入業務数据。"));
         }
         if (!payload || typeof payload !== "object") {
-          throw new Error("服务器返回的业务数据格式无效。");
+          throw new Error("服务器返回的業務数据格式无效。");
         }
         const dashboard = payload as {
           profile: AccountProfile;
@@ -1503,7 +1503,7 @@ export default function Home() {
         console.error("Failed to initialize dashboard.", error);
         if (!cancelled) {
           setDataLoadError(
-            error instanceof Error ? error.message : "无法载入业务数据。",
+            error instanceof Error ? error.message : "无法载入業務数据。",
           );
         }
       }
@@ -1880,14 +1880,14 @@ export default function Home() {
     if (draftAmount.trim() === "") return 0;
     const amount = Number(draftAmount);
     if (!Number.isSafeInteger(amount) || amount < 0 || amount > 99_999_999_999_999) {
-      throw new Error(`收支项目「${item.name}」金额必须是0至99999999999999的整数。`);
+      throw new Error(`收支项目「${item.name}」金額必须是0至99999999999999的整数。`);
     }
     return amount;
   };
   const balanceResult = (() => {
     try {
       if (balanceExpensesMigrationPending) {
-        throw new Error("手动收支数据尚未就绪，请先完成相关数据库迁移。");
+        throw new Error("手動收支数据尚未就绪，请先完成相关数据库迁移。");
       }
       const orderTotals = orders.flatMap((order) => {
         if (getBalanceServiceMonth(order, getOrderDateKeys(order)) !== balanceMonth) return [];
@@ -1929,7 +1929,7 @@ export default function Home() {
         error: "",
       };
     } catch (error) {
-      return { summary: null, error: error instanceof Error ? error.message : "收支汇总失败，请刷新后重试。" };
+      return { summary: null, error: error instanceof Error ? error.message : "收支汇総失败，请刷新后重试。" };
     }
   })();
   const sortedFinanceOrders = [...filteredOrderFinanceOrders].sort((first, second) =>
@@ -2108,12 +2108,12 @@ export default function Home() {
   function addDriverWageItemDraft() {
     if (driverWageItemsMigrationPending) return;
     if (currentProfile?.role !== "admin") {
-      alert("仅管理员可以管理司机工資手动项目。");
+      alert("仅管理员可以管理運転士工資手動项目。");
       return;
     }
     if (!requireSpecificRegionForNewData()) return;
     if (!selectedDriverFinanceDriver) {
-      alert("请先選択一位司机。");
+      alert("请先選択一位運転士。");
       return;
     }
     setDriverWageItemDrafts((drafts) => [...drafts, {
@@ -2126,7 +2126,7 @@ export default function Home() {
     if (driverWageItemsMigrationPending) return;
     if (currentProfile?.role !== "admin" || !requireSpecificRegionForNewData()) return;
     if (!selectedDriverFinanceDriver) {
-      alert("请先選択一位司机。");
+      alert("请先選択一位運転士。");
       return;
     }
     if (driverWageItemDrafts.length === 0) {
@@ -2143,12 +2143,12 @@ export default function Home() {
       !Number.isSafeInteger(amount) ||
       Math.abs(amount) > 99_999_999_999_999
     )) {
-      alert("请填写所属会社、项目名称和有效的日元整数金额。");
+      alert("请填写所属会社、项目名称和有效的日元整数金額。");
       return;
     }
     const total = updates.reduce((sum, item) => sum + item.amount, 0);
     if (!Number.isSafeInteger(total)) {
-      alert("手动工資项目合计超出安全金额范围，请分开录入或缩小金额。");
+      alert("手動工資项目合计超出安全金額范围，请分开录入或缩小金額。");
       return;
     }
     const saved = updates.map(({ draft, amount }) => ({
@@ -2188,7 +2188,7 @@ export default function Home() {
   }
   async function exportCompanyWages() {
     if (companyDriverFinanceDetails.length === 0 && monthDriverWageItems.length === 0) {
-      alert("所选月份及所属会社暂无司机工資记录。");
+      alert("所选月份及所属会社暂无運転士工資记录。");
       return;
     }
     try {
@@ -2205,7 +2205,7 @@ export default function Home() {
         })),
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "会社工資总表导出失败，请重试。");
+      alert(error instanceof Error ? error.message : "会社工資総表导出失败，请重试。");
     }
   }
   const filteredVehicleFinanceDetails = monthlyFinanceOrders
@@ -2248,7 +2248,7 @@ export default function Home() {
         error: "",
       };
     } catch (error) {
-      return { rows: [], error: error instanceof Error ? error.message : "車両月度汇总失败，请刷新后重试。" };
+      return { rows: [], error: error instanceof Error ? error.message : "車両月度汇総失败，请刷新后重试。" };
     }
   })();
   const vehicleSummaryTotals = totalVehicleSummaries(vehicleSummaryResult.rows);
@@ -2375,12 +2375,12 @@ export default function Home() {
       if (!description && supply.amount.trim() === "") continue;
       if (!description || amount === null) {
         setVehicleMonthlyFinanceError(
-          "请为每条备品明細填写名称和非负整数金额。",
+          "请为每条备品明細填写名称和非负整数金額。",
         );
         return;
       }
       if (description.length > 300 || amount > 99_999_999_999_999) {
-        setVehicleMonthlyFinanceError("备品名称最多 300 个字符，金额不能超过 99999999999999 日元。");
+        setVehicleMonthlyFinanceError("备品名称最多 300 个字符，金額不能超过 99999999999999 日元。");
         return;
       }
       if (supplies.length >= 100) {
@@ -2411,7 +2411,7 @@ export default function Home() {
           supplies.reduce((sum, supply) => sum + supply.amount, 0),
       )
     ) {
-      setVehicleMonthlyFinanceError("費用、备品金额和公里数必须在有效范围内。");
+      setVehicleMonthlyFinanceError("費用、备品金額和公里数必须在有效范围内。");
       return;
     }
     if (
@@ -2464,7 +2464,7 @@ export default function Home() {
           regionNames: Object.fromEntries(regionNameById),
         });
       } catch (error) {
-        alert(error instanceof Error ? error.message : "車両月度汇总导出失败，请重试。");
+        alert(error instanceof Error ? error.message : "車両月度汇総导出失败，请重试。");
       }
       return;
     }
@@ -2598,7 +2598,7 @@ export default function Home() {
       balanceCompanyFilter === "" ||
       balanceCompanyFilter === "__unassigned_company__"
     ) {
-      setBalanceExpenseError("请選択具体所属会社后再保存收支金额。");
+      setBalanceExpenseError("请選択具体所属会社后再保存收支金額。");
       return;
     }
     const items = balanceExpenseItems.filter(
@@ -2614,13 +2614,13 @@ export default function Home() {
         value < 0 ||
         value > 99_999_999_999_999
       ) {
-        setBalanceExpenseError("每项收支金额必须是 0 至 99999999999999 的整数。");
+        setBalanceExpenseError("每项收支金額必须是 0 至 99999999999999 的整数。");
         return;
       }
       amounts.set(item.id, value);
     }
     if (amounts.size === 0) {
-      setBalanceExpenseError("没有需要保存的金额变更。");
+      setBalanceExpenseError("没有需要保存的金額变更。");
       return;
     }
     setBalanceExpenseItems((records) =>
@@ -2647,7 +2647,7 @@ export default function Home() {
 
   function deleteBalanceExpenseItem(item: BalanceExpenseItem) {
     requestDelete(
-      `确定删除「${item.companyName || "未填写会社"}」的${item.kind === "income" ? "收入" : "支出"}项目「${item.name}」及其所有月份金额吗？`,
+      `确定删除「${item.companyName || "未填写会社"}」的${item.kind === "income" ? "收入" : "支出"}项目「${item.name}」及其所有月份金額吗？`,
       () =>
         setBalanceExpenseItems((items) =>
           items.filter((current) => current.id !== item.id),
@@ -3005,7 +3005,7 @@ export default function Home() {
 
   function requireSpecificRegionForNewData() {
     if (!activeRegionId || activeRegionId === ALL_REGIONS_ID) {
-      setPersistenceError("新增业务数据前，请先選択一个具体地域。");
+      setPersistenceError("新增業務数据前，请先選択一个具体地域。");
       return false;
     }
     return true;
@@ -4140,7 +4140,7 @@ export default function Home() {
         calculateOrderFinance(finance).driverWages <= 99_999_999_999_999;
     });
     if (!validOrderPrice || !validFinance) {
-      alert("日元金额请输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超時時間最多填写两位小数，超時计算金额不得超出限额，行程簡概及出金备注最多 1000 字，出金状態须为有效选项。");
+      alert("日元金額请输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超時時間最多填写两位小数，超時计算金額不得超出限额，行程簡概及出金备注最多 1000 字，出金状態须为有效选项。");
       return;
     }
 
@@ -4233,7 +4233,7 @@ export default function Home() {
           Number.isSafeInteger(amount) && amount >= 0 && amount <= 99_999_999_999_999) &&
         (finance.companyAdvancePaymentNote || "").length <= 1000 && hasValidDriverPayment(finance),
       )) {
-      alert("車費、司机工資、会社立替及外注司机費用须为不超过 99,999,999,999,999 的非负日元整数；司机工資与外注費用须按費用类型選択。行程簡概及外注司机备注最多1000字，预约最多3660个日历日。");
+      alert("車費、運転士工資、会社立替及外注運転士費用须为不超过 99,999,999,999,999 的非负日元整数；運転士工資与外注費用须按費用类型選択。行程簡概及外注運転士备注最多1000字，预约最多3660个日历日。");
       return;
     }
     const savedForm: OrderDraft = {
@@ -4312,7 +4312,7 @@ export default function Home() {
         <div className="w-full max-w-lg rounded-xl border bg-white p-6 text-center shadow-sm">
           {dataLoadError ? (
             <>
-              <h1 className="text-lg font-bold text-rose-800">无法载入业务数据</h1>
+              <h1 className="text-lg font-bold text-rose-800">无法载入業務数据</h1>
               <p role="alert" className="mt-2 text-sm text-gray-700">{dataLoadError}</p>
               <p className="mt-2 text-sm text-gray-600">
                 请检查 Supabase 环境变量、数据库迁移和当前账号的激活状態。
@@ -4387,7 +4387,7 @@ export default function Home() {
     }
     if (targets.some(({ key, orderId, date }) => accountingForm[key]?.driverPaymentType !==
       allOrders.find(order => order.id === orderId)?.financeByDate[date]?.driverPaymentType)) {
-      alert("費用类型尚未保存，请先保存财务数据后再選任司机；未保存的金额不会自动提交。");
+      alert("費用类型尚未保存，请先保存财务数据后再選任運転士；未保存的金額不会自動提交。");
       return;
     }
     if (targets.some(({ key, orderId, date }) => {
@@ -4398,7 +4398,7 @@ export default function Home() {
         [finance, accountingForm[key]].some(entry => entry &&
           (withCompanyAdvanceDriver(entry, name).companyAdvancePaymentNote || "").length > 1000);
     })) {
-      alert("司机姓名加入后外注司机备注超过1000字，请先缩短备注再選任。");
+      alert("運転士姓名加入后外注運転士备注超过1000字，请先缩短备注再選任。");
       return;
     }
     setOrders(current => current.map(order => {
@@ -4748,7 +4748,7 @@ export default function Home() {
           車両月度費用功能尚未启用：请数据库管理员应用
           {" "}
           <code>supabase/migrations/20261018000000_vehicle_monthly_finance.sql</code>
-          {" "}后再录入月度費用或車両固定月費；其余业务数据已正常载入。
+          {" "}后再录入月度費用或車両固定月費；其余業務数据已正常载入。
         </p>
       )}
       {balanceExpensesMigrationPending && (
@@ -4756,15 +4756,15 @@ export default function Home() {
           收支平衡支出项目尚未启用：请数据库管理员应用
           {" "}
           <code>supabase/migrations/20261019000000_balance_expenses.sql</code>
-          {" "}后再新增项目或保存金额；其余业务数据已正常载入。
+          {" "}后再新增项目或保存金額；其余業務数据已正常载入。
         </p>
       )}
       {driverWageItemsMigrationPending && (
         <p role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          司机工資手动项目尚未启用：请数据库管理员应用
+          運転士工資手動项目尚未启用：请数据库管理员应用
           {" "}
           <code>supabase/migrations/20261103000000_driver_wage_items.sql</code>
-          {" "}后再录入；其余业务数据已正常载入。
+          {" "}后再录入；其余業務数据已正常载入。
         </p>
       )}
       {pendingSaveCount > 0 && !persistenceError && (
@@ -4896,7 +4896,7 @@ export default function Home() {
                           (position) => position === loginAccountForm.position,
                         ) && (
                           <option value={loginAccountForm.position}>
-                            {loginAccountForm.position}（现有职位）
+                            {loginAccountForm.position}（現有职位）
                           </option>
                         )}
                       {LOGIN_ACCOUNT_POSITIONS.map((position) => (
@@ -5108,14 +5108,14 @@ export default function Home() {
             >
               <div className="mb-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-4">
-                  <p className="text-sm font-semibold text-blue-800">总请求金额</p>
+                  <p className="text-sm font-semibold text-blue-800">総請求金額</p>
                   <p className="mt-2 text-2xl font-bold tabular-nums text-blue-950">
                     {formatYen(filteredFinanceTotals.requestAmount)}
                   </p>
                   <dl className="mt-3 space-y-1 border-t border-blue-200 pt-2 text-sm text-blue-950">
                     {([
                       ["口座入金", filteredFinanceRequestAmounts.bank],
-                      ["现金入金", filteredFinanceRequestAmounts.cash],
+                      ["現金入金", filteredFinanceRequestAmounts.cash],
                       ["未设置入金方式", filteredFinanceRequestAmounts.unassigned],
                     ] as const).map(([label, amount]) => (
                       <div key={label} className="flex flex-wrap justify-between gap-x-2">
@@ -5126,7 +5126,7 @@ export default function Home() {
                   <p className="mt-2 text-xs text-blue-800">按訂単入金方式分类，不代表已实际收款。</p>
                 </div>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4">
-                  <p className="text-sm font-semibold text-emerald-800">利润总和</p>
+                  <p className="text-sm font-semibold text-emerald-800">利润総和</p>
                   <p className="mt-2 text-2xl font-bold tabular-nums text-emerald-950">
                     {formatYen(filteredFinanceTotals.profit)}
                   </p>
@@ -5156,15 +5156,15 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">訂単日期</th>
                       <th className="px-4 py-3 font-semibold">訂単名称</th>
                       <th className="px-4 py-3 font-semibold">来源</th>
-                      <th className="px-4 py-3 font-semibold">司机</th>
+                      <th className="px-4 py-3 font-semibold">運転士</th>
                       <th className="px-4 py-3 font-semibold">車両番号</th>
                       <th className="px-4 py-3 text-right font-semibold">請求書状態</th>
                       <th className="px-4 py-3 text-right font-semibold">入金状態</th>
-                      <th className="px-4 py-3 text-right font-semibold">请求金额</th>
-                      <th className="px-4 py-3 text-right font-semibold">司机总立替</th>
-                      <th className="px-4 py-3 text-right font-semibold">会社总支出</th>
-                      <th className="px-4 py-3 text-right font-semibold">司机总工資</th>
-                      <th className="px-4 py-3 text-right font-semibold">訂単总利润</th>
+                      <th className="px-4 py-3 text-right font-semibold">請求金額</th>
+                      <th className="px-4 py-3 text-right font-semibold">運転士総立替</th>
+                      <th className="px-4 py-3 text-right font-semibold">会社総支出</th>
+                      <th className="px-4 py-3 text-right font-semibold">運転士総工資</th>
+                      <th className="px-4 py-3 text-right font-semibold">訂単総利润</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5256,14 +5256,14 @@ export default function Home() {
                   type="button"
                   onClick={async () => {
                     if (activeRegionId === ALL_REGIONS_ID || !selectedDriverFinanceDriver) {
-                      alert("请先選択一个分区和一位司机，再导出月度工資表。");
+                      alert("请先選択一个分区和一位運転士，再导出月度工資表。");
                       return;
                     }
                     if (
                       filteredDriverFinanceDetails.length === 0 &&
                       selectedDriverWageItems.length === 0
                     ) {
-                      alert("该司机本月暂无工資记录。");
+                      alert("该運転士本月暂无工資记录。");
                       return;
                     }
                     try {
@@ -5287,7 +5287,7 @@ export default function Home() {
                   onClick={exportCompanyWages}
                   className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
                 >
-                  会社全员工資总表（A4）
+                  会社全员工資総表（A4）
                 </button>
                 </>
               }
@@ -5326,19 +5326,19 @@ export default function Home() {
             >
               <div className="mb-2 flex flex-wrap justify-end gap-2">
                 <div className="rounded border px-4 py-2 text-right">
-                  <span className="mr-3 text-sm font-semibold">司机立替</span>
+                  <span className="mr-3 text-sm font-semibold">運転士立替</span>
                   <span className="text-lg font-bold tabular-nums">{formatYen(driverFinanceTotalAdvances)}</span>
                 </div>
                 <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-2 text-right">
                   <span className="mr-3 text-sm font-semibold text-emerald-800">
-                    工資总额
+                    工資総额
                   </span>
                   <span className="text-lg font-bold tabular-nums text-emerald-950">
                     {formatYen(driverFinanceTotalWage)}
                   </span>
                 </div>
                 <div className="rounded border border-blue-200 bg-blue-50 px-4 py-2 text-right">
-                  <span className="mr-3 text-sm font-semibold text-blue-800">支付总额</span>
+                  <span className="mr-3 text-sm font-semibold text-blue-800">支付総额</span>
                   <span className="text-lg font-bold tabular-nums text-blue-950">{formatYen(driverFinanceTotalAdvances + driverFinanceTotalWage)}</span>
                 </div>
               </div>
@@ -5358,24 +5358,24 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">服务日期</th>
                       <th className="px-4 py-3 font-semibold">訂単名称</th>
                       <th className="px-4 py-3 font-semibold">車輌番号</th>
-                      <th className="px-4 py-3 font-semibold">司机姓名</th>
+                      <th className="px-4 py-3 font-semibold">運転士姓名</th>
                       <th className="px-4 py-3 font-semibold">所属会社</th>
                       <th className="px-4 py-3 font-semibold">核算担当</th>
-                      <th className="px-4 py-3 text-right font-semibold">司机立替</th>
+                      <th className="px-4 py-3 text-right font-semibold">運転士立替</th>
                       <th className="px-4 py-3 text-right font-semibold">超時時間</th>
                       <th className="px-4 py-3 text-right font-semibold">超時工資</th>
                       <th className="px-4 py-3 text-right font-semibold">奖励工資</th>
-                      <th className="px-4 py-3 text-right font-semibold">司机比例工資</th>
-                      <th className="px-4 py-3 text-right font-semibold">司机固定工資</th>
-                      <th className="px-4 py-3 text-right font-semibold">工資总额</th>
-                      <th className="px-4 py-3 text-right font-semibold">支付总额</th>
+                      <th className="px-4 py-3 text-right font-semibold">運転士比例工資</th>
+                      <th className="px-4 py-3 text-right font-semibold">運転士固定工資</th>
+                      <th className="px-4 py-3 text-right font-semibold">工資総额</th>
+                      <th className="px-4 py-3 text-right font-semibold">支付総额</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredDriverFinanceDetails.length === 0 ? (
                       <tr>
                         <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
-                          暂无司机工資记录
+                          暂无運転士工資记录
                         </td>
                       </tr>
                     ) : (
@@ -5425,9 +5425,9 @@ export default function Home() {
               <section className="mt-4 rounded border bg-white p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="font-semibold">手动工資项目</h3>
+                    <h3 className="font-semibold">手動工資项目</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      按所选月份、司机和所属会社保存；全部会社筛选時可为每个项目单独選択会社。金额可填写正数或负数，并计入工資及支付总额。
+                      按所选月份、運転士和所属会社保存；全部会社筛选時可为每个项目单独選択会社。金額可填写正数或负数，并计入工資及支付総额。
                     </p>
                   </div>
                   <button
@@ -5446,14 +5446,14 @@ export default function Home() {
                 </div>
                 {!selectedDriverFinanceDriver ? (
                   <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    请先選択運転士，再录入手动工資项目。
+                    请先選択運転士，再录入手動工資项目。
                   </p>
                 ) : driverWageItemsMigrationPending ? (
                   <p role="alert" className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    手动工資项目尚未启用，请先应用数据库迁移后再录入。
+                    手動工資项目尚未启用，请先应用数据库迁移后再录入。
                   </p>
                 ) : driverWageItemDrafts.length === 0 ? (
-                  <p className="text-sm text-gray-500">当前月份暂无手动工資项目。</p>
+                  <p className="text-sm text-gray-500">当前月份暂无手動工資项目。</p>
                 ) : (
                   <div className="space-y-2">
                     {driverWageItemDrafts.map((draft, index) => (
@@ -5512,7 +5512,7 @@ export default function Home() {
                           />
                         </label>
                         <label className="w-48 text-sm font-medium">
-                          金额（JPY）
+                          金額（JPY）
                           <input
                             type="number"
                             min="-99999999999999"
@@ -5564,7 +5564,7 @@ export default function Home() {
                         }
                         className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        保存手动工資项目
+                        保存手動工資项目
                       </button>
                     </div>
                   </div>
@@ -5628,7 +5628,7 @@ export default function Home() {
                         {financeMonth} 月度費用与里程
                       </h3>
                       <p className="mt-1 text-xs text-gray-500">
-                        停車场費和保险費默认使用車両資料中的固定月额；保存过的月份金额不会随默认值变更。
+                        停車场費和保险費默认使用車両資料中的固定月额；保存过的月份金額不会随默认值变更。
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -5705,8 +5705,8 @@ export default function Home() {
                                 min="0"
                                 max="99999999999999"
                                 step="1"
-                                aria-label={`备品金额 ${index + 1}`}
-                                placeholder="金额（JPY）"
+                                aria-label={`备品金額 ${index + 1}`}
+                                placeholder="金額（JPY）"
                                 value={supply.amount}
                                 onChange={(event) =>
                                   setVehicleMonthlyFinanceForm({
@@ -5808,7 +5808,7 @@ export default function Home() {
               {selectedVehicleForFinance && (
                 <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                   {[
-                    ["訂単利润总和", formatYen(vehicleOrderProfit)],
+                    ["訂単利润総和", formatYen(vehicleOrderProfit)],
                     ["各种費用支出", formatYen(vehicleMonthlyExpenses)],
                     ["扣除費用后利润", formatYen(vehicleNetProfit)],
                     [
@@ -5853,10 +5853,10 @@ export default function Home() {
                           <tr>
                             <th className="px-4 py-3 font-semibold">服务月份</th>
                             <th className="px-4 py-3 font-semibold">車両番号</th>
-                            <th className="px-4 py-3 text-right font-semibold">请求总金额</th>
-                            <th className="px-4 py-3 text-right font-semibold">司机立替</th>
+                            <th className="px-4 py-3 text-right font-semibold">請求総金額</th>
+                            <th className="px-4 py-3 text-right font-semibold">運転士立替</th>
                             <th className="px-4 py-3 text-right font-semibold">会社支付</th>
-                            <th className="px-4 py-3 text-right font-semibold">司机工資</th>
+                            <th className="px-4 py-3 text-right font-semibold">運転士工資</th>
                             <th className="px-4 py-3 text-right font-semibold">固定費用与备品</th>
                             <th className="px-4 py-3 text-right font-semibold">訂単利润（扣費后）</th>
                           </tr>
@@ -5882,7 +5882,7 @@ export default function Home() {
                         </tbody>
                         <tfoot className="border-t bg-blue-50 font-semibold">
                           <tr>
-                            <td colSpan={2} className="px-4 py-3">合计／利润汇总</td>
+                            <td colSpan={2} className="px-4 py-3">合计／利润汇総</td>
                             <td className="px-4 py-3 text-right tabular-nums">{formatYen(vehicleSummaryTotals.requestAmount)}</td>
                             <td className="px-4 py-3 text-right tabular-nums">{formatYen(vehicleSummaryTotals.driverAdvances)}</td>
                             <td className="px-4 py-3 text-right tabular-nums">{formatYen(vehicleSummaryTotals.companyExpenses)}</td>
@@ -5909,11 +5909,11 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">服务日期</th>
                       <th className="px-4 py-3 font-semibold">訂単名称</th>
                       <th className="px-4 py-3 font-semibold">運転士</th>
-                      <th className="px-4 py-3 text-right font-semibold">请求金额</th>
-                      <th className="px-4 py-3 text-right font-semibold">司机总立替</th>
-                      <th className="px-4 py-3 text-right font-semibold">会社总支出</th>
-                      <th className="px-4 py-3 text-right font-semibold">司机总工資</th>
-                      <th className="px-4 py-3 text-right font-semibold">訂単总利润</th>
+                      <th className="px-4 py-3 text-right font-semibold">請求金額</th>
+                      <th className="px-4 py-3 text-right font-semibold">運転士総立替</th>
+                      <th className="px-4 py-3 text-right font-semibold">会社総支出</th>
+                      <th className="px-4 py-3 text-right font-semibold">運転士総工資</th>
+                      <th className="px-4 py-3 text-right font-semibold">訂単総利润</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5962,7 +5962,7 @@ export default function Home() {
                     title="A4 PDF 导出"
                     className="rounded border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
                   >
-                    外注司机出金明細
+                    外注運転士出金明細
                   </button>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
                     月份
@@ -5991,26 +5991,26 @@ export default function Home() {
                 </div>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                当月利润＝请求总金额＋手动输入的其他收入－下方手动输入的支出总和。不自动扣除車両費用、司机工資、立替或其他运营支出。
-                整单请求金额（訂単价格及全日期的ETC旅報、司机立替旅報、会社立替旅報、超時費）按首个服务日所在月份计入，不按天分摊。
-                首个服务日排除休运日；请求按訂単所属会社归集，其他收入和支出按手动项目所属会社及录入月份归集。
-                口座入金、现金入金按訂単入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列。
+                当月利润＝請求総金額＋手動输入的其他收入－下方手動输入的支出総和。不自動扣除車両費用、運転士工資、立替或其他运营支出。
+                整单請求金額（訂単价格及全日期的ETC旅報、運転士立替旅報、会社立替旅報、超時費）按首个服务日所在月份计入，不按天分摊。
+                首个服务日排除休运日；請求按訂単所属会社归集，其他收入和支出按手動项目所属会社及录入月份归集。
+                口座入金、現金入金按訂単入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列。
               </p>
               {balanceResult.summary ? (
               <>
               <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <section className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-4 shadow-sm">
-                  <p className="text-sm font-semibold text-blue-800">请求总和</p>
+                  <p className="text-sm font-semibold text-blue-800">請求総和</p>
                   <p className="mt-2 text-2xl font-bold tabular-nums text-blue-950">
                     {formatYen(balanceResult.summary.totals.requestAmount)}
                   </p>
                   <p className="mt-1 text-xs text-blue-800">
-                    整单请求金额归首个服务日所在月份
+                    整单請求金額归首个服务日所在月份
                   </p>
                   <dl className="mt-3 space-y-1 border-t border-blue-200 pt-2 text-sm text-blue-950">
                     {([
                       ["口座入金", balanceResult.summary.totals.bankRequestAmount],
-                      ["现金入金", balanceResult.summary.totals.cashRequestAmount],
+                      ["現金入金", balanceResult.summary.totals.cashRequestAmount],
                       ["未设置入金方式", balanceResult.summary.totals.unassignedRequestAmount],
                     ] as const).map(([label, amount]) => (
                       <div key={label} className="flex flex-wrap justify-between gap-x-2">
@@ -6020,18 +6020,18 @@ export default function Home() {
                   </dl>
                 </section>
                 <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm">
-                  <p className="text-sm font-semibold text-emerald-800">其他收入总和</p>
+                  <p className="text-sm font-semibold text-emerald-800">其他收入総和</p>
                   <p className="mt-2 text-2xl font-bold tabular-nums text-emerald-950">
                     {formatYen(balanceResult.summary.totals.incomeTotal)}
                   </p>
-                  <p className="mt-1 text-xs text-emerald-800">手动输入的其他收入当月金额合计</p>
+                  <p className="mt-1 text-xs text-emerald-800">手動输入的其他收入当月金額合计</p>
                 </section>
                 <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm">
-                  <p className="text-sm font-semibold text-emerald-800">支出总和</p>
+                  <p className="text-sm font-semibold text-emerald-800">支出総和</p>
                   <p className="mt-2 text-2xl font-bold tabular-nums text-emerald-950">
                     {formatYen(balanceResult.summary.totals.expenseTotal)}
                   </p>
-                  <p className="mt-1 text-xs text-emerald-800">仅下方手动输入项目的当月金额合计</p>
+                  <p className="mt-1 text-xs text-emerald-800">仅下方手動输入项目的当月金額合计</p>
                   <dl className="mt-3 space-y-1 border-t border-emerald-200 pt-2 text-sm text-emerald-950">
                     {(["paypay", "微信", "支付宝", "口座", ""] as const).map((method) => (
                       <div key={method} className="flex flex-wrap justify-between gap-x-2">
@@ -6041,7 +6041,7 @@ export default function Home() {
                     ))}
                   </dl>
                   <p className="mt-2 text-xs text-emerald-800">
-                    外注司机出金对账明細，仅供核对，不重复计入收支平衡；月份沿用訂単首个服务月。
+                    外注運転士出金对账明細，仅供核对，不重复计入收支平衡；月份沿用訂単首个服务月。
                   </p>
                 </section>
                 <section className="rounded-lg border border-violet-200 bg-violet-50 px-5 py-4 shadow-sm">
@@ -6051,7 +6051,7 @@ export default function Home() {
                   <p className={`mt-2 text-2xl font-bold tabular-nums ${balanceResult.summary.totals.net < 0 ? "text-red-600" : "text-black"}`}>
                     {formatYen(balanceResult.summary.totals.net)}
                   </p>
-                  <p className="mt-1 text-xs text-violet-800">请求总和 + 其他收入 - 支出总和</p>
+                  <p className="mt-1 text-xs text-violet-800">請求総和 + 其他收入 - 支出総和</p>
                 </section>
               </div>
               <div className="mb-5 overflow-x-auto rounded-lg border bg-white">
@@ -6065,7 +6065,7 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3">所属会社</th>
-                      {["请求总和", "口座入金", "现金入金", "未设置入金方式", "其他收入（手动）", "支出总和（手动）", "当月利润／亏损"].map((label) => (
+                      {["請求総和", "口座入金", "現金入金", "未设置入金方式", "其他收入（手動）", "支出総和（手動）", "当月利润／亏损"].map((label) => (
                         <th key={label} className="px-4 py-3 text-right">{label}</th>
                       ))}
                     </tr>
@@ -6105,9 +6105,9 @@ export default function Home() {
               <section key={kind} className="mb-5 overflow-hidden rounded-lg border bg-white">
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-gray-50 p-4">
                   <div>
-                    <h3 className="font-bold">手动{label}项目</h3>
+                    <h3 className="font-bold">手動{label}项目</h3>
                     <p className="mt-1 text-xs text-gray-600">
-                      {kind === "income" ? "这里的其他收入计入利润。" : "收支平衡仅扣除这里手动输入的費用。"}项目名称按会社长期保留；每月金额需单独录入并保存。
+                      {kind === "income" ? "这里的其他收入计入利润。" : "收支平衡仅扣除这里手動输入的費用。"}项目名称按会社长期保留；每月金額需单独录入并保存。
                     </p>
                   </div>
                   {balanceCompanyFilter !== "" && (
@@ -6142,7 +6142,7 @@ export default function Home() {
                 </div>
                 {balanceCompanyFilter === "" && (
                   <p className="border-b bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    请選択具体所属会社后添加项目或录入金额；全部会社视图仅用于查看汇总。
+                    请選択具体所属会社后添加项目或录入金額；全部会社视图仅用于查看汇総。
                   </p>
                 )}
                 <div className="overflow-x-auto">
@@ -6156,7 +6156,7 @@ export default function Home() {
                         <th className="px-4 py-3 font-semibold">所属会社</th>
                         <th className="px-4 py-3 font-semibold">{label}项目</th>
                         <th className="px-4 py-3 text-right font-semibold">
-                          {balanceMonth} 金额（JPY）
+                          {balanceMonth} 金額（JPY）
                         </th>
                         <th className="px-4 py-3 text-right font-semibold">操作</th>
                       </tr>
@@ -6185,7 +6185,7 @@ export default function Home() {
                                   min="0"
                                   max="99999999999999"
                                   step="1"
-                                  aria-label={`${item.name} ${balanceMonth} 金额`}
+                                  aria-label={`${item.name} ${balanceMonth} 金額`}
                                   value={
                                     balanceExpenseAmountDrafts[draftKey] ??
                                     (item.monthlyAmounts[balanceMonth] === undefined
@@ -6224,10 +6224,10 @@ export default function Home() {
                     <tfoot className="border-t bg-gray-50">
                       <tr>
                         <th colSpan={2} className="px-4 py-3 text-left">
-                          手动{label}合计
+                          手動{label}合计
                         </th>
                         <th className="px-4 py-3 text-right tabular-nums">
-                          {balanceResult.summary ? formatYen(kind === "income" ? balanceResult.summary.totals.incomeTotal : balanceResult.summary.totals.expenseTotal) : "金额无效／数据未就绪"}
+                          {balanceResult.summary ? formatYen(kind === "income" ? balanceResult.summary.totals.incomeTotal : balanceResult.summary.totals.expenseTotal) : "金額无效／数据未就绪"}
                         </th>
                         <th />
                       </tr>
@@ -6241,7 +6241,7 @@ export default function Home() {
                     </p>
                   ) : (
                     <span className="text-xs text-gray-500">
-                      新月份沿用已登记的{label}项目，金额默认空白。
+                      新月份沿用已登记的{label}项目，金額默认空白。
                     </span>
                   )}
                   {balanceCompanyFilter !== "" &&
@@ -6252,7 +6252,7 @@ export default function Home() {
                         disabled={balanceExpensesMigrationPending}
                         className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        保存本月{label}金额
+                        保存本月{label}金額
                       </button>
                     )}
                 </div>
@@ -6552,7 +6552,7 @@ export default function Home() {
                 {(restingDriverNamesByDate.get(d.date)?.length ?? 0) > 0 && (
                   <div
                     className="calendar-rest-drivers mt-1 break-words text-xs font-semibold leading-tight text-red-600"
-                    title={`司机休息：${restingDriverNamesByDate.get(d.date)!.join("、")}`}
+                    title={`運転士休息：${restingDriverNamesByDate.get(d.date)!.join("、")}`}
                   >
                     {restingDriverNamesByDate.get(d.date)!.join("、")}
                   </div>
@@ -6775,8 +6775,8 @@ export default function Home() {
                     draggable={!vehicleRecord.calendarOnly}
                     role="button"
                     tabIndex={-1}
-                    title="拖动调整車両顺序"
-                    aria-label={`拖动调整車両顺序 ${vehicleRecord.plate || vehicle}`}
+                    title="拖動调整車両顺序"
+                    aria-label={`拖動调整車両顺序 ${vehicleRecord.plate || vehicle}`}
                     onDragStart={(event) => {
                       if (vehicleRecord.calendarOnly) { event.preventDefault(); return; }
                       event.dataTransfer.effectAllowed = "move";
@@ -7466,7 +7466,7 @@ export default function Home() {
                             <button
                               type="button"
                               aria-haspopup="dialog"
-                              aria-label={`選任司机：${order.customer}`}
+                              aria-label={`選任運転士：${order.customer}`}
                               onClick={() => setDriverSelectionTarget(order.id)}
                               className="font-medium text-blue-700 hover:underline"
                             >
@@ -7698,7 +7698,7 @@ export default function Home() {
               </div>
               <div className="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-3">
                 <label className="min-w-[min(100%,20rem)] flex-1 text-sm font-medium">
-                  全体标语（司机端顶部显示）
+                  全体标语（運転士端顶部显示）
                   <input
                     type="text"
                     maxLength={100}
@@ -7766,7 +7766,7 @@ export default function Home() {
                               ));
                             }}
                             className="w-full min-w-44 rounded border p-2 text-sm disabled:bg-gray-100"
-                            placeholder="离开此栏時自动保存"
+                            placeholder="离开此栏時自動保存"
                           />
                         </td>
                         <td className="px-4 py-3">{driver.phone || "-"}</td>
@@ -8040,7 +8040,7 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">運行管理者</th>
                       <th className="px-4 py-3 font-semibold">整備管理者</th>
                       <th className="px-4 py-3 font-semibold">会社电话</th>
-                      <th className="px-4 py-3 font-semibold">营业所地址</th>
+                      <th className="px-4 py-3 font-semibold">営業所地址</th>
                       <th className="px-4 py-3 font-semibold">車庫位置</th>
                       <th className="px-4 py-3 font-semibold">振込口座</th>
                       <th className="px-4 py-3 font-semibold">T番号</th>
@@ -8133,7 +8133,7 @@ export default function Home() {
               </button>
             </div>
             <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              系统会从每条信息中识别“配車時間、上車地点、下車地点”；以下状態、司机、来源和所属公司将应用于本批所有訂単。
+              系统会从每条信息中识别“配車時間、上車地点、下車地点”；以下状態、運転士、来源和所属公司将应用于本批所有訂単。
             </p>
             <div className="space-y-4">
               <label className="block text-sm font-medium">
@@ -8173,14 +8173,14 @@ export default function Home() {
                 </select>
               </label>
               <div className="block text-sm font-medium">
-                司机
+                運転士
                 <button
                   type="button"
                   aria-haspopup="dialog"
                   onClick={() => setDriverSelectionTarget("batch")}
                   className="mt-1 w-full rounded border px-3 py-2 text-left hover:bg-blue-50"
                 >
-                  {batchOrderDriver || "未安排司机"} · 点击選任
+                  {batchOrderDriver || "未安排運転士"} · 点击選任
                 </button>
               </div>
               <div className="block text-sm font-medium">
@@ -8213,7 +8213,7 @@ export default function Home() {
                   {companies.map((company) => (
                     <option key={company} value={company}>{company}</option>
                   ))}
-                  <option value="__custom_company__">＋ 手动输入新公司</option>
+                  <option value="__custom_company__">＋ 手動输入新公司</option>
                 </select>
                 {batchOrderCustomCompanyMode && (
                   <input
@@ -8478,7 +8478,7 @@ export default function Home() {
                   className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50">
                   {getOrderDriverLabel(form)} · 点击選任
                 </button>
-                <p className="mt-1 text-xs text-gray-600">選任后统一应用到所有用車日；可在下方逐日调整司机。</p>
+                <p className="mt-1 text-xs text-gray-600">選任后统一应用到所有用車日；可在下方逐日调整運転士。</p>
               </div>
 
               {customDriverMode && (
@@ -8498,7 +8498,7 @@ export default function Home() {
 
               <fieldset className="space-y-3 rounded border border-blue-200 bg-blue-50/40 p-3">
                 <legend className="px-1 text-sm font-semibold">每日行程与車費</legend>
-                <p className="text-xs text-gray-600">司机工資与外注司机費用二选一。外注司机費用、出金方式、状態和备注由上方外注司机字段录入；下方立替費用区关联显示，不会重复计入。会社立替費用独立记录。</p>
+                <p className="text-xs text-gray-600">運転士工資与外注運転士費用二选一。外注運転士費用、出金方式、状態和备注由上方外注運転士字段录入；下方立替費用区关联显示，不会重复计入。会社立替費用独立记录。</p>
                 {getOrderDateKeys(form).map((date) => {
                   const finance = getReservationFinance(form)[date] || emptyOrderFinance;
                   return (
@@ -8561,7 +8561,7 @@ export default function Home() {
                           onChange={name => setForm(current => updateReservationDailyDriver(current, date, name))}
                         />
                         <label className="block text-sm font-medium">費用类型
-                          <select aria-label={`${date} 司机費用类型`} className="mt-1 w-full rounded border p-2"
+                          <select aria-label={`${date} 運転士費用类型`} className="mt-1 w-full rounded border p-2"
                             value={finance.driverPaymentType || ""}
                             onChange={event => {
                               const type = event.target.value;
@@ -8571,13 +8571,13 @@ export default function Home() {
                                   type, getServiceDriver(current, date))));
                             }}>
                             <option value="" disabled>選択工資或外注</option>
-                            <option value="wage">司机工資</option>
-                            <option value="company_advance">司机外注</option>
+                            <option value="wage">運転士工資</option>
+                            <option value="company_advance">運転士外注</option>
                           </select>
                         </label>
                         <div className="grid grid-cols-2 gap-2">
-                          <label className="block text-sm font-medium">司机工資（JPY）
-                            <input aria-label={`${date} 司机工資`} type="number" min="0" max="99999999999999" step="1" inputMode="numeric"
+                          <label className="block text-sm font-medium">運転士工資（JPY）
+                            <input aria-label={`${date} 運転士工資`} type="number" min="0" max="99999999999999" step="1" inputMode="numeric"
                               disabled={finance.driverPaymentType !== "wage"}
                               className="mt-1 w-full rounded border p-2 disabled:bg-gray-100"
                               value={finance.driverWage || ""}
@@ -8585,8 +8585,8 @@ export default function Home() {
                                 { driverWageMode: "fixed", driverWage: event.target.value === "" ? 0 : Number(event.target.value) }))} />
                           </label>
                           <label className="block text-sm font-medium">
-                            {finance.driverPaymentType === "company_advance" ? "外注司机費用（JPY）" : "司机外注（JPY）"}
-                            <input aria-label={`${date} ${finance.driverPaymentType === "company_advance" ? "外注司机費用" : "司机外注"}`} type="number" min="0" max="99999999999999" step="1" inputMode="numeric"
+                            {finance.driverPaymentType === "company_advance" ? "外注運転士費用（JPY）" : "運転士外注（JPY）"}
+                            <input aria-label={`${date} ${finance.driverPaymentType === "company_advance" ? "外注運転士費用" : "運転士外注"}`} type="number" min="0" max="99999999999999" step="1" inputMode="numeric"
                               disabled={finance.driverPaymentType !== "company_advance"}
                               className="mt-1 w-full rounded border p-2 disabled:bg-gray-100"
                               value={finance.externalDriverFee || ""}
@@ -8595,11 +8595,11 @@ export default function Home() {
                           </label>
                         </div>
                         {finance.driverPaymentType === "wage" && finance.driverWageMode === "percentage" &&
-                          <p className="text-xs text-amber-700">当前为比例工資；输入快捷金额后改为固定工資，奖励及超時工資仍保留。</p>}
+                          <p className="text-xs text-amber-700">当前为比例工資；输入快捷金額后改为固定工資，奖励及超時工資仍保留。</p>}
                         {finance.driverPaymentType === "company_advance" &&
                           <>
-                          <label className="block text-sm font-medium">外注司机出金方式
-                            <select aria-label={`${date} 外注司机出金方式`} className="mt-1 w-full rounded border p-2"
+                          <label className="block text-sm font-medium">外注運転士出金方式
+                            <select aria-label={`${date} 外注運転士出金方式`} className="mt-1 w-full rounded border p-2"
                               value={finance.companyAdvancePaymentMethod || ""}
                               onChange={event => {
                                 const method = event.target.value;
@@ -8616,8 +8616,8 @@ export default function Home() {
                               <option value="口座">口座</option>
                             </select>
                           </label>
-                          <label className="block text-sm font-medium">外注司机出金状態
-                            <select aria-label={`${date} 外注司机出金状態`} className="mt-1 w-full rounded border p-2"
+                          <label className="block text-sm font-medium">外注運転士出金状態
+                            <select aria-label={`${date} 外注運転士出金状態`} className="mt-1 w-full rounded border p-2"
                               value={finance.companyAdvancePaymentStatus || ""}
                               onChange={event => {
                                 const status = event.target.value;
@@ -8631,8 +8631,8 @@ export default function Home() {
                               <option value="未完成">未完成</option>
                             </select>
                           </label>
-                          <label className="block text-sm font-medium">外注司机备注
-                            <textarea aria-label={`${date} 外注司机备注`} rows={2} maxLength={1000}
+                          <label className="block text-sm font-medium">外注運転士备注
+                            <textarea aria-label={`${date} 外注運転士备注`} rows={2} maxLength={1000}
                               className="mt-1 w-full rounded border p-2" value={finance.companyAdvancePaymentNote || ""}
                               onChange={event => setForm(current => updateReservationFinance(current, date,
                                 { companyAdvancePaymentNote: event.target.value }))} />
@@ -8664,7 +8664,7 @@ export default function Home() {
                   }))}
                 />
                 <span id="order-time-hint" className="mt-1 block text-xs font-normal text-gray-500">
-                  可直接输入 0930，离开输入框后自动整理为 09:30；也可输入 09:30。
+                  可直接输入 0930，离开输入框后自動整理为 09:30；也可输入 09:30。
                 </span>
               </label>
 
@@ -8720,7 +8720,7 @@ export default function Home() {
                   {companies.map((company) => (
                     <option key={company} value={company}>{company}</option>
                   ))}
-                  <option value="__custom_company__">＋ 手动输入新公司</option>
+                  <option value="__custom_company__">＋ 手動输入新公司</option>
                 </select>
               </label>
 
@@ -8798,7 +8798,7 @@ export default function Home() {
                 onClick={() => setPendingOrderConflicts([])} className="text-2xl text-gray-500">×</button>
             </div>
             <p className="mt-3 text-sm text-gray-700">
-              以下予約在相同日期与本予約使用同一車両或同一司机，且時間重复或相近（2小時内）：
+              以下予約在相同日期与本予約使用同一車両或同一運転士，且時間重复或相近（2小時内）：
             </p>
             <ul className="mt-2 space-y-2 text-sm text-gray-700">
               {pendingOrderConflicts.map(({ order, vehicles, drivers }) => (
@@ -8809,7 +8809,7 @@ export default function Home() {
                   <div className="text-xs font-bold text-red-600">
                     {vehicles.length > 0 && `車両重复：${vehicles.join("、")}`}
                     {vehicles.length > 0 && drivers.length > 0 && "　"}
-                    {drivers.length > 0 && `司机重复：${drivers.join("、")}`}
+                    {drivers.length > 0 && `運転士重复：${drivers.join("、")}`}
                   </div>
                 </li>
               ))}
@@ -9329,7 +9329,7 @@ export default function Home() {
                 />
               </label>
               <label className="block text-sm font-medium">
-                营业所地址
+                営業所地址
                 <textarea
                   rows={2}
                   className="mt-1 w-full resize-y rounded border p-2"
@@ -9479,7 +9479,7 @@ export default function Home() {
                     ? accountingForm[driverSelectionTarget.slice("accounting-finance:".length)]?.driver || ""
                     : driverSelectionOrder?.driver || ""}
           allowManual={driverSelectionTarget !== "driver-finance-filter"}
-          emptyLabel={driverSelectionTarget === "driver-finance-filter" ? "全部司机" : "未安排司机"}
+          emptyLabel={driverSelectionTarget === "driver-finance-filter" ? "全部運転士" : "未安排運転士"}
           showServiceDays={driverSelectionTarget !== "driver-finance-filter"}
           onClose={() => setDriverSelectionTarget(null)}
           onSelect={(name, manual) => {
@@ -9550,7 +9550,7 @@ export default function Home() {
                   ? "車名,車両番号,座位数,燃油类型,車検有効期限,自賠責有効期限,備考,車両所属（可选）"
                   : batchAddType === "sources"
                     ? "来源,名（可选）,連絡先（可选）,颜色（可选）"
-                    : "会社名称,運行管理者（可选）,整備管理者（可选）,会社电话（可选）,营业所地址（可选）,車庫位置（可选）"}
+                    : "会社名称,運行管理者（可选）,整備管理者（可选）,会社电话（可选）,営業所地址（可选）,車庫位置（可选）"}
               className="w-full resize-y rounded border p-3 text-sm"
             />
             <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex justify-end gap-3 border-t bg-white px-6 py-4">
@@ -9597,7 +9597,7 @@ export default function Home() {
                     return;
                   }
                   if (!company.bankAccount || !/^T[0-9]{13}$/.test(company.taxRegistrationNumber) || !company.phone || !company.rollCallAddress) {
-                    alert("请先在所属会社登记振込口座、有效T番号、电话和营业所地址。");
+                    alert("请先在所属会社登记振込口座、有效T番号、电话和営業所地址。");
                     return;
                   }
                   const price = primaryAccountingOrderPrice;
@@ -9716,7 +9716,7 @@ export default function Home() {
                 {getOrderVehicleNumber({ ...accountingPreviewOrder, financeByDate: primaryAccountingForm })}
               </p>
               <p>
-                <span className="text-gray-500">司机：</span>
+                <span className="text-gray-500">運転士：</span>
                 {getOrderDriverLabel(allOrders.find(order => order.id === accountingPreviewOrder.id) || accountingPreviewOrder)}
               </p>
               <p>
@@ -9740,7 +9740,7 @@ export default function Home() {
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {([
-                    ["driver", "司机（全部统一）", accountingBatchDriverOptions, accountingBatchCommon.driver, "未安排司机"],
+                    ["driver", "運転士（全部统一）", accountingBatchDriverOptions, accountingBatchCommon.driver, "未安排運転士"],
                     ["orderSource", "訂単来源（全部统一）", accountingSourceOptions, accountingBatchCommon.orderSource, "未填写"],
                     ["company", "訂単所属（全部统一）", accountingCompanyOptions, accountingBatchCommon.company, "未设置"],
                     ["status", "訂単状態（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "请選択訂単状態"],
@@ -9783,7 +9783,7 @@ export default function Home() {
                           )}
                           {field !== "status" && <option value="">{emptyLabel}</option>}
                           {common && field !== "status" && !options.includes(common) && (
-                            <option value={common}>{common}（现有记录）</option>
+                            <option value={common}>{common}（現有记录）</option>
                           )}
                           {options.map((option) => (
                             <option key={option} value={option}>{option}</option>
@@ -9877,8 +9877,8 @@ export default function Home() {
                         </span>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 md:justify-end">
-                        <span>当日请求 {formatYen(dailyTotals.requestAmount)}</span>
-                        <span>ETC总额 {formatYen(dailyEtcTotal)}</span>
+                        <span>当日請求 {formatYen(dailyTotals.requestAmount)}</span>
+                        <span>ETC総额 {formatYen(dailyEtcTotal)}</span>
                         <span>燃油費 {formatYen(dailyFuelCost)}</span>
                         <span>燃油消耗 {dailyTotals.fuelConsumption.toLocaleString("ja-JP")} L</span>
                         <span>
@@ -9987,7 +9987,7 @@ export default function Home() {
                             value={getServiceDriver({ driver: "", financeByDate: { day: finance } }, "day")}
                             onChange={(driver) => updateAccountingFinance(financeKey, { driver })}
                           />
-                      <label className="block text-sm font-medium">司机費用类型
+                      <label className="block text-sm font-medium">運転士費用类型
                         <select className="mt-1 w-full rounded border p-2" value={finance.driverPaymentType || ""}
                           onChange={event => {
                             const type = event.target.value;
@@ -9996,14 +9996,14 @@ export default function Home() {
                               current[financeKey] || emptyOrderFinance, type,
                               getServiceDriver({ driver: "", financeByDate: { day: current[financeKey] } }, "day")) }));
                           }}>
-                          <option value="" disabled>请選択司机費用类型</option>
-                          <option value="wage">司机工資</option>
-                          <option value="company_advance">司机外注</option>
+                          <option value="" disabled>请選択運転士費用类型</option>
+                          <option value="wage">運転士工資</option>
+                          <option value="company_advance">運転士外注</option>
                         </select>
                       </label>
                           <label className="block text-sm font-medium">
-                            {finance.driverPaymentType === "company_advance" ? "外注司机費用（JPY）" : "司机工資快捷入力（JPY）"}
-                            <input aria-label={`${date} ${finance.driverPaymentType === "company_advance" ? "外注司机費用" : "司机工資快捷入力"}`} type="number" min="0" max="99999999999999"
+                            {finance.driverPaymentType === "company_advance" ? "外注運転士費用（JPY）" : "運転士工資快捷入力（JPY）"}
+                            <input aria-label={`${date} ${finance.driverPaymentType === "company_advance" ? "外注運転士費用" : "運転士工資快捷入力"}`} type="number" min="0" max="99999999999999"
                               step="1" inputMode="numeric" disabled={finance.driverPaymentType !== "wage" && finance.driverPaymentType !== "company_advance"}
                               className="mt-1 w-full rounded border bg-white p-2 disabled:bg-gray-100"
                               value={finance.driverPaymentType === "company_advance"
@@ -10019,11 +10019,11 @@ export default function Home() {
                           </label>
                         </div>
                         {finance.driverPaymentType === "wage" && finance.driverWageMode === "percentage" &&
-                          <p className="text-xs text-amber-700 sm:col-span-2">当前为比例工資；输入快捷金额后改为固定工資，奖励及超時工資仍保留。</p>}
+                          <p className="text-xs text-amber-700 sm:col-span-2">当前为比例工資；输入快捷金額后改为固定工資，奖励及超時工資仍保留。</p>}
                       {finance.driverPaymentType === "company_advance" &&
                         <>
-                        <label className="block text-sm font-medium">外注司机出金方式
-                          <select aria-label={`${date} 外注司机出金方式`} className="mt-1 w-full rounded border bg-white p-2"
+                        <label className="block text-sm font-medium">外注運転士出金方式
+                          <select aria-label={`${date} 外注運転士出金方式`} className="mt-1 w-full rounded border bg-white p-2"
                             value={finance.companyAdvancePaymentMethod || ""}
                             onChange={event => {
                               const method = event.target.value;
@@ -10039,8 +10039,8 @@ export default function Home() {
                             <option value="口座">口座</option>
                           </select>
                         </label>
-                        <label className="block text-sm font-medium">外注司机出金状態
-                          <select aria-label={`${date} 外注司机出金状態`} className="mt-1 w-full rounded border bg-white p-2"
+                        <label className="block text-sm font-medium">外注運転士出金状態
+                          <select aria-label={`${date} 外注運転士出金状態`} className="mt-1 w-full rounded border bg-white p-2"
                             value={finance.companyAdvancePaymentStatus || ""}
                             onChange={event => {
                               const status = event.target.value;
@@ -10053,14 +10053,14 @@ export default function Home() {
                             <option value="未完成">未完成</option>
                           </select>
                         </label>
-                        <label className="block text-sm font-medium">外注司机备注
-                          <textarea aria-label={`${date} 外注司机备注`} rows={2} maxLength={1000}
+                        <label className="block text-sm font-medium">外注運転士备注
+                          <textarea aria-label={`${date} 外注運転士备注`} rows={2} maxLength={1000}
                             className="mt-1 w-full rounded border bg-white p-2"
                             value={finance.companyAdvancePaymentNote || ""}
                             onChange={event => updateAccountingFinance(financeKey, {
                               companyAdvancePaymentNote: event.target.value,
                             })} />
-                          <span className="text-xs font-normal text-gray-600">外注司机費用不进入工資表。</span>
+                          <span className="text-xs font-normal text-gray-600">外注運転士費用不进入工資表。</span>
                         </label>
                         </>}
                       </div>
@@ -10158,7 +10158,7 @@ export default function Home() {
                                 {section.title === "立替費用" && (
                                   <div className="grid content-start gap-3 sm:col-span-2 sm:grid-cols-2">
                                   <label className="min-w-0 block text-sm font-medium">
-                                    外注司机出金方式
+                                    外注運転士出金方式
                                     <select className="mt-1 h-10 w-full rounded border bg-gray-100 p-2" disabled
                                       value={finance.driverPaymentType === "company_advance"
                                         ? finance.companyAdvancePaymentMethod || "" : ""}>
@@ -10170,7 +10170,7 @@ export default function Home() {
                                     </select>
                                   </label>
                                   <label className="min-w-0 block text-sm font-medium">
-                                    外注司机出金状態
+                                    外注運転士出金状態
                                     <select className="mt-1 h-10 w-full rounded border bg-gray-100 p-2" disabled
                                       value={finance.driverPaymentType === "company_advance"
                                         ? finance.companyAdvancePaymentStatus || "" : ""}>
@@ -10180,7 +10180,7 @@ export default function Home() {
                                     </select>
                                   </label>
                                   <label className="block text-sm font-medium sm:col-span-2">
-                                    外注司机备注
+                                    外注運転士备注
                                     <textarea rows={2} maxLength={1000} readOnly
                                       className="mt-1 h-12 w-full resize-none rounded border bg-gray-100 p-2"
                                       value={finance.driverPaymentType === "company_advance"
@@ -10195,10 +10195,10 @@ export default function Home() {
                         </fieldset>
                       ))}
                       <fieldset disabled={finance.driverPaymentType === "company_advance"} className="min-w-0 rounded border p-3 md:col-span-2 md:row-start-3 disabled:opacity-50">
-                        <legend className="px-1 text-sm font-semibold">司机工資</legend>
+                        <legend className="px-1 text-sm font-semibold">運転士工資</legend>
                         <div className={`grid gap-3 sm:grid-cols-2 ${finance.driverWageMode === "percentage" ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
                           <label className="block text-sm font-medium">
-                            司机工資方式
+                            運転士工資方式
                             <select
                               className="mt-1 w-full rounded border p-2"
                               value={finance.driverWageMode}
@@ -10215,14 +10215,14 @@ export default function Home() {
                                 }))
                               }
                             >
-                              <option value="fixed">司机固定工資</option>
-                              <option value="percentage">司机比例工資</option>
+                              <option value="fixed">運転士固定工資</option>
+                              <option value="percentage">運転士比例工資</option>
                             </select>
                           </label>
                           {finance.driverWageMode === "percentage" ? (
                             <>
                               <label className="block text-sm font-medium">
-                                司机比例工資
+                                運転士比例工資
                                 <select
                                   className="mt-1 w-full rounded border p-2"
                                   value={finance.driverWagePercentage}
@@ -10247,7 +10247,7 @@ export default function Home() {
                                 </select>
                               </label>
                               <label className="block text-sm font-medium">
-                                计算司机比例工資
+                                计算運転士比例工資
                                 <div className="relative mt-1">
                                   <input
                                     type="number"
@@ -10268,7 +10268,7 @@ export default function Home() {
                             </>
                           ) : (
                             <label className="block text-sm font-medium">
-                              司机固定工資
+                              運転士固定工資
                               <div className="relative mt-1">
                                 <input
                                   type="number"
@@ -10298,7 +10298,7 @@ export default function Home() {
                             </label>
                           )}
                           <label className="block text-sm font-medium">
-                            司机奖励工資
+                            運転士奖励工資
                             <div className="relative mt-1">
                               <input
                                 type="number"
@@ -10335,14 +10335,14 @@ export default function Home() {
               })}
             </div>
             <div className="mt-5">
-              <h3 className="mb-2 text-sm font-semibold">自动统计</h3>
+              <h3 className="mb-2 text-sm font-semibold">自動统计</h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
                 {[
-                  { label: "请求金额", amount: accountingTotals.requestAmount },
-                  { label: "司机总立替", amount: accountingTotals.driverAdvances },
-                  { label: "会社总支出", amount: accountingTotals.companyExpenses },
-                  { label: "司机总工資", amount: accountingTotals.driverWages },
-                  { label: "訂単总利润", amount: accountingTotals.profit },
+                  { label: "請求金額", amount: accountingTotals.requestAmount },
+                  { label: "運転士総立替", amount: accountingTotals.driverAdvances },
+                  { label: "会社総支出", amount: accountingTotals.companyExpenses },
+                  { label: "運転士総工資", amount: accountingTotals.driverWages },
+                  { label: "訂単総利润", amount: accountingTotals.profit },
                 ].map((item) => (
                   <div key={item.label} className="rounded border bg-gray-50 p-3">
                     <p className="text-xs text-gray-500">{item.label}</p>
@@ -10351,10 +10351,10 @@ export default function Home() {
                 ))}
               </div>
               <p className="mt-3 text-xs text-gray-500">
-                请求金额 = 訂単价格 + ETC（旅報）+ 司机立替（旅報）+ 会社立替（旅報）+ 超時请求；
-                比例工資 =（请求金额 - 司机总立替 - 会社总支出）× 50% / 60% / 70%；
-                司机总工資 = 超時工資 + 固定工資或比例工資 + 奖励工資；
-                訂単总利润 = 请求金额 - 会社总支出 - 司机总立替 - 司机总工資。
+                請求金額 = 訂単价格 + ETC（旅報）+ 運転士立替（旅報）+ 会社立替（旅報）+ 超時請求；
+                比例工資 =（請求金額 - 運転士総立替 - 会社総支出）× 50% / 60% / 70%；
+                運転士総工資 = 超時工資 + 固定工資或比例工資 + 奖励工資；
+                訂単総利润 = 請求金額 - 会社総支出 - 運転士総立替 - 運転士総工資。
               </p>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -10427,7 +10427,7 @@ export default function Home() {
                 >
                   <option value="">未選択</option>
                   <option value="口座入金">口座入金</option>
-                  <option value="现金入金">现金入金</option>
+                  <option value="現金入金">現金入金</option>
                 </select>
               </label>
               <label className="block text-sm font-semibold">
@@ -10583,7 +10583,7 @@ export default function Home() {
                     <dd className="break-words font-medium">{selectedOrderVehicleCompany?.maintenanceManager || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
-                    <dt className="text-gray-500">营业所地址</dt>
+                    <dt className="text-gray-500">営業所地址</dt>
                     <dd className="break-words whitespace-pre-wrap font-medium">{selectedOrderVehicleCompany?.rollCallAddress || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">

@@ -41,14 +41,14 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
   const dailyRows = [...data.rows].sort((first, second) => first.date.localeCompare(second.date))
     .map((row) => `<section class="day">
     <div class="day-heading"><strong>${escapeHtml(row.date)}${row.offDate ? "（休运）" : ""}</strong>
-    <span>司机：${escapeHtml(row.driver || "—")}</span><span>車両番号：${escapeHtml(row.vehicleNumber || "—")}</span></div>
+    <span>運転士：${escapeHtml(row.driver || "—")}</span><span>車両番号：${escapeHtml(row.vehicleNumber || "—")}</span></div>
     <table><tbody><tr>
     ${detail("ETC（社報）", number(row.etcCompany))}${detail("ETC（旅報）", number(row.etcTrip))}
     ${detail("燃油費", number(row.fuelCost))}${detail("燃油消耗（L）", number(row.fuelLiters))}
     ${detail("油价（JPY/L）", unitPrice(row.fuelCost, row.fuelLiters))}${detail("超時工資（工資内数）", number(row.overtime))}
-    </tr><tr>${detail("司机立替（社報）", number(row.driverAdvanceCompany))}${detail("司机立替（旅報）", number(row.driverAdvanceTrip))}
+    </tr><tr>${detail("運転士立替（社報）", number(row.driverAdvanceCompany))}${detail("運転士立替（旅報）", number(row.driverAdvanceTrip))}
     ${detail("会社立替（社報）", number(row.companyAdvanceCompany))}${detail("会社立替（旅報）", number(row.companyAdvanceTrip))}
-    ${detail("司机工資（含超時及奖励）", number(row.wages), 2)}
+    ${detail("運転士工資（含超時及奖励）", number(row.wages), 2)}
     </tr></tbody></table></section>`).join("");
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
     <title>团务費用明細</title><style>
@@ -76,24 +76,24 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     footer { margin-top: 12px; font-size: 9px; color: #555; }
     </style></head><body><div class="sheet"><article class="content">
     <header><h1>团务費用明細</h1><p class="name">${escapeHtml(data.name || "未填写訂単名称")}</p>
-    <div class="meta"><span>行程日期：${escapeHtml(data.period)}</span><span>金额单位：JPY ／ 燃油：L ／ 油价：JPY/L</span></div></header>
-    <h2>每日司机与成本明細</h2>${dailyRows}
-    <h2>整单費用汇总</h2>
+    <div class="meta"><span>行程日期：${escapeHtml(data.period)}</span><span>金額单位：JPY ／ 燃油：L ／ 油价：JPY/L</span></div></header>
+    <h2>每日運転士与成本明細</h2>${dailyRows}
+    <h2>整单費用汇総</h2>
     <table><tbody><tr>
     ${detail("ETC（社報）合计", number(sum("etcCompany")))}${detail("ETC（旅報）合计", number(sum("etcTrip")))}
     ${detail("燃油費合计", number(sum("fuelCost")))}${detail("燃油消耗合计（L）", number(sum("fuelLiters")))}
     ${detail("平均油价（JPY/L）", unitPrice(sum("fuelCost"), sum("fuelLiters")))}${detail("超時工資合计（工資内数）", number(sum("overtime")))}
-    </tr><tr>${detail("司机立替（社報）合计", number(sum("driverAdvanceCompany")))}${detail("司机立替（旅報）合计", number(sum("driverAdvanceTrip")))}
+    </tr><tr>${detail("運転士立替（社報）合计", number(sum("driverAdvanceCompany")))}${detail("運転士立替（旅報）合计", number(sum("driverAdvanceTrip")))}
     ${detail("会社立替（社報）合计", number(sum("companyAdvanceCompany")))}${detail("会社立替（旅報）合计", number(sum("companyAdvanceTrip")))}
-    ${detail("司机工資合计（含超時及奖励）", number(sum("wages")), 2)}</tr></tbody></table>
+    ${detail("運転士工資合计（含超時及奖励）", number(sum("wages")), 2)}</tr></tbody></table>
     <div class="cards">
-    <div class="card">ETC 总额<strong>${number(sum("etcCompany") + sum("etcTrip"))}</strong></div>
+    <div class="card">ETC 総额<strong>${number(sum("etcCompany") + sum("etcTrip"))}</strong></div>
     <div class="card">燃油費合计<strong>${number(sum("fuelCost"))}</strong></div>
-    <div class="card">司机立替合计<strong>${number(sum("driverAdvanceCompany") + sum("driverAdvanceTrip"))}</strong></div>
+    <div class="card">運転士立替合计<strong>${number(sum("driverAdvanceCompany") + sum("driverAdvanceTrip"))}</strong></div>
     <div class="card">会社立替合计<strong>${number(sum("companyAdvanceCompany") + sum("companyAdvanceTrip"))}</strong></div>
-    <div class="card">司机工資合计<strong>${number(sum("wages"))}</strong></div></div>
+    <div class="card">運転士工資合计<strong>${number(sum("wages"))}</strong></div></div>
     <h2>备注</h2><div class="note">${escapeHtml(data.note)}</div>
-    <footer>按当前财务编辑内容生成（未自动保存）。油价合计按总燃油費 ÷ 总消耗计算。超時工資已包含在司机工資中，请勿重复计入。</footer>
+    <footer>按当前财务编辑内容生成（未自動保存）。油价合计按総燃油費 ÷ 総消耗计算。超時工資已包含在運転士工資中，请勿重复计入。</footer>
     </article></div></body></html>`;
 }
 

@@ -105,7 +105,7 @@ const orderSchema = z.object({
   accountingStatus: z.enum(["完成核算", "未完成"]).default("未完成"),
   invoiceStatus: z.enum(["未完成", "已完成"]),
   invoiceSentDate: z.union([dateSchema, z.literal("")]),
-  depositMethod: z.enum(["", "口座入金", "现金入金"]).default(""),
+  depositMethod: z.enum(["", "口座入金", "現金入金"]).default(""),
   depositDate: z.union([dateSchema, z.literal("")]).default(""),
   accountingAssignee: z.string().max(200).default(""),
   financeNote: z.string().max(5000).default(""),
@@ -981,7 +981,7 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to load dashboard data.", error);
     return jsonResponse(
-      { error: "无法读取业务数据，请检查 Supabase 配置和数据库迁移。" },
+      { error: "无法读取業務数据，请检查 Supabase 配置和数据库迁移。" },
       { status: 500 },
     );
   }
@@ -998,7 +998,7 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+      return jsonResponse({ error: "請求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = mutationSchema.safeParse(body);
     if (!parsed.success) {
@@ -1010,7 +1010,7 @@ export async function POST(request: Request) {
         parsed.data.collection === "balanceExpenseItems" ||
         parsed.data.collection === "driverWageItems")
     ) {
-      return jsonResponse({ error: "仅管理员可以管理車両统计、收支平衡及司机工資手动项目。" }, { status: 403 });
+      return jsonResponse({ error: "仅管理员可以管理車両统计、收支平衡及運転士工資手動项目。" }, { status: 403 });
     }
     if (parsed.data.deleteIds.length > 0) {
       const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);
@@ -1040,7 +1040,7 @@ export async function POST(request: Request) {
     console.error("Failed to persist dashboard data.", error);
     if (typeof error === "object" && error !== null && "code" in error && error.code === "PDR01") {
       return jsonResponse(
-        { error: "訂単已关联司机派单或执行历史，不能永久删除；请改为取消訂単。历史记录和小票会保留。" },
+        { error: "訂単已关联運転士派单或执行历史，不能永久删除；请改为取消訂単。历史记录和小票会保留。" },
         { status: 409 },
       );
     }

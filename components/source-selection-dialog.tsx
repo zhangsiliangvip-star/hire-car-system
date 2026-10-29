@@ -84,9 +84,9 @@ export function SourceSelectionDialog({
             </button>
           ))}
         </div>
-        {matches.length === 0 && <p className="py-5 text-center text-sm text-gray-500">暂无匹配来源，可在下方手动输入。</p>}
+        {matches.length === 0 && <p className="py-5 text-center text-sm text-gray-500">暂无匹配来源，可在下方手動输入。</p>}
         <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
-          <input aria-label="手动输入来源" placeholder="手动输入新来源" maxLength={200} value={manualName}
+          <input aria-label="手動输入来源" placeholder="手動输入新来源" maxLength={200} value={manualName}
             onChange={(event) => setManualName(event.target.value)} className="min-w-0 flex-1 rounded border p-2" />
           <button type="button" disabled={!manualName.trim()} onClick={() => onSelect(manualName.trim())}
             className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">選択</button>

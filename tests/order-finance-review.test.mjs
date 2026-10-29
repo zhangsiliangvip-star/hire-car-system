@@ -158,7 +158,7 @@ test("order review drawer isolates the order and rejects without booking, removi
   assert.ok(c.states[0].rows.some(row => row.kind === "finance" && row.claim.category === "overtime"));
   assert.ok(c.states[0].rows.some(row => row.orderId === second));
   assert.equal(c.approved, 0);
-  assert.match(c.states[2], /未计入金额.*记录保留/);
+  assert.match(c.states[2], /未计入金額.*记录保留/);
 });
 test("approvals use exact claim versions and refresh totals for advances, overtime and daily fuel", async () => {
   for (const row of rows.slice(0, 3)) {

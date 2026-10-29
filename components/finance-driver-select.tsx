@@ -32,13 +32,13 @@ export function FinanceDriverSelect({
   return (
     <div>
       <div className="block text-sm font-medium">
-        当日司机
+        当日運転士
         <button
           type="button"
           onClick={() => setIsOpen(true)}
           className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50"
         >
-          {value || "未安排司机"} · 点击選任
+          {value || "未安排運転士"} · 点击選任
         </button>
       </div>
       {isOpen && (

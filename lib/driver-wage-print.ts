@@ -39,7 +39,7 @@ export function buildDriverWagePrintHtml(data: DriverWagePrintData) {
   const manualWageTotal = data.manualItems.reduce((total, item) => total + item.amount, 0);
   const totalWage = sum("totalWage") + manualWageTotal;
   const days = new Set(rows.map((row) => row.serviceDate)).size;
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>司机月度工資表</title>
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>運転士月度工資表</title>
   <style>
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
@@ -64,31 +64,31 @@ export function buildDriverWagePrintHtml(data: DriverWagePrintData) {
   .notes { margin-top: 16px; border: 1px solid #bac3cd; padding: 10px; line-height: 1.8; }
   footer { font-size: 9px; color: #555; margin-top: 14px; }
   </style></head><body><div class="sheet"><article class="content">
-  <header><h1>司机月度工資表</h1><div class="meta">
-  <span>司机：<strong>${escapeHtml(data.driver)}</strong></span><span>工資月份：${escapeHtml(data.month)}</span>
+  <header><h1>運転士月度工資表</h1><div class="meta">
+  <span>運転士：<strong>${escapeHtml(data.driver)}</strong></span><span>工資月份：${escapeHtml(data.month)}</span>
   <span>分区：${escapeHtml(data.region)}</span><span>币种：JPY</span></div></header>
   <p>有记录日数：${days} 日</p>
-  <div class="summary"><div>司机立替（工資外）<strong>¥${number(sum("driverAdvances"))}</strong></div>
-  <div>工資总额<strong>¥${number(totalWage)}</strong></div>
-  <div>支付总额<strong>¥${number(sum("driverAdvances") + totalWage)}</strong></div></div>
+  <div class="summary"><div>運転士立替（工資外）<strong>¥${number(sum("driverAdvances"))}</strong></div>
+  <div>工資総额<strong>¥${number(totalWage)}</strong></div>
+  <div>支付総额<strong>¥${number(sum("driverAdvances") + totalWage)}</strong></div></div>
   <h2>每日工資明細（日期升序，同日多单分别列示）</h2>
   <table><colgroup><col style="width:10%"><col style="width:17%"><col style="width:10%"><col style="width:9%"><col style="width:5%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:9%"></colgroup>
-  <thead><tr><th>服务日期</th><th>訂単名称／核算担当</th><th>車両番号</th><th>司机立替</th><th>超時<br>h</th><th>超時工資</th><th>奖励</th><th>比例工資</th><th>固定工資</th><th>工資总额</th><th>支付总额</th></tr></thead>
+  <thead><tr><th>服务日期</th><th>訂単名称／核算担当</th><th>車両番号</th><th>運転士立替</th><th>超時<br>h</th><th>超時工資</th><th>奖励</th><th>比例工資</th><th>固定工資</th><th>工資総额</th><th>支付総额</th></tr></thead>
   <tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.serviceDate)}</td>
   <td>${escapeHtml(row.customer)}<small>核算：${escapeHtml(row.accountingAssignee || "—")}</small></td>
   <td>${escapeHtml(row.vehicleNumber || "—")}</td>${cell(row.driverAdvances)}${cell(row.overtimeHours)}
   ${cell(row.overtimeFee)}${cell(row.bonusWage)}${cell(row.percentageWage)}${cell(row.fixedWage)}${cell(row.totalWage)}${cell(row.driverAdvances + row.totalWage)}</tr>`).join("")}</tbody>
   <tfoot><tr><td colspan="3">月度合计</td>${cell(sum("driverAdvances"))}${cell(sum("overtimeHours"))}${cell(sum("overtimeFee"))}${cell(sum("bonusWage"))}${cell(sum("percentageWage"))}${cell(sum("fixedWage"))}${cell(sum("totalWage"))}${cell(sum("driverAdvances") + sum("totalWage"))}</tr></tfoot></table>
-  ${data.manualItems.length > 0 ? `<h2>其他手动工資项目</h2><table><thead><tr><th>项目名称</th><th>金额（JPY）</th></tr></thead><tbody>${data.manualItems.map((item) => `<tr><td>${escapeHtml(item.name)}</td>${cell(item.amount)}</tr>`).join("")}</tbody><tfoot><tr><td>手动项目合计</td>${cell(manualWageTotal)}</tr></tfoot></table>` : ""}
-  <div class="notes">工資总额 = 超時工資 ＋ 奖励 ＋ 比例工資 ＋ 固定工資 ＋ 手动工資项目。<br>
-  支付总额 = 司机立替 ＋ 工資总额；司机立替不计入工資，不含会社立替。未扣除税費或其他扣款，不代表扣税后实発工資或已支付金额。<br>
+  ${data.manualItems.length > 0 ? `<h2>其他手動工資项目</h2><table><thead><tr><th>项目名称</th><th>金額（JPY）</th></tr></thead><tbody>${data.manualItems.map((item) => `<tr><td>${escapeHtml(item.name)}</td>${cell(item.amount)}</tr>`).join("")}</tbody><tfoot><tr><td>手動项目合计</td>${cell(manualWageTotal)}</tr></tfoot></table>` : ""}
+  <div class="notes">工資総额 = 超時工資 ＋ 奖励 ＋ 比例工資 ＋ 固定工資 ＋ 手動工資项目。<br>
+  支付総额 = 運転士立替 ＋ 工資総额；運転士立替不计入工資，不含会社立替。未扣除税費或其他扣款，不代表扣税后实発工資或已支付金額。<br>
   有记录日数按不同服务日期去重统计，不作为考勤认定。</div>
-  <footer>依据当前所选月份、分区和司机的已保存财务记录生成。訂単价格、请求金额及利润不在本表中显示。</footer>
+  <footer>依据当前所选月份、分区和運転士的已保存财务记录生成。訂単价格、請求金額及利润不在本表中显示。</footer>
   </article></div></body></html>`;
 }
 
 export async function printDriverWages(data: DriverWagePrintData) {
-  await printA4Html(buildDriverWagePrintHtml(data), "司机月度工資表打印");
+  await printA4Html(buildDriverWagePrintHtml(data), "運転士月度工資表打印");
 }
 
 type CompanyWagePrintData = {
@@ -126,7 +126,7 @@ export function buildCompanyWagePrintHtml(data: CompanyWagePrintData) {
   const manualWageTotal = data.manualItems.reduce((total, item) => total + item.amount, 0);
   const sum = (key: "fixed" | "percentage" | "overtime" | "bonus" | "wages" | "advances") =>
     rows.reduce((total, row) => total + row[key], 0);
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>所属会社全员工資总表</title><style>
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>所属会社全员工資総表</title><style>
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; color: #172033; background: white; }
@@ -146,27 +146,27 @@ export function buildCompanyWagePrintHtml(data: CompanyWagePrintData) {
   small { display: block; margin-top: 3px; color: #555; }
   .notes { border: 1px solid #bac3cd; padding: 10px; margin-top: 18px; line-height: 1.8; }
   </style></head><body><div class="sheet"><article class="content">
-  <header><h1>所属会社全员工資总表</h1><div class="meta">
+  <header><h1>所属会社全员工資総表</h1><div class="meta">
   <span>所属会社：<strong>${escapeHtml(data.company)}</strong></span>
   <span>月份：${escapeHtml(data.month)}</span><span>分区：${escapeHtml(data.region)}</span><span>币种：JPY</span></div></header>
-  <p>司机人数：${rows.length} 人</p>
-  <div class="summary"><div>司机立替（工資外）<strong>¥${number(sum("advances"))}</strong></div>
-  <div>工資总额<strong>¥${number(sum("wages") + manualWageTotal)}</strong></div>
-  <div>支付总额<strong>¥${number(sum("advances") + sum("wages") + manualWageTotal)}</strong></div></div>
+  <p>運転士人数：${rows.length} 人</p>
+  <div class="summary"><div>運転士立替（工資外）<strong>¥${number(sum("advances"))}</strong></div>
+  <div>工資総额<strong>¥${number(sum("wages") + manualWageTotal)}</strong></div>
+  <div>支付総额<strong>¥${number(sum("advances") + sum("wages") + manualWageTotal)}</strong></div></div>
   <table><colgroup><col style="width:4%"><col style="width:16%"><col style="width:6%">
   <col style="width:11%"><col style="width:9%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:13%"><col style="width:13%"></colgroup>
-  <thead><tr><th>序号</th><th>司机／分区</th><th>记录<br>日数</th><th>司机立替</th><th>超時工資</th><th>奖励</th><th>比例工資</th><th>固定工資</th><th>工資总额</th><th>支付总额</th></tr></thead>
+  <thead><tr><th>序号</th><th>運転士／分区</th><th>记录<br>日数</th><th>運転士立替</th><th>超時工資</th><th>奖励</th><th>比例工資</th><th>固定工資</th><th>工資総额</th><th>支付総额</th></tr></thead>
   <tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(row.driver)}<small>${escapeHtml(row.region)}</small></td>
   ${cell(row.dates.size)}${cell(row.advances)}${cell(row.overtime)}${cell(row.bonus)}${cell(row.percentage)}${cell(row.fixed)}${cell(row.wages)}${cell(row.advances + row.wages)}</tr>`).join("")}</tbody>
   <tfoot><tr><td colspan="3">合计</td>${cell(sum("advances"))}${cell(sum("overtime"))}${cell(sum("bonus"))}${cell(sum("percentage"))}${cell(sum("fixed"))}${cell(sum("wages"))}${cell(sum("advances") + sum("wages"))}</tr></tfoot></table>
-  ${data.manualItems.length > 0 ? `<h2>其他手动工資项目</h2><table><thead><tr><th>司机</th><th>所属会社</th><th>项目</th><th>金额（JPY）</th></tr></thead><tbody>${data.manualItems.map((item) => `<tr><td>${escapeHtml(item.driver)}</td><td>${escapeHtml(item.companyName || "未设置")}</td><td>${escapeHtml(item.name)}</td>${cell(item.amount)}</tr>`).join("")}</tbody><tfoot><tr><td colspan="3">手动项目合计</td>${cell(manualWageTotal)}</tr></tfoot></table>` : ""}
-  <div class="notes">按訂単所属会社归集所选月份的全部司机，不受单个司机筛选影响。<br>
-  同名司机跨分区分别列示；同一司机同一天的多笔訂単，记录日数只计一次。无财务记录的司机不列入本表。<br>
-  工資总额 = 超時工資 ＋ 奖励 ＋ 比例工資 ＋ 固定工資 ＋ 手动工資项目。支付总额 = 司机立替 ＋ 工資总额。<br>
-  司机立替不计入工資，不含会社立替。未扣除税費或其他扣款，不代表扣税后实発工資或已支付金额。</div>
+  ${data.manualItems.length > 0 ? `<h2>其他手動工資项目</h2><table><thead><tr><th>運転士</th><th>所属会社</th><th>项目</th><th>金額（JPY）</th></tr></thead><tbody>${data.manualItems.map((item) => `<tr><td>${escapeHtml(item.driver)}</td><td>${escapeHtml(item.companyName || "未设置")}</td><td>${escapeHtml(item.name)}</td>${cell(item.amount)}</tr>`).join("")}</tbody><tfoot><tr><td colspan="3">手動项目合计</td>${cell(manualWageTotal)}</tr></tfoot></table>` : ""}
+  <div class="notes">按訂単所属会社归集所选月份的全部運転士，不受单个運転士筛选影响。<br>
+  同名運転士跨分区分别列示；同一運転士同一天的多笔訂単，记录日数只计一次。无财务记录的運転士不列入本表。<br>
+  工資総额 = 超時工資 ＋ 奖励 ＋ 比例工資 ＋ 固定工資 ＋ 手動工資项目。支付総额 = 運転士立替 ＋ 工資総额。<br>
+  運転士立替不计入工資，不含会社立替。未扣除税費或其他扣款，不代表扣税后实発工資或已支付金額。</div>
   </article></div></body></html>`;
 }
 
 export async function printCompanyWages(data: CompanyWagePrintData) {
-  await printA4Html(buildCompanyWagePrintHtml(data), "所属会社全员工資总表打印");
+  await printA4Html(buildCompanyWagePrintHtml(data), "所属会社全员工資総表打印");
 }

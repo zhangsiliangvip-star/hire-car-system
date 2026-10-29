@@ -64,7 +64,7 @@ export default function Review() {
     const note = notes[`${row.claim.assignmentId}-${row.claim.category}`] || "";
     if (decision === "rejected" && !note.trim()) { setError("退回時请填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      `确认${financeCategoryLabels[row.claim.category]}入账？仅处理此分类；请核对是否已手工录入相同費用。` : "确认退回给司机修改？")) return;
+      `确认${financeCategoryLabels[row.claim.category]}入账？仅处理此分类；请核对是否已手工录入相同費用。` : "确认退回给運転士修改？")) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -87,7 +87,7 @@ export default function Review() {
     const note = notes[row.claim.id] || "";
     if (decision === "rejected" && !note.trim()) { setError("退回時请填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      "确认将燃油費追加到指定訂単当天的燃油費？公司支付／油卡，不加到司机立替和应発金额。请核对是否已手工录入。" : "确认退回燃油費？")) return;
+      "确认将燃油費追加到指定訂単当天的燃油費？公司支付／油卡，不加到運転士立替和应発金額。请核对是否已手工录入。" : "确认退回燃油費？")) return;
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -116,7 +116,7 @@ export default function Review() {
     } catch (cause) { if (current === generation.current) { console.error("Review receipt failed.", cause); setError(cause instanceof Error ? cause.message : "票据读取失败。"); } }
   }
   return <main className="driver-main driver-finance">
-    <Link className="driver-link" href="/">‹ 预约管理</Link><h1>司机财务审核</h1>
+    <Link className="driver-link" href="/">‹ 预约管理</Link><h1>運転士财务审核</h1>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy}
       onChange={event => { if (event.target.value) {
         setBusy(true); setRows([]); setError(""); setNotice(""); setReceipt(""); setNotes({}); setMonth(event.target.value);
@@ -126,7 +126,7 @@ export default function Review() {
       setBusy(true); setRows([]); setError(""); setReceipt(""); setNotes({}); setRevision(value => value + 1);
       setFuelRows([]);
     }}>刷新</button>
-    <p className="driver-muted">立替金额作为新增費用追加；超時小時数替换当日原值，单价仍由后台设定。确认前请核对重复票据。司机月工資只读，包含后台手动加减项目。</p>
+    <p className="driver-muted">立替金額作为新增費用追加；超時小時数替换当日原值，单价仍由后台设定。确认前请核对重复票据。運転士月工資只读，包含后台手動加减项目。</p>
     {error && <p role="alert" className="driver-error">{error}</p>}
     {notice && <p role="status" className="driver-notice">{notice}</p>}
     {busy && <p className="driver-muted">正在处理…</p>}
@@ -156,7 +156,7 @@ export default function Review() {
       <h2>{row.claim.date} · {row.driverName} · 燃油費</h2>
       <p>关联訂単：{row.pickup} → {row.destination}</p>
       <p>¥{row.claim.amount.toLocaleString()} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已计入訂単燃油費" : "已退回"}</p>
-      <p className="driver-muted">每天一笔，全部关联指定訂単当日燃油費；不计司机立替及应発金额。</p>
+      <p className="driver-muted">每天一笔，全部关联指定訂単当日燃油費；不计運転士立替及应発金額。</p>
       {row.claim.receipts.map((path, index) => <button className="driver-link" key={path}
         onClick={() => void viewReceipt(path, "driver-fuel-receipts")}>油票 {index + 1}　</button>)}
       {row.claim.status === "pending" ? <>
@@ -168,6 +168,6 @@ export default function Review() {
     </section>)}
     {receipt && <section className="driver-card"><button className="driver-link" onClick={() => setReceipt("")}>关闭票据</button>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="finance-receipt" src={receipt} alt="司机立替票据" /></section>}
+      <img className="finance-receipt" src={receipt} alt="運転士立替票据" /></section>}
   </main>;
 }

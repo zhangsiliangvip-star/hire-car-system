@@ -6,7 +6,7 @@ export function summarizeRequestAmounts(
   const totals = { bank: 0, cash: 0, unassigned: 0 };
   for (const row of rows) {
     if (row.depositMethod === "口座入金") totals.bank += row.requestAmount;
-    else if (row.depositMethod === "现金入金") totals.cash += row.requestAmount;
+    else if (row.depositMethod === "現金入金") totals.cash += row.requestAmount;
     else if (row.depositMethod === "") totals.unassigned += row.requestAmount;
     else throw new Error("訂単入金方式无效，请检查訂単資料。");
   }

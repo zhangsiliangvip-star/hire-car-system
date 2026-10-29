@@ -26,7 +26,7 @@ export default function DriverBrand() {
   }
 
   return <header className="driver-brand">
-    <span className="driver-brand-title">GO RIDE <span>司机端</span></span>
+    <span className="driver-brand-title">GO RIDE <span>運転士端</span></span>
     {pathname !== "/driver/login" && <div className="driver-brand-actions">
       <Link className="driver-header-button" href="/driver/profile">个人資料</Link>
       <button className="driver-header-button" type="button" disabled={busy} onClick={() => void logout()}>

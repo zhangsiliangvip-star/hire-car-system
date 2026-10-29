@@ -136,7 +136,7 @@ test("existing emails are never hijacked, duplicate driver bindings and missing 
   assert.equal(duplicate.calls.some(call => call.name === "bind_driver_identity"), false);
   const partial = api({ admin: true, bindError: { code: "23505" } });
   const response = await partial.POST(request(command)); assert.equal(response.status, 503);
-  assert.match((await response.json()).error, /已创建但司机绑定未完成/);
+  assert.match((await response.json()).error, /已创建但運転士绑定未完成/);
 });
 test("password reset targets only exact linked driver/version and never stores or returns cleartext", async () => {
   const command = { driverId: id, userId, expectedVersion: 1, password: "Test-only-password-123" };

@@ -80,8 +80,8 @@ export function OrderReceipts({ orderId, date }: { orderId: string; date: string
     };
   }, [orderId, date, revision]);
   if (data?.enabled === false) return null;
-  return <section className={styles.receipts} aria-label="司机已批准小票">
-    <div className={styles.toolbar}><span>司机小票（仅已批准）</span>
+  return <section className={styles.receipts} aria-label="運転士已批准小票">
+    <div className={styles.toolbar}><span>運転士小票（仅已批准）</span>
       <button type="button" className={styles.refresh} onClick={() => {
         setData(null); setSelected(null); setError(""); setRevision(value => value + 1);
       }}>小票刷新</button>

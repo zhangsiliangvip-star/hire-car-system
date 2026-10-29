@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     const identity = await requireDriver();
     if (identity.response) return identity.response;
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode()))
-      return jsonResponse({ error: "请求来源无效。" }, { status: 403 });
+      return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     const text = await request.text();
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = financeSubmissionSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "请检查明細、金额和超時小時数。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "请检查明細、金額和超時小時数。" }, { status: 400 });
     const item = parsed.data;
     const { data, error } = item.historical
       ? await identity.supabase.rpc("submit_driver_historical_finance", {

@@ -23,6 +23,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Driver identity request failed.", error);
-    return jsonResponse({ error: "无法读取司机身份，请稍后重试。" }, { status: 500 });
+    return jsonResponse({ error: "无法读取運転士身份，请稍后重试。" }, { status: 500 });
   }
 }

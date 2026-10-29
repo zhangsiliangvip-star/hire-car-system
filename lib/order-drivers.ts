@@ -19,7 +19,7 @@ function getServiceDriverPresentation(order: DriverAssignment, date: string): { 
   const finance = order.financeByDate?.[date];
   if (finance?.driverPaymentType === "company_advance") {
     const label = finance.companyAdvancePaymentNote?.split(/\r?\n/)
-      .find(line => line.startsWith("外注司机："))?.slice("外注司机：".length).trim() || "";
+      .find(line => line.startsWith("外注運転士："))?.slice("外注運転士：".length).trim() || "";
     return { label, isExternal: Boolean(label) };
   }
   return { label: getServiceDriver(order, date), isExternal: false };

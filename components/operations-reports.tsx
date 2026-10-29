@@ -110,7 +110,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
     className="m-auto max-h-[92dvh] w-[min(1100px,96vw)] overflow-y-auto rounded-lg p-4 shadow-xl backdrop:bg-black/40"
     onCancel={event => { event.preventDefault(); close(); }}>
     <h2 id="operation-editor-title" className="mb-2 text-lg font-bold">编辑运行日報 · {row.driverName}</h2>
-    <p className="mb-3 text-sm text-gray-600">全部日期時間为日本時間。修改不改变司机归属；出库日期须与日報日期一致。归库后经由地须填写完整。
+    <p className="mb-3 text-sm text-gray-600">全部日期時間为日本時間。修改不改变運転士归属；出库日期须与日報日期一致。归库后经由地须填写完整。
       旧日報点呼日期会预填，请核对后保存。切换到其他应用／标签页会清除未保存的编辑。</p>
     <form onSubmit={save} onInput={markDirty} className="space-y-4" onChange={event => {
       if (event.target instanceof HTMLInputElement && event.target.name === "serviceDate") {
@@ -182,7 +182,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
         {input("returnKm", "归库公里表", r.returnKm, "number")}
         {input("returnedAt", "到着日期時間", toJapanInput(r.returnedAt), "datetime-local")}
       </fieldset>
-      <fieldset disabled={busy} className="space-y-2"><legend className="mb-2 font-semibold">休息记录（不从工作总時长中扣除）</legend>
+      <fieldset disabled={busy} className="space-y-2"><legend className="mb-2 font-semibold">休息记录（不从工作総時长中扣除）</legend>
         {rests.map((rest, i) => <div key={rest.key} className="grid items-end gap-3 sm:grid-cols-3">
           {input(`${rest.key}.startedAt`, `休息 ${i + 1} 开始`, toJapanInput(rest.startedAt), "datetime-local", true)}
           {input(`${rest.key}.endedAt`, `休息 ${i + 1} 结束`, toJapanInput(rest.endedAt), "datetime-local")}
@@ -270,7 +270,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
   const vehicles = [...new Set([...(vehicle ? [vehicle] : []), ...rows.filter(row => !company || row.company === company).flatMap(row =>
     row.report.header?.vehicleNumber ? [row.report.header.vehicleNumber] : [])])].sort();
   async function remove(row: OperationRow) {
-    if (lock.current || !window.confirm(`永久删除 ${operationDateLabel(row.report.serviceDate)} · ${row.driverName} 的日報？\n司机端的日報、所有经由地和修改历史将全部清除，不留删除日志，无法恢复。`)) return;
+    if (lock.current || !window.confirm(`永久删除 ${operationDateLabel(row.report.serviceDate)} · ${row.driverName} 的日報？\n運転士端的日報、所有经由地和修改历史将全部清除，不留删除日志，无法恢复。`)) return;
     lock.current = true; setBusy(true); setNotice(""); setError("");
     const current = new AbortController(); write.current = current;
     try {
@@ -320,12 +320,12 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
       月批量打印遵循当前会社、車両番号和日期筛选，每份日報一页；清空日期可打印整月。导出PDF時在打印窗口選択“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
     {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-    {!data && !error && <p role="status">正在读取司机日報…</p>}
+    {!data && !error && <p role="status">正在读取運転士日報…</p>}
     {data && !data.enabled && <p role="status">运行管理尚未在此环境启用，目前仅在隔离测试版开放。</p>}
     {data?.enabled && <><p className="text-sm text-gray-600">共 {filtered.length} 份日報（含出库中）</p>
       <div className="overflow-x-auto rounded border bg-white"><table className="w-full min-w-[1700px] border-collapse text-sm">
         <thead className="bg-gray-50"><tr>{["日期", "車両番号", "運転手", "出勤点呼時間", "出库地点", "出発時間",
-          "接客地点", "下客地点", "归库地点", "到着時間", "退勤点呼時間", "工作总時长", "操作"].map(label =>
+          "接客地点", "下客地点", "归库地点", "到着時間", "退勤点呼時間", "工作総時长", "操作"].map(label =>
           <th key={label} className="whitespace-nowrap border-b p-2 text-center">{label}</th>)}</tr></thead>
         <tbody>{filtered.map(row => {
           const r = row.report; const stops = r.stops.filter(stop => stop.address.trim()); const hours = dutyDuration(r);
@@ -342,7 +342,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
               <button className={`${buttonClass} text-red-700`} disabled={busy} onClick={() => void remove(row)}>删除</button>
               <button className={buttonClass} disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 运行日報`)}>导出PDF</button>
             </div></td></tr>;
-        })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有司机日報。</td></tr>}</tbody>
+        })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
       </table></div></>}
     {editing && <OperationReportEditor key={editing.report.id} row={editing} onClose={() => setEditing(null)}
       onSaved={() => { setEditing(null); setNotice("日報已保存，修改记录已保留。"); setData(null); setRevision(v => v + 1); }} />}

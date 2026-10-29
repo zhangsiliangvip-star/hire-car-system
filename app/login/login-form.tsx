@@ -35,11 +35,11 @@ export default function LoginForm({
         } else if (error.code === "email_not_confirmed") {
           setErrorMessage("邮箱尚未验证，请先完成邀请邮件中的验证。");
         } else if (error.status === 429) {
-          setErrorMessage("登录请求过于频繁，请稍后再试。");
+          setErrorMessage("登录請求过于频繁，请稍后再试。");
         } else if (!error.status || error.status >= 500) {
           setErrorMessage("暂時无法连接登录服务，请检查网络或稍后重试。");
         } else {
-          setErrorMessage(`登录服务拒绝了请求（${error.code ?? error.status}），请联系管理员核查。`);
+          setErrorMessage(`登录服务拒绝了請求（${error.code ?? error.status}），请联系管理员核查。`);
         }
         return;
       }
@@ -73,7 +73,7 @@ export default function LoginForm({
             </div>
             <div className="relative z-10 mt-12 hidden border-t border-white/15 pt-6 lg:block">
               <p className="text-xs tracking-widest text-slate-400">東京 · 大阪 · 北海道</p>
-              <p className="mt-3 text-sm leading-7 text-slate-300">预约排車、财务核算与业务协作，<br />在一个清晰的工作台中完成。</p>
+              <p className="mt-3 text-sm leading-7 text-slate-300">预约排車、财务核算与業務协作，<br />在一个清晰的工作台中完成。</p>
             </div>
           </section>
           <form onSubmit={signIn} aria-label="账号登录" aria-busy={isSubmitting}
@@ -121,7 +121,7 @@ export default function LoginForm({
         </a>
           </form>
         </div>
-        <p className="mt-6 text-center text-xs leading-6 text-slate-500">内部业务管理系统 · 仅限授权人员使用</p>
+        <p className="mt-6 text-center text-xs leading-6 text-slate-500">内部業務管理系统 · 仅限授权人员使用</p>
       </div>
     </main>
   );

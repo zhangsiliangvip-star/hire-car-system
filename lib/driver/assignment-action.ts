@@ -24,7 +24,7 @@ export async function assignmentAction(
     if (identity.response) return identity.response;
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode())) {
       console.error("Driver action origin rejected.");
-      return jsonResponse({ error: "请求来源无效。" }, { status: 403 });
+      return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     }
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
       return jsonResponse({ error: "请使用 JSON 提交。" }, { status: 415 });
@@ -34,10 +34,10 @@ export async function assignmentAction(
       return jsonResponse({ error: "行程不存在或已撤派。" }, { status: 404 });
     }
     const text = await request.text();
-    if (text.length > 1024) return jsonResponse({ error: "请求内容过大。" }, { status: 413 });
+    if (text.length > 1024) return jsonResponse({ error: "請求内容过大。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch {
-      return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
+      return jsonResponse({ error: "請求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = action === "acknowledge"
       ? acknowledgeSchema.transform((value) => ({ ...value, state: "acknowledged" })).safeParse(body)

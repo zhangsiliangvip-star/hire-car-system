@@ -36,11 +36,11 @@ export async function POST(request: Request) {
     if (!profile) return jsonResponse({ error: "需要后台账号。" }, { status: 403 });
     if (new URL(request.url).search) return jsonResponse({ error: "不支持查询参数。" }, { status: 400 });
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode()))
-      return jsonResponse({ error: "请求来源无效。" }, { status: 403 });
+      return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json")
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     const text = await request.text();
-    if (text.length > 131072) return jsonResponse({ error: "请求过大。" }, { status: 413 });
+    if (text.length > 131072) return jsonResponse({ error: "請求过大。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON格式无效。" }, { status: 400 }); }
     const parsed = operationCommandSchema.safeParse(body);
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       const status = error.code === "42501" ? 403 : error.code === "P0002" ? 404 :
         ["40001", "23505"].includes(error.code) ? 409 :
         ["22023", "22007", "22008", "22P02", "23514"].includes(error.code) ? 422 : 503;
-      return jsonResponse({ error: status === 409 ? "日報已被司机或后台修改，请关闭后刷新核对。" :
+      return jsonResponse({ error: status === 409 ? "日報已被運転士或后台修改，请关闭后刷新核对。" :
         status === 404 ? "日報已不存在，请刷新列表。" :
         status === 422 ? "保存失败：请检查時間先后、公里数倒退及未完成的经由地／休息；允许提前填写，但顺序必须正确。" :
         "日報操作未获确认，请刷新核对后重试。" }, { status });

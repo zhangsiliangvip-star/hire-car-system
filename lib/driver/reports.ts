@@ -41,7 +41,7 @@ export const reportSchema = z.object({
 }).strict();
 export type DailyReport = z.infer<typeof reportSchema>;
 export const reportTimeErrors: Record<string, string> = {
-  PVS01: "訂単关联与司机或服务日不一致，请重新選択关联訂単。",
+  PVS01: "訂単关联与運転士或服务日不一致，请重新選択关联訂単。",
   PVS02: "请填写本地域已登记且唯一的車両番号；关联日報保存后会同步訂単。",
   PDT01: "出勤点呼時間不能晚于出库時間，请检查日期和時間。",
   PDT02: "退勤点呼時間不能早于出库時間，请检查日期和時間。",

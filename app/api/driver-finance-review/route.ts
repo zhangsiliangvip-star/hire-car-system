@@ -32,11 +32,11 @@ export async function POST(request: Request) {
     const { supabase, profile } = await getAuthenticatedProfile();
     if (profile?.role !== "admin") return jsonResponse({ error: "需要后台管理员。" }, { status: 403 });
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode()))
-      return jsonResponse({ error: "请求来源无效。" }, { status: 403 });
+      return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
       return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
     const text = await request.text();
-    if (text.length > 4096) return jsonResponse({ error: "请求过大。" }, { status: 413 });
+    if (text.length > 4096) return jsonResponse({ error: "請求过大。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     if (typeof body === "object" && body !== null && "fuelId" in body) {
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver finance review rejected.", { code: error.code });
-      return jsonResponse({ error: "审核未完成：訂単、司机或财务已变化，或申報已处理。请刷新；财务冲突请退回后重新申報。" }, { status: 409 });
+      return jsonResponse({ error: "审核未完成：訂単、運転士或财务已变化，或申報已处理。请刷新；财务冲突请退回后重新申報。" }, { status: 409 });
     }
     return jsonResponse({ claim: financeClaimSchema.parse(data) });
   } catch (error) {

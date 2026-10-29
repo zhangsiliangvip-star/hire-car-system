@@ -5,7 +5,7 @@ import "./driver.css";
 
 export const dynamic = "force-dynamic";
 export function generateMetadata() {
-  return { title: isDriverPwaTestMode() ? "GO RIDE · 司机端测试" : "GO RIDE · 司机端" };
+  return { title: isDriverPwaTestMode() ? "GO RIDE · 運転士端测试" : "GO RIDE · 運転士端" };
 }
 
 export default function DriverLayout({ children }: { children: React.ReactNode }) {

@@ -80,13 +80,13 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
         </button>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        仅管理员可查看。记录启用后的业务新增、修改、删除及請求書编号分配；相同内容重复保存不产生记录。
+        仅管理员可查看。记录启用后的業務新增、修改、删除及請求書编号分配；相同内容重复保存不产生记录。
         時間均为日本時間。历史操作无法补查；印章只记录图片指纹，不保留图片副本。
       </p>
       <div className="mb-4 grid gap-3 rounded border bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="text-sm">业务类型
+        <label className="text-sm">業務类型
           <select value={filters.table} onChange={(event) => changeFilter("table", event.target.value)} className={controlClass}>
-            <option value="">全部业务</option>
+            <option value="">全部業務</option>
             {Object.entries(auditTables).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </label>

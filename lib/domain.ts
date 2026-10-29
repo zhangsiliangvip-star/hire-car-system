@@ -82,7 +82,7 @@ export type Order = AuditedRecord & {
   accountingStatus: "未完成" | "完成核算";
   invoiceStatus: "未完成" | "已完成";
   invoiceSentDate: string;
-  depositMethod: "" | "口座入金" | "现金入金";
+  depositMethod: "" | "口座入金" | "現金入金";
   depositDate: string;
   accountingAssignee: string;
   financeNote: string;

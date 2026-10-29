@@ -44,7 +44,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
           fetch(`/api/driver/orders?${query}`, { cache: "no-store", signal: controller.signal }),
         ]);
         if (me.status === 401 || response.status === 401) { location.replace("/driver/login"); return; }
-        if (!me.ok) throw new Error("司机身份不可用，请联系管理员或重新登录。");
+        if (!me.ok) throw new Error("運転士身份不可用，请联系管理员或重新登录。");
         const profile: Identity = await me.json();
         if (!response.ok) throw new Error(response.status === 404 ? "行程已撤派或不存在。" : "无法读取行程，请重试。");
         const data: { trips: DriverTrip[] } = await response.json();

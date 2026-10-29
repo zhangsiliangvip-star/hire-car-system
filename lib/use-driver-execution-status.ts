@@ -31,7 +31,7 @@ export function useDriverExecutionStatus(enabled: boolean) {
         if (!active || request.signal.aborted) return;
         console.error("Driver status refresh failed.", cause instanceof Error ? cause.name : "UnknownError");
         setData(null);
-        setError("司机实時状態暂時不可用，正在重试；预约卡片仍保留。");
+        setError("運転士实時状態暂時不可用，正在重试；预约卡片仍保留。");
         timer = setTimeout(() => void load(), 3000);
       }
     }
