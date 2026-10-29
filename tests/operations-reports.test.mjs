@@ -319,7 +319,7 @@ test("PDF and monthly print contain one complete escaped sheet per report in ser
   for (const value of ["08:00", "09:00", "10:00", "11:00", "18:00", "10:30"])
     assert.ok(html.includes(value), value);
   assert.doesNotMatch(html, /\d{2}\/\d{2} \d{2}:\d{2}/);
-  assert.match(html, /26小時30分/); assert.match(html, /休息记录/);
+  assert.match(html, /26小時30分/); assert.match(html, /休息記録/);
   assert.match(html, /80\.0 km/); assert.match(html, /&lt;img/); assert.doesNotMatch(html, /<img src=x/);
   assert.match(html, /break-after:page/);
   assert.throws(() => printing.buildOperationsPrintHtml([], "empty"), /没有可打印/);

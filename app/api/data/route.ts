@@ -1040,7 +1040,7 @@ export async function POST(request: Request) {
     console.error("Failed to persist dashboard data.", error);
     if (typeof error === "object" && error !== null && "code" in error && error.code === "PDR01") {
       return jsonResponse(
-        { error: "訂単已关联運転士派单或执行历史，不能永久删除；請改为取消訂単。历史记录和小票会保留。" },
+        { error: "訂単已关联運転士派单或执行历史，不能永久删除；請改为取消訂単。历史記録和小票会保留。" },
         { status: 409 },
       );
     }

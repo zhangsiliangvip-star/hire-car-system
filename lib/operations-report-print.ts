@@ -90,7 +90,7 @@ export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
       <table class="totals"><tbody><tr><th>メーター数<br>運行開始前</th><td>${km(r.departureKm)} km</td>
         <th>メーター数<br>運行終了後</th><td>${km(r.returnKm)} km</td><th>差引全走行距離</th><td>${km(totals.distance)} km</td></tr>
         <tr><th>累计休息</th><td colspan="5">${durationLabel(totals.restMs)}（经由地到着至出発）</td></tr></tbody></table>
-      ${r.rests.length ? `<table class="rest-records"><thead><tr><th colspan="2">休息记录（另存的休息打卡）</th></tr><tr><th>开始</th><th>结束</th></tr></thead><tbody>${r.rests.map(rest =>
+      ${r.rests.length ? `<table class="rest-records"><thead><tr><th colspan="2">休息記録（另存的休息打卡）</th></tr><tr><th>开始</th><th>结束</th></tr></thead><tbody>${r.rests.map(rest =>
         `<tr><td>${time(rest.startedAt)}</td><td>${time(rest.endedAt)}</td></tr>`).join("")}</tbody></table>` : ""}
       ${inspectionForm(row.operationsManager)}
       <footer>工時＝退勤点呼－出勤点呼；不扣除休息。公里表为累计读数。運行管理者取車両所属会社資料；其他点检、确认及给油栏未采集，留空手填。○为原表印刷符号，不代表已通过。日報版本 ${r.version}。</footer>

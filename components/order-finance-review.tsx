@@ -99,7 +99,7 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
         <h2 className="min-w-0 break-words font-semibold">{name} · 運転士申報审核</h2>
         <button type="button" disabled={busy} onClick={dismiss} className="rounded border px-3 py-1">关闭</button>
       </div>
-      <p className="mb-3 text-xs text-gray-600">仅审核待审核申報。批准才入账；驳回相当于从訂単待审核区删除，不计入金額，但保留记录并允许運転士重報。已批准申報不能在此撤销。</p>
+      <p className="mb-3 text-xs text-gray-600">仅审核待审核申報。批准才入账；驳回相当于从訂単待审核区删除，不计入金額，但保留記録并允许運転士重報。已批准申報不能在此撤销。</p>
       {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mb-3 text-sm text-emerald-800">{notice}</p>}
       {blocked && <p role="alert" className="mb-3 text-sm text-red-700">訂単有未完成保存或保存错误，請先处理后再审核。</p>}
@@ -191,7 +191,7 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
     if (lock.current || blocked) return;
     if (decision === "rejected" && !note.trim()) { setError("驳回時請填写原因，便于運転士重新申報。"); return; }
     if (!window.confirm(decision === "approved" ? `确认${row.date}的${label(row)}入账？請核对是否已手工录入相同数据。` :
-      "确认驳回并从待审核区移除？不计入金額，保留审核记录，運転士可重新申報。")) return;
+      "确认驳回并从待审核区移除？不计入金額，保留审核記録，運転士可重新申報。")) return;
     const current = generation.current;
     const controller = new AbortController();
     writeController.current = controller;
@@ -211,7 +211,7 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
         (row.kind === "fuel" ? !("id" in saved) || saved.id !== row.claim.id :
           !("category" in saved) || saved.category !== row.claim.category)) throw new Error("审核返回结果不匹配，請刷新核对。");
       setData(previous => previous ? { ...previous, rows: previous.rows.filter(item => orderReviewKey(item) !== orderReviewKey(row)) } : previous);
-      setNotice(decision === "approved" ? "已批准入账。" : "已驳回并移出待审核区，未计入金額；记录保留，運転士可重新申報。");
+      setNotice(decision === "approved" ? "已批准入账。" : "已驳回并移出待审核区，未计入金額；記録保留，運転士可重新申報。");
       if (decision === "approved") {
         try { await onApproved(controller.signal); }
         catch (cause) {

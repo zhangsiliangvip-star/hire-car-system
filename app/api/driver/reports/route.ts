@@ -57,8 +57,8 @@ export async function POST(request: Request) {
         ["40001", "23505"].includes(error.code) ? 409 :
         ["22023", "22007", "22008", "22P02", "23514"].includes(error.code) ? 422 : 503;
       return jsonResponse({ error: status === 409 ? "日報已变化或操作重复，請刷新后核对。" :
-        status === 422 && parsed.data.action === "remove_stop" ? "只能删除全空经由地；已有地点、公里数或時間的记录不能删除。" :
-        status === 422 ? "记录顺序无效：請检查時間先后、公里表不能倒退，并在归库前填写完整所有经由地的到着、出発時間。" :
+        status === 422 && parsed.data.action === "remove_stop" ? "只能删除全空经由地；已有地点、公里数或時間的記録不能删除。" :
+        status === 422 ? "記録顺序无效：請检查時間先后、公里表不能倒退，并在归库前填写完整所有经由地的到着、出発時間。" :
         status === 404 ? "日報或经由地不存在。" : "日報操作未获确认，請重试或联系管理员。" }, { status });
     }
     return jsonResponse({ report: reportSchema.parse(data) });

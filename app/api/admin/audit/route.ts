@@ -21,11 +21,11 @@ export async function GET(request: Request) {
     const { supabase, profile } = await getAuthenticatedProfile();
     if (!profile) return jsonResponse({ error: "請先登录。" }, { status: 401 });
     if (profile.role !== "admin") {
-      return jsonResponse({ error: "仅管理员可以查看操作记录。" }, { status: 403 });
+      return jsonResponse({ error: "仅管理员可以查看操作記録。" }, { status: 403 });
     }
     const parsed = filtersSchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!parsed.success) {
-      return jsonResponse({ error: "操作记录筛选条件无效，請检查日期或页码。" }, { status: 400 });
+      return jsonResponse({ error: "操作記録筛选条件无效，請检查日期或页码。" }, { status: 400 });
     }
     const filters = parsed.data;
     let query = supabase.from("audit_logs").select("*")
@@ -47,6 +47,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Failed to load audit history.", error);
-    return jsonResponse({ error: "无法读取操作记录，請检查网络及操作留痕数据库迁移。" }, { status: 500 });
+    return jsonResponse({ error: "无法读取操作記録，請检查网络及操作留痕数据库迁移。" }, { status: 500 });
   }
 }

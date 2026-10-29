@@ -257,7 +257,7 @@ test("historical trip cards stay read-only without explanatory clutter", () => {
     }).default;
     const html = renderToStaticMarkup(React.createElement(Component, detail ? { orderId: trip.orderId } : {}));
     assert.match(html, /历史訂単（只读）/);
-    assert.doesNotMatch(html, /历史记录仅供查看|仅在安全停車|行程状態不直接入账|驾驶中請勿操作手机/);
+    assert.doesNotMatch(html, /历史記録仅供查看|仅在安全停車|行程状態不直接入账|驾驶中請勿操作手机/);
     assert.doesNotMatch(html, /查看行程 ›|退回上一步/);
     for (const action of Object.values(orders.tripActions)) {
       assert.equal(html.includes(`>${action.label}</button>`), false);
@@ -308,7 +308,7 @@ test("phone rollback asks for confirmation, posts only the preceding state and l
     assert.ok(orders.assignmentIdSchema.safeParse(calls[0].body.requestId).success);
     resolve(Response.json({ version: 7, status: orders.tripPreviousStates[status] }));
     await pending;
-    assert.match(values[5], /操作已记录/);
+    assert.match(values[5], /操作已記録/);
   }
 });
 test("LAN-compatible request IDs are unique valid UUID v4 without randomUUID", () => {

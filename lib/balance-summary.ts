@@ -53,7 +53,7 @@ export function summarizeBalance(
     return row;
   };
   const check = (amount: number) => {
-    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error("收支金額无效或超出范围，請检查财务记录。");
+    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error("收支金額无效或超出范围，請检查财务記録。");
     return amount;
   };
   const matches = (name: string) => companyFilter === "" ||
@@ -89,7 +89,7 @@ export function summarizeBalance(
     .slice().sort((a, b) => a.date.localeCompare(b.date) || a.customer.localeCompare(b.customer));
   let paymentTotal = 0;
   for (const item of payments) {
-    if (!Object.hasOwn(paymentAmounts, item.method)) throw new Error("会社立替出金方式无效，請检查财务记录。");
+    if (!Object.hasOwn(paymentAmounts, item.method)) throw new Error("会社立替出金方式无效，請检查财务記録。");
     paymentAmounts[item.method] += check(item.amount);
     paymentTotal += item.amount;
     if (!Number.isSafeInteger(paymentAmounts[item.method]) || !Number.isSafeInteger(paymentTotal)) {

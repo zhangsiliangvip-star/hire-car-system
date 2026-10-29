@@ -158,7 +158,7 @@ test("order review drawer isolates the order and rejects without booking, removi
   assert.ok(c.states[0].rows.some(row => row.kind === "finance" && row.claim.category === "overtime"));
   assert.ok(c.states[0].rows.some(row => row.orderId === second));
   assert.equal(c.approved, 0);
-  assert.match(c.states[2], /未计入金額.*记录保留/);
+  assert.match(c.states[2], /未计入金額.*記録保留/);
 });
 test("approvals use exact claim versions and refresh totals for advances, overtime and daily fuel", async () => {
   for (const row of rows.slice(0, 3)) {
@@ -222,7 +222,7 @@ test("drawer shows dates, drivers, details, amounts, overtime and compact photos
   cursor = 6;
   const html = renderToStaticMarkup(React.createElement(drawer, drawerProps));
   for (const text of ["訂単财务审核", "2026-10-25", "2026-10-26", "Test driver", "Parking", "1,000 JPY", "2,000 JPY",
-    "1.5 小時", "批准入账", "驳回移除", "保留记录", "Review error"]) assert.ok(html.includes(text), text);
+    "1.5 小時", "批准入账", "驳回移除", "保留記録", "Review error"]) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /Other driver|Other order/);
   assert.equal((html.match(/>批准入账<\/button>/g) ?? []).length, 3);
   assert.equal((html.match(/>驳回移除<\/button>/g) ?? []).length, 3);

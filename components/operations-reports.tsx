@@ -182,7 +182,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
         {input("returnKm", "归库公里表", r.returnKm, "number")}
         {input("returnedAt", "到着日期時間", toJapanInput(r.returnedAt), "datetime-local")}
       </fieldset>
-      <fieldset disabled={busy} className="space-y-2"><legend className="mb-2 font-semibold">休息记录（不从工作総時长中扣除）</legend>
+      <fieldset disabled={busy} className="space-y-2"><legend className="mb-2 font-semibold">休息記録（不从工作総時长中扣除）</legend>
         {rests.map((rest, i) => <div key={rest.key} className="grid items-end gap-3 sm:grid-cols-3">
           {input(`${rest.key}.startedAt`, `休息 ${i + 1} 开始`, toJapanInput(rest.startedAt), "datetime-local", true)}
           {input(`${rest.key}.endedAt`, `休息 ${i + 1} 结束`, toJapanInput(rest.endedAt), "datetime-local")}
@@ -194,7 +194,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
           setRests(items => [...items, { key: createDriverRequestId(), startedAt: r.departedAt, endedAt: null }]); markDirty();
         }}>＋ 休息</button>
       </fieldset>
-      {input("reason", "修改原因（保留修改前后记录）", "", "text", true)}
+      {input("reason", "修改原因（保留修改前后記録）", "", "text", true)}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="flex justify-end gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={close}>取消</button>
         <button className={`${buttonClass} font-semibold`} disabled={busy}>{busy ? "保存中…" : "保存修改"}</button></div>
@@ -345,7 +345,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
         })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
       </table></div></>}
     {editing && <OperationReportEditor key={editing.report.id} row={editing} onClose={() => setEditing(null)}
-      onSaved={() => { setEditing(null); setNotice("日報已保存，修改记录已保留。"); setData(null); setRevision(v => v + 1); }} />}
+      onSaved={() => { setEditing(null); setNotice("日報已保存，修改記録已保留。"); setData(null); setRevision(v => v + 1); }} />}
   </div>;
 }
 

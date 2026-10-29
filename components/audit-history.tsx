@@ -49,14 +49,14 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
         }
         const response = await fetch(`/api/admin/audit?${params}`, { signal: controller.signal });
         const payload = await readJsonSafely(response);
-        if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "读取操作记录失败。"));
+        if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "读取操作記録失败。"));
         const parsed = pageSchema.safeParse(payload);
-        if (!parsed.success) throw new Error("服务器返回的操作记录格式不正确。");
+        if (!parsed.success) throw new Error("服务器返回的操作記録格式不正确。");
         if (!controller.signal.aborted) setResult(parsed.data);
       } catch (caught) {
         if (controller.signal.aborted) return;
         console.error("Failed to load audit history.", caught);
-        setError(caught instanceof Error ? caught.message : "读取操作记录失败。");
+        setError(caught instanceof Error ? caught.message : "读取操作記録失败。");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -73,15 +73,15 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
   return (
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-bold">操作记录</h2>
+        <h2 className="text-lg font-bold">操作記録</h2>
         <button type="button" onClick={() => setRefresh((value) => value + 1)}
           disabled={loading} className="rounded border bg-white px-3 py-2 text-sm disabled:opacity-50">
           重新读取
         </button>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        仅管理员可查看。记录启用后的業務新增、修改、删除及請求書编号分配；相同内容重复保存不产生记录。
-        時間均为日本時間。历史操作无法补查；印章只记录图片指纹，不保留图片副本。
+        仅管理员可查看。記録启用后的業務新增、修改、删除及請求書编号分配；相同内容重复保存不产生記録。
+        時間均为日本時間。历史操作无法补查；印章只記録图片指纹，不保留图片副本。
       </p>
       <div className="mb-4 grid gap-3 rounded border bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
         <label className="text-sm">業務类型
@@ -112,15 +112,15 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
         <label className="text-sm">结束日期
           <input type="date" value={filters.end} onChange={(event) => changeFilter("end", event.target.value)} className={controlClass} />
         </label>
-        <label className="text-sm sm:col-span-2">记录编号（精确查询，可从下方记录复制）
+        <label className="text-sm sm:col-span-2">記録编号（精确查询，可从下方記録复制）
           <input value={filters.record} placeholder="UUID" onChange={(event) => changeFilter("record", event.target.value)} className={controlClass} />
         </label>
       </div>
       {error && <p role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-      {loading && <p role="status" className="mb-4 text-sm text-gray-600">正在读取操作记录…</p>}
+      {loading && <p role="status" className="mb-4 text-sm text-gray-600">正在读取操作記録…</p>}
       {result && (
         <>
-          {result.logs.length === 0 && <p className="rounded border bg-white p-4 text-sm text-gray-500">没有符合条件的操作记录。</p>}
+          {result.logs.length === 0 && <p className="rounded border bg-white p-4 text-sm text-gray-500">没有符合条件的操作記録。</p>}
           <div className="space-y-3">
             {result.logs.map((log) => (
               <details key={log.id} className="rounded border bg-white p-4">
@@ -132,7 +132,7 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
                   </span>
                 </summary>
                 <p className="my-3 break-all text-xs text-gray-500">
-                  记录编号：{log.record_id}　操作账号编号：{log.actor_id ?? "系统操作"}
+                  記録编号：{log.record_id}　操作账号编号：{log.actor_id ?? "系统操作"}
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed text-left text-sm">

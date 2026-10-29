@@ -1952,7 +1952,7 @@ export default function Home() {
   }
   async function exportOrderFinance() {
     if (sortedFinanceOrders.length === 0) {
-      alert("当前筛选范围暂无訂単财务记录。");
+      alert("当前筛选范围暂无訂単财务記録。");
       return;
     }
     try {
@@ -2188,7 +2188,7 @@ export default function Home() {
   }
   async function exportCompanyWages() {
     if (companyDriverFinanceDetails.length === 0 && monthDriverWageItems.length === 0) {
-      alert("所选月份及所属会社暂无運転士工資记录。");
+      alert("所选月份及所属会社暂无運転士工資記録。");
       return;
     }
     try {
@@ -2453,7 +2453,7 @@ export default function Home() {
         return;
       }
       if (vehicleSummaryResult.rows.length === 0) {
-        alert("当前分区暂无車両或财务记录。");
+        alert("当前分区暂无車両或财务記録。");
         return;
       }
       try {
@@ -2469,7 +2469,7 @@ export default function Home() {
       return;
     }
     if (!selectedVehicleForFinance && filteredVehicleFinanceDetails.length === 0) {
-      alert("当前月份及分区暂无車両财务记录。");
+      alert("当前月份及分区暂无車両财务記録。");
       return;
     }
     if (vehicleFinanceVehicleFilter && !selectedVehicleForFinance) {
@@ -4796,7 +4796,7 @@ export default function Home() {
               ...(currentProfile.role === "admin"
                 ? [
                     { id: "login" as const, label: "ログイン管理", icon: "♙" },
-                    { id: "audit" as const, label: "操作记录", icon: "≡" },
+                    { id: "audit" as const, label: "操作記録", icon: "≡" },
                   ]
                 : []),
             ].map((item) => (
@@ -5171,7 +5171,7 @@ export default function Home() {
                     {sortedFinanceOrders.length === 0 ? (
                       <tr>
                         <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
-                          该月份暂无訂単财务记录
+                          该月份暂无訂単财务記録
                         </td>
                       </tr>
                     ) : (
@@ -5263,7 +5263,7 @@ export default function Home() {
                       filteredDriverFinanceDetails.length === 0 &&
                       selectedDriverWageItems.length === 0
                     ) {
-                      alert("该運転士本月暂无工資记录。");
+                      alert("该運転士本月暂无工資記録。");
                       return;
                     }
                     try {
@@ -5375,7 +5375,7 @@ export default function Home() {
                     {filteredDriverFinanceDetails.length === 0 ? (
                       <tr>
                         <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
-                          暂无運転士工資记录
+                          暂无運転士工資記録
                         </td>
                       </tr>
                     ) : (
@@ -5836,7 +5836,7 @@ export default function Home() {
               {!vehicleFinanceVehicleFilter ? (
                 <div>
                   <p className="mb-3 text-sm text-gray-600">
-                    每車一行，包含外注車両（标注“外注”，未登记番号時明确提示）。訂単利润已扣除固定費用与备品。月度費用使用已保存记录；未登记月份使用默认停車场費及保险費。无运营记录的車両也计入固定成本。
+                    每車一行，包含外注車両（标注“外注”，未登记番号時明确提示）。訂単利润已扣除固定費用与备品。月度費用使用已保存記録；未登记月份使用默认停車场費及保险費。无运营記録的車両也计入固定成本。
                   </p>
                   {vehicleSummaryResult.error ? (
                     <p role="alert" className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{vehicleSummaryResult.error}</p>
@@ -5863,7 +5863,7 @@ export default function Home() {
                         </thead>
                         <tbody>
                           {vehicleSummaryResult.rows.length === 0 ? (
-                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">暂无車両或财务记录</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">暂无車両或财务記録</td></tr>
                           ) : vehicleSummaryResult.rows.map((row) => (
                             <tr key={row.key} className="border-t hover:bg-gray-50">
                               <td className="px-4 py-3">{row.month}</td>
@@ -5920,7 +5920,7 @@ export default function Home() {
                     {filteredVehicleFinanceDetails.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                          暂无車両财务记录
+                          暂无車両财务記録
                         </td>
                       </tr>
                     ) : (
@@ -7649,7 +7649,7 @@ export default function Home() {
                       : invoiceStatusDialog.status === "unpaid" ? "未入金" : invoiceStatusDialog.status
                   }」。
                   {invoiceStatusDialog.kind === "deposit" && invoiceStatusDialog.status === "paid" && (
-                    <span className="mt-1 block text-xs">新标记为已入金的訂単将记录今天（{todayDateKey}）为入金日；已有入金日保留。</span>
+                    <span className="mt-1 block text-xs">新标记为已入金的訂単将記録今天（{todayDateKey}）为入金日；已有入金日保留。</span>
                   )}
                 </p>
                 <div className="mt-5 flex justify-end gap-2">
@@ -7774,7 +7774,7 @@ export default function Home() {
                         <td className="px-4 py-3">{driver.whatsapp || "-"}</td>
                         <td className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
                         {driver.id.startsWith("unregistered-driver-")
-                          ? <td colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士记录</td>
+                          ? <td colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士記録</td>
                           : <DriverLoginFields driverId={driver.id} name={driver.name} regionId={driver.regionId} />}
                         <td className="px-4 py-3">
                           <div className="flex gap-3">
@@ -8420,7 +8420,7 @@ export default function Home() {
                   <option value="仮予約">仮予約</option>
                   <option value="予約確定">予約確定</option>
                   {(form.status === "運行中" || form.status === "完了") && (
-                    <option value={form.status} disabled>历史状態（已停用，保留原记录）</option>
+                    <option value={form.status} disabled>历史状態（已停用，保留原記録）</option>
                   )}
                   <option value="キャンセル">キャンセル</option>
                 </select>
@@ -8498,7 +8498,7 @@ export default function Home() {
 
               <fieldset className="space-y-3 rounded border border-blue-200 bg-blue-50/40 p-3">
                 <legend className="px-1 text-sm font-semibold">每日行程与車費</legend>
-                <p className="text-xs text-gray-600">運転士工資与外注運転士費用二选一。外注運転士費用、出金方式、状態和备注由上方外注運転士字段录入；下方立替費用区关联显示，不会重复计入。会社立替費用独立记录。</p>
+                <p className="text-xs text-gray-600">運転士工資与外注運転士費用二选一。外注運転士費用、出金方式、状態和备注由上方外注運転士字段录入；下方立替費用区关联显示，不会重复计入。会社立替費用独立記録。</p>
                 {getOrderDateKeys(form).map((date) => {
                   const finance = getReservationFinance(form)[date] || emptyOrderFinance;
                   return (
@@ -9779,11 +9779,11 @@ export default function Home() {
                             </option>
                           )}
                           {(common === "運行中" || common === "完了") && (
-                            <option value={common} disabled>历史状態（已停用，保留原记录）</option>
+                            <option value={common} disabled>历史状態（已停用，保留原記録）</option>
                           )}
                           {field !== "status" && <option value="">{emptyLabel}</option>}
                           {common && field !== "status" && !options.includes(common) && (
-                            <option value={common}>{common}（現有记录）</option>
+                            <option value={common}>{common}（現有記録）</option>
                           )}
                           {options.map((option) => (
                             <option key={option} value={option}>{option}</option>
@@ -10374,7 +10374,7 @@ export default function Home() {
                   {accountingAssignee &&
                     !accountingAccounts.some((account) => account.email === accountingAssignee) && (
                       <option value={accountingAssignee}>
-                        {getAccountingAssigneeName(accountingAssignee, accountingAccounts)}（历史记录）
+                        {getAccountingAssigneeName(accountingAssignee, accountingAccounts)}（历史記録）
                       </option>
                     )}
                 </select>

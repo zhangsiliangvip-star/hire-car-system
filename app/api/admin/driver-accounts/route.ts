@@ -80,7 +80,7 @@ async function write(request: Request, creating: boolean) {
       console.error("Driver auth creation failed.", { code: error?.code, status: error?.status });
       return jsonResponse({ error: ["email_exists", "user_already_exists"].includes(error?.code || "")
         ? "该邮箱已存在，未绑定也未修改原账号；請使用独立運転士邮箱。"
-        : error?.code === "weak_password" ? "密码强度不足，請使用更强的密码。" : "運転士认证账号创建未获确认，請先核对认证记录，勿连续重复新增。" },
+        : error?.code === "weak_password" ? "密码强度不足，請使用更强的密码。" : "運転士认证账号创建未获确认，請先核对认证記録，勿连续重复新增。" },
         { status: ["email_exists", "user_already_exists"].includes(error?.code || "") ? 409 : error?.status === 429 ? 429 : 503 });
     }
     const binding = await identity.supabase.rpc("bind_driver_identity", { target_user: data.user.id, target_driver: driver.driverId });

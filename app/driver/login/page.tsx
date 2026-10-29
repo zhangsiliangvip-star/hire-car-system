@@ -53,6 +53,6 @@ export default function DriverLogin() {
       {error && <p className="driver-error" role="alert">{error}</p>}
       <button className="driver-button" disabled={busy}>{busy ? "正在核验…" : "登录運転士端"}</button>
     </form>
-    <p className="driver-muted" style={{ marginTop: 24 }}>支持联网查看本人派单、确认接单和记录执行进度，不提供离线写入或定位。</p>
+    <p className="driver-muted" style={{ marginTop: 24 }}>支持联网查看本人派单、确认接单和記録执行进度，不提供离线写入或定位。</p>
   </main>;
 }

@@ -64,7 +64,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   <thead><tr><th>所属会社</th><th>請求総和</th><th>口座入金</th><th>現金入金</th><th>未设置入金方式</th><th>其他收入（手動）</th><th>支出総和（手動）</th><th>当月利润／亏损</th></tr></thead>
   <tbody>${rows.length ? rows.map((row) =>
     `<tr><td>${escapeHtml(row.companyName || "未填写")}</td>${cells(row)}</tr>`).join("")
-    : '<tr><td colspan="8">暂无收支记录</td></tr>'}</tbody>
+    : '<tr><td colspan="8">暂无收支記録</td></tr>'}</tbody>
   <tfoot><tr><td>合计</td>${cells(totals)}</tr></tfoot></table>
   <h2>手動其他收入明細</h2><table><colgroup><col style="width:30%"><col style="width:40%"><col style="width:30%"></colgroup>
   <thead><tr><th>所属会社</th><th>收入项目</th><th class="number">金額（JPY）</th></tr></thead>
@@ -127,10 +127,10 @@ export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
     <thead><tr><th>日期</th><th>訂単名称</th><th>所属会社</th><th>外注運転士出金状態</th><th>外注運転士备注</th><th class="number">金額（JPY）</th></tr></thead>
     <tbody>${entries.length ? entries.map((row) =>
       `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer)}</td><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.status || "未選択")}</td><td style="white-space:pre-wrap">${escapeHtml(row.note || "")}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
-      : '<tr><td colspan="6">暂无出金记录</td></tr>'}</tbody>
+      : '<tr><td colspan="6">暂无出金記録</td></tr>'}</tbody>
     <tfoot><tr><td colspan="5">${method || "未设置出金方式"}合计</td><td class="number">${yen(paymentAmounts[method])}</td></tr></tfoot></table></section>`;
   }).join("")}
-  <p class="notes">仅供对账，不重复计入收支平衡。沿用页面所选月份、分区与所属会社范围，按訂単首个服务月归集訂単全部日期的外注運転士費用。使用已保存的财务记录，未设置出金方式单列以免漏账。</p>
+  <p class="notes">仅供对账，不重复计入收支平衡。沿用页面所选月份、分区与所属会社范围，按訂単首个服务月归集訂単全部日期的外注運転士費用。使用已保存的财务記録，未设置出金方式单列以免漏账。</p>
   </article></div></body></html>`;
 }
 

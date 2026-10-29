@@ -2451,7 +2451,7 @@ test("balance payment reconciliation filters methods without changing expenses o
   assert.ok(html.includes("¥1,500"));
   assert.ok(html.includes("仅供对账，不重复计入收支平衡"));
   const emptyHtml = buildCompanyAdvancePrintHtml({ ...data, summary: summarizeBalance("", [], [], []) });
-  assert.equal((emptyHtml.match(/暂无出金记录/g) || []).length, 5);
+  assert.equal((emptyHtml.match(/暂无出金記録/g) || []).length, 5);
   assert.ok(emptyHtml.includes("未设置出金方式合计"));
   assert.throws(() => buildCompanyAdvancePrintHtml({
     ...data, summary: { ...summary, paymentTotal: NaN },
@@ -3348,7 +3348,7 @@ test("last-operation labels escape operator names and render historical rows", (
   assert.ok(!html.includes("<script>"));
   assert.ok(html.includes("&lt;script&gt;"));
   const historical = renderToStaticMarkup(React.createElement(LastOperation, { record: { id } }));
-  assert.ok(historical.includes("历史记录"));
+  assert.ok(historical.includes("历史記録"));
 });
 
 test("history UI renders filters, operator, Japan time and escaped before/after details", () => {
@@ -3378,7 +3378,7 @@ test("history UI renders filters, operator, Japan time and escaped before/after 
       { id: "60000000-0000-4000-8000-000000000002", name: "大阪" },
       { id: "60000000-0000-4000-8000-000000000003", name: "北海道" }],
   }));
-  for (const value of ["操作记录", "業務类型", "开始日期", "结束日期", "操作前", "操作后", "Test Operator", "2026/10/16 03:00:00"]) {
+  for (const value of ["操作記録", "業務类型", "开始日期", "结束日期", "操作前", "操作后", "Test Operator", "2026/10/16 03:00:00"]) {
     assert.ok(html.includes(value), value);
   }
   assert.ok(!html.includes("<script>"));

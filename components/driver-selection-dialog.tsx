@@ -90,7 +90,7 @@ export function DriverSelectionDialog({
         {showServiceDays && (
           <>
             <p className="mb-4 text-sm text-gray-500">最近30天服务日数由高到低排列，常出勤運転士在左上角；同一天多单计1天，同日数按姓名排序。</p>
-            <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务记录中的運転士；排除休运日、取消訂単及未来日期，不作为考勤证明。</p>
+            <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务記録中的運転士；排除休运日、取消訂単及未来日期，不作为考勤证明。</p>
           </>
         )}
         <input aria-label="搜索運転士" placeholder="搜索運転士姓名" value={search}

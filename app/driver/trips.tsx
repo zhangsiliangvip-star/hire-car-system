@@ -92,7 +92,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
     if (savingRef.current || refreshing) return;
     const state = backwards ? tripPreviousStates[trip.status] : tripActions[trip.status]?.state;
     if (!state) return;
-    if (backwards && !window.confirm(`将行程状態从“${tripStatusLabels[trip.status]}”退回“${tripStatusLabels[state]}”？已有记录会保留。`)) return;
+    if (backwards && !window.confirm(`将行程状態从“${tripStatusLabels[trip.status]}”退回“${tripStatusLabels[state]}”？已有記録会保留。`)) return;
     savingRef.current = true; setSaving(true); setError(""); setNotice("");
     try {
       if (pendingRequest.current?.assignmentId !== trip.assignmentId || pendingRequest.current.version !== trip.version || pendingRequest.current.state !== state) {
@@ -110,7 +110,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
         throw new Error(typeof failure.error === "string" ? failure.error :
           response.status === 409 ? "派单状態已变化，正在刷新，請核对后重试。" : `行程更新未获确认（${response.status}），請重试或联系调度。`);
       }
-      pendingRequest.current = null; setNotice("操作已记录，正在刷新最新行程状態。"); refresh();
+      pendingRequest.current = null; setNotice("操作已記録，正在刷新最新行程状態。"); refresh();
     } catch (cause) {
       console.error("Driver trip action failed.", cause);
       setError(cause instanceof Error ? cause.message : "无法更新行程。");
@@ -179,7 +179,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
           <div><p className="driver-muted">行程簡概</p><p className="whitespace-pre-wrap">{trip.details.tripSummary || "未填写"}</p></div>
         </div>}
         {detail ? <>
-          {!("historical" in trip) && tripActions[trip.status] && <button className="driver-button" disabled={saving || refreshing} onClick={() => advance(trip)}>{saving ? "正在记录…" : refreshing ? "正在更新…" : tripActions[trip.status]?.label}</button>}
+          {!("historical" in trip) && tripActions[trip.status] && <button className="driver-button" disabled={saving || refreshing} onClick={() => advance(trip)}>{saving ? "正在記録…" : refreshing ? "正在更新…" : tripActions[trip.status]?.label}</button>}
           {!("historical" in trip) && tripPreviousStates[trip.status] && <button className="driver-button driver-secondary" disabled={saving || refreshing}
             onClick={() => advance(trip, true)}>退回上一步</button>}
         </> : "historical" in trip ? null :

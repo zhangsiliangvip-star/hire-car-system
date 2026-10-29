@@ -45,7 +45,7 @@ function ReturnRow({ report, disabled, saveChanges }: {
   report: DailyReport; disabled: boolean; saveChanges: () => Promise<void>;
 }) {
   const formId = "report-edit-return";
-  return <tbody aria-label="归库记录"><tr className="driver-sheet-location">
+  return <tbody aria-label="归库記録"><tr className="driver-sheet-location">
     <th scope="row">归库</th><td><form id={formId} data-return onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
       <input key={report.returnAddress} name="address" aria-label="归库地点地址" maxLength={300}
         disabled={disabled} defaultValue={report.returnAddress ?? ""} />
@@ -59,7 +59,7 @@ function DepartureRow({ report, disabled, saveChanges }: {
   report: DailyReport; disabled: boolean; saveChanges: () => Promise<void>;
 }) {
   const formId = "report-edit-departure";
-  return <tbody aria-label="出库记录"><tr className="driver-sheet-location">
+  return <tbody aria-label="出库記録"><tr className="driver-sheet-location">
     <th scope="row">出库</th><td><form id={formId} data-departure onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
       <input key={report.departureAddress} name="address" aria-label="出库地点地址" required maxLength={300}
         disabled={disabled} defaultValue={report.departureAddress} />
