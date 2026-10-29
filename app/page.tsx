@@ -7499,9 +7499,9 @@ export default function Home() {
                                     ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                                     : "border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200"
                                 }`}
-                                aria-label={`${order.customer} 核算状態：${order.accountingStatus === "完成核算" ? "核算完成" : "未完成，财务统计"}`}
+                                aria-label={`${order.customer} 核算状態：${order.accountingStatus === "完成核算" ? "核算完成" : "未完成，財務統計"}`}
                               >
-                                {order.accountingStatus === "完成核算" ? "核算完成" : "财务统计"}
+                                {order.accountingStatus === "完成核算" ? "核算完成" : "財務統計"}
                               </button>
                               <button
                                 type="button"
@@ -9579,7 +9579,7 @@ export default function Home() {
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="accounting-preview-title" className="text-xl font-bold">
-                訂単财务统计
+                訂単財務統計
               </h2>
               <button
                 type="button"

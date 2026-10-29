@@ -402,7 +402,7 @@ test("reservation accounting action distinguishes completed and incomplete statu
   assert.match(button, /order\.accountingStatus === "完成核算"/);
   assert.match(button, /border-emerald-200 bg-emerald-50 text-emerald-700/);
   assert.match(button, /border-amber-300 bg-amber-100 text-amber-900/);
-  assert.match(button, /核算状態：\$\{order\.accountingStatus === "完成核算" \? "核算完成" : "未完成，财务统计"\}/);
+  assert.match(button, /核算状態：\$\{order\.accountingStatus === "完成核算" \? "核算完成" : "未完成，財務統計"\}/);
 });
 
 test("accounting uses exact new import batches but preserves historical same-day grouping", () => {
