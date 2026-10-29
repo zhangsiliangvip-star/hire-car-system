@@ -1029,11 +1029,11 @@ export default function Home() {
     setDialogSaving(true);
     try {
       if ((await Promise.all(saves)).every(Boolean)) close();
-      else alert("保存未获服务器确认，窗口和输入内容已保留。请检查保存错误，重新载入后核对数据。");
+      else alert("保存未获服务器确认，窗口和输入内容已保留。請检查保存错误，重新载入后核对数据。");
     } catch (error) {
       console.error("Dialog save confirmation failed.", error);
       setPersistenceError(error instanceof Error ? error.message : "无法确认保存结果。");
-      alert("无法确认保存结果，窗口和输入内容已保留，请重新载入后核对数据。");
+      alert("无法确认保存结果，窗口和输入内容已保留，請重新载入后核对数据。");
     } finally {
       dialogSavingRef.current = false;
       setDialogSaving(false);
@@ -1082,7 +1082,7 @@ export default function Home() {
     if (!payload || typeof payload !== "object" || !("orders" in payload) || !Array.isArray(payload.orders))
       throw new Error("訂単财务返回格式无效。");
     if (signal.aborted) return;
-    if (getVersionOrders() !== version) throw new Error("訂単有新的本地修改，请刷新核对已批准金額。");
+    if (getVersionOrders() !== version) throw new Error("訂単有新的本地修改，請刷新核对已批准金額。");
     syncOrders((payload as DashboardData).orders, version);
   }, [getVersionOrders, syncOrders]);
   const {
@@ -1887,7 +1887,7 @@ export default function Home() {
   const balanceResult = (() => {
     try {
       if (balanceExpensesMigrationPending) {
-        throw new Error("手動收支数据尚未就绪，请先完成相关数据库迁移。");
+        throw new Error("手動收支数据尚未就绪，請先完成相关数据库迁移。");
       }
       const orderTotals = orders.flatMap((order) => {
         if (getBalanceServiceMonth(order, getOrderDateKeys(order)) !== balanceMonth) return [];
@@ -1929,7 +1929,7 @@ export default function Home() {
         error: "",
       };
     } catch (error) {
-      return { summary: null, error: error instanceof Error ? error.message : "收支汇総失败，请刷新后重试。" };
+      return { summary: null, error: error instanceof Error ? error.message : "收支汇総失败，請刷新后重试。" };
     }
   })();
   const sortedFinanceOrders = [...filteredOrderFinanceOrders].sort((first, second) =>
@@ -1976,7 +1976,7 @@ export default function Home() {
         })),
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "财务表导出失败，请重试。");
+      alert(error instanceof Error ? error.message : "财务表导出失败，請重试。");
     }
   }
   const [driverFinanceYear] = financeMonth.split("-").map(Number);
@@ -2113,7 +2113,7 @@ export default function Home() {
     }
     if (!requireSpecificRegionForNewData()) return;
     if (!selectedDriverFinanceDriver) {
-      alert("请先選択一位運転士。");
+      alert("請先選択一位運転士。");
       return;
     }
     setDriverWageItemDrafts((drafts) => [...drafts, {
@@ -2126,11 +2126,11 @@ export default function Home() {
     if (driverWageItemsMigrationPending) return;
     if (currentProfile?.role !== "admin" || !requireSpecificRegionForNewData()) return;
     if (!selectedDriverFinanceDriver) {
-      alert("请先選択一位運転士。");
+      alert("請先選択一位運転士。");
       return;
     }
     if (driverWageItemDrafts.length === 0) {
-      alert("请先添加工資项目。");
+      alert("請先添加工資项目。");
       return;
     }
     const updates = driverWageItemDrafts.map((draft) => ({
@@ -2143,12 +2143,12 @@ export default function Home() {
       !Number.isSafeInteger(amount) ||
       Math.abs(amount) > 99_999_999_999_999
     )) {
-      alert("请填写所属会社、项目名称和有效的日元整数金額。");
+      alert("請填写所属会社、项目名称和有效的日元整数金額。");
       return;
     }
     const total = updates.reduce((sum, item) => sum + item.amount, 0);
     if (!Number.isSafeInteger(total)) {
-      alert("手動工資项目合计超出安全金額范围，请分开录入或缩小金額。");
+      alert("手動工資项目合计超出安全金額范围，請分开录入或缩小金額。");
       return;
     }
     const saved = updates.map(({ draft, amount }) => ({
@@ -2205,7 +2205,7 @@ export default function Home() {
         })),
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "会社工資総表导出失败，请重试。");
+      alert(error instanceof Error ? error.message : "会社工資総表导出失败，請重试。");
     }
   }
   const filteredVehicleFinanceDetails = monthlyFinanceOrders
@@ -2248,7 +2248,7 @@ export default function Home() {
         error: "",
       };
     } catch (error) {
-      return { rows: [], error: error instanceof Error ? error.message : "車両月度汇総失败，请刷新后重试。" };
+      return { rows: [], error: error instanceof Error ? error.message : "車両月度汇総失败，請刷新后重试。" };
     }
   })();
   const vehicleSummaryTotals = totalVehicleSummaries(vehicleSummaryResult.rows);
@@ -2375,7 +2375,7 @@ export default function Home() {
       if (!description && supply.amount.trim() === "") continue;
       if (!description || amount === null) {
         setVehicleMonthlyFinanceError(
-          "请为每条备品明細填写名称和非负整数金額。",
+          "請为每条备品明細填写名称和非负整数金額。",
         );
         return;
       }
@@ -2464,7 +2464,7 @@ export default function Home() {
           regionNames: Object.fromEntries(regionNameById),
         });
       } catch (error) {
-        alert(error instanceof Error ? error.message : "車両月度汇総导出失败，请重试。");
+        alert(error instanceof Error ? error.message : "車両月度汇総导出失败，請重试。");
       }
       return;
     }
@@ -2473,7 +2473,7 @@ export default function Home() {
       return;
     }
     if (vehicleFinanceVehicleFilter && !selectedVehicleForFinance) {
-      alert("无法识别所选車両，请重新選択車両番号。");
+      alert("无法识别所选車両，請重新選択車両番号。");
       return;
     }
     try {
@@ -2485,7 +2485,7 @@ export default function Home() {
         monthly: selectedVehicleForFinance ? vehicleMonthlyFinanceForm : null,
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "車両财务表导出失败，请重试。");
+      alert(error instanceof Error ? error.message : "車両财务表导出失败，請重试。");
     }
   }
   const todayDateKey = toDateKey(new Date());
@@ -2545,7 +2545,7 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to complete a confirmed deletion.", error);
       setDeleteError(
-        error instanceof Error ? error.message : "删除失败，请稍后重试。",
+        error instanceof Error ? error.message : "删除失败，請稍后重试。",
       );
     } finally {
       setIsDeleting(false);
@@ -2559,7 +2559,7 @@ export default function Home() {
       balanceCompanyFilter === "" ||
       balanceCompanyFilter === "__unassigned_company__"
     ) {
-      setBalanceExpenseError("请先選択具体所属会社，再添加收支项目。");
+      setBalanceExpenseError("請先選択具体所属会社，再添加收支项目。");
       return;
     }
     const name = balanceExpenseNameDraft[kind].trim();
@@ -2598,7 +2598,7 @@ export default function Home() {
       balanceCompanyFilter === "" ||
       balanceCompanyFilter === "__unassigned_company__"
     ) {
-      setBalanceExpenseError("请選択具体所属会社后再保存收支金額。");
+      setBalanceExpenseError("請選択具体所属会社后再保存收支金額。");
       return;
     }
     const items = balanceExpenseItems.filter(
@@ -2669,7 +2669,7 @@ export default function Home() {
         summary: balanceResult.summary,
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "财务報表导出失败，请重试。");
+      alert(error instanceof Error ? error.message : "财务報表导出失败，請重试。");
     }
   }
 
@@ -2698,7 +2698,7 @@ export default function Home() {
     const email = loginAccountForm.email.trim().toLowerCase();
     const position = loginAccountForm.position.trim();
     if (!fullName || !email || !loginAccountForm.company || !position || !loginAccountForm.regionId) {
-      alert("请填写用户姓名、邮箱、所属会社、职位和地域。");
+      alert("請填写用户姓名、邮箱、所属会社、职位和地域。");
       return;
     }
     const directCreation = editingLoginAccountId === null;
@@ -2846,7 +2846,7 @@ export default function Home() {
       textarea.remove();
       if (!copied) {
         console.error(`复制${fieldName}失败。`, error);
-        alert(`复制${fieldName}失败，请检查浏览器剪贴板权限。`);
+        alert(`复制${fieldName}失败，請检查浏览器剪贴板权限。`);
       }
     }
   }
@@ -3005,7 +3005,7 @@ export default function Home() {
 
   function requireSpecificRegionForNewData() {
     if (!activeRegionId || activeRegionId === ALL_REGIONS_ID) {
-      setPersistenceError("新增業務数据前，请先選択一个具体地域。");
+      setPersistenceError("新增業務数据前，請先選択一个具体地域。");
       return false;
     }
     return true;
@@ -3054,16 +3054,16 @@ export default function Home() {
     if (!requireSpecificRegionForNewData()) return;
     const details = parseImportedOrderDetails(batchOrderInput);
     if (details.length === 0) {
-      alert("未识别到预约信息。请按“06:30 上車地点 下車地点”的格式粘贴。");
+      alert("未识别到预约信息。請按“06:30 上車地点 下車地点”的格式粘贴。");
       return;
     }
     if (details.length > 500) {
-      alert("一次最多导入 500 条预约，请分批导入。");
+      alert("一次最多导入 500 条预约，請分批导入。");
       return;
     }
     const batchVehicle = availableVehicleRecords.find((vehicle) => vehicle.id === batchOrderVehicle);
     if (!batchOrderDate || !batchVehicle) {
-      alert("请選択有效的日期和运营中的車両。");
+      alert("請選択有效的日期和运营中的車両。");
       return;
     }
 
@@ -3150,7 +3150,7 @@ export default function Home() {
     };
 
     if (!savedDriver.name) {
-      alert("请填写運転士。");
+      alert("請填写運転士。");
       return;
     }
 
@@ -3208,12 +3208,12 @@ export default function Home() {
       if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "全体标语保存失败。"));
       if (typeof payload !== "object" || payload === null ||
         !("slogan" in payload) || typeof payload.slogan !== "string") {
-        throw new Error("全体标语保存结果无效，请刷新核对。");
+        throw new Error("全体标语保存结果无效，請刷新核对。");
       }
       setDriverGlobalSlogan(payload.slogan);
     } catch (error) {
       console.error("Driver global slogan save failed.", error);
-      setDriverGlobalSloganError(error instanceof Error ? error.message : "全体标语保存失败，请重试。");
+      setDriverGlobalSloganError(error instanceof Error ? error.message : "全体标语保存失败，請重试。");
     } finally {
       setDriverGlobalSloganSaving(false);
     }
@@ -3289,7 +3289,7 @@ export default function Home() {
     };
 
     if (!savedSource.companyName) {
-      alert("请填写来源。");
+      alert("請填写来源。");
       return;
     }
 
@@ -3405,11 +3405,11 @@ export default function Home() {
     if (dialogSavingRef.current) return;
     if (!sealCompany) return;
     if (sealUploadBusy) {
-      alert("印章正在处理，请稍后再保存。");
+      alert("印章正在处理，請稍后再保存。");
       return;
     }
     if (!isCompanySealDataUrl(sealDraft)) {
-      alert("印章图片无效，请重新上传。");
+      alert("印章图片无效，請重新上传。");
       return;
     }
     if (sealCompany.id.startsWith("unregistered-")) {
@@ -3420,7 +3420,7 @@ export default function Home() {
       return finishDialogSave([waitForCompanies()], () => setSealCompany(null));
     }
     if (!companyRecords.some((company) => company.id === sealCompany.id)) {
-      alert("所属会社已不存在，请关闭窗口后刷新重试。");
+      alert("所属会社已不存在，請关闭窗口后刷新重试。");
       return;
     }
     setCompanyRecords((current) => current.map((company) =>
@@ -3467,11 +3467,11 @@ export default function Home() {
   function saveCompany() {
     if (dialogSavingRef.current) return;
     if (companySealBusy) {
-      alert("印章正在处理，请稍后再保存。");
+      alert("印章正在处理，請稍后再保存。");
       return;
     }
     if (!isCompanySealDataUrl(companyForm.sealImage)) {
-      alert("印章图片无效，请重新上传。");
+      alert("印章图片无效，請重新上传。");
       return;
     }
     if (editingCompanyId === null && !requireSpecificRegionForNewData()) return;
@@ -3485,7 +3485,7 @@ export default function Home() {
       return;
     }
     if (!savedName) {
-      alert("请填写会社名。");
+      alert("請填写会社名。");
       return;
     }
 
@@ -3658,14 +3658,14 @@ export default function Home() {
     }
 
     if (!savedVehicle.name) {
-      alert("请填写車名。");
+      alert("請填写車名。");
       return;
     }
 
     const plateRequired =
       editingVehicleId === null && !isOutsourcedVehicle(savedVehicle.name);
     if (plateRequired && !savedVehicle.plate) {
-      alert("请填写車両番号。");
+      alert("請填写車両番号。");
       return;
     }
 
@@ -3798,7 +3798,7 @@ export default function Home() {
     if (!requireSpecificRegionForNewData()) return;
     const lines = batchInput.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     if (!batchAddType || lines.length === 0) {
-      alert("请先填写要新增的内容。");
+      alert("請先填写要新增的内容。");
       return;
     }
 
@@ -3819,7 +3819,7 @@ export default function Home() {
         new Set(names).size !== names.length ||
         names.some((name) => driverRecords.some((driver) => driver.name === name))
       ) {
-        alert("運転士不能重复，请检查批量内容。");
+        alert("運転士不能重复，請检查批量内容。");
         return;
       }
       setDriverRecords((current) => [
@@ -3856,7 +3856,7 @@ export default function Home() {
             !fuelTypes.includes(record.fuelType),
         )
       ) {
-        alert("車両每行请按顺序填写：車名、車両番号、座位数（5/7/8/10）、燃油类型、車検有効期限、自賠責有効期限、備考、車両所属（后4项可选）。");
+        alert("車両每行請按顺序填写：車名、車両番号、座位数（5/7/8/10）、燃油类型、車検有効期限、自賠責有効期限、備考、車両所属（后4项可选）。");
         return;
       }
       if (
@@ -3866,7 +3866,7 @@ export default function Home() {
             !companyRecords.some((company) => company.name === record.ownerCompany),
         )
       ) {
-        alert("車両所属必须填写所属会社列表中的名称，请检查批量内容。");
+        alert("車両所属必须填写所属会社列表中的名称，請检查批量内容。");
         return;
       }
       const batchRegionId = getRegionForNewRecords();
@@ -3904,7 +3904,7 @@ export default function Home() {
         new Set(names).size !== names.length ||
         names.some((name) => orderSourceRecords.some((source) => source.companyName === name))
       ) {
-        alert("来源不能重复，请检查批量内容。");
+        alert("来源不能重复，請检查批量内容。");
         return;
       }
       setOrderSourceRecords((current) => [
@@ -3944,7 +3944,7 @@ export default function Home() {
         new Set(names).size !== names.length ||
         names.some((name) => companyRecords.some((company) => company.name === name))
       ) {
-        alert("所属会社名称不能重复，请检查批量内容。");
+        alert("所属会社名称不能重复，請检查批量内容。");
         return;
       }
       setCompanyRecords((current) => [
@@ -4140,7 +4140,7 @@ export default function Home() {
         calculateOrderFinance(finance).driverWages <= 99_999_999_999_999;
     });
     if (!validOrderPrice || !validFinance) {
-      alert("日元金額请输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超時時間最多填写两位小数，超時计算金額不得超出限额，行程簡概及出金备注最多 1000 字，出金状態须为有效选项。");
+      alert("日元金額請输入不超过 99,999,999,999,999 的非负整数，燃油消耗和超時時間最多填写两位小数，超時计算金額不得超出限额，行程簡概及出金备注最多 1000 字，出金状態须为有效选项。");
       return;
     }
 
@@ -4191,7 +4191,7 @@ export default function Home() {
   function addOrder(skipConflictCheck = false) {
     if (dialogSavingRef.current) return;
     if (editingOrderId !== null && !orders.some((order) => order.id === editingOrderId)) {
-      alert("预约已删除，请关闭窗口后重新操作。");
+      alert("预约已删除，請关闭窗口后重新操作。");
       return;
     }
     const targetRegionId = editingOrderId === null
@@ -4206,7 +4206,7 @@ export default function Home() {
       !formVehicle &&
       orderFormVehicles.filter((vehicle) => vehicle.name === form.vehicle).length > 1
     ) {
-      alert(`車名「${form.vehicle}」有多台車両，请選択具体的車両番号。`);
+      alert(`車名「${form.vehicle}」有多台車両，請選択具体的車両番号。`);
       return;
     }
     if (
@@ -4218,7 +4218,7 @@ export default function Home() {
     }
 
     if (!form.customer.trim()) {
-      alert("请填写訂単名称。");
+      alert("請填写訂単名称。");
       return;
     }
 
@@ -4301,7 +4301,7 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to sign out.", error);
       setPersistenceError(
-        error instanceof Error ? error.message : "退出登录失败，请重试。",
+        error instanceof Error ? error.message : "退出登录失败，請重试。",
       );
     }
   }
@@ -4315,7 +4315,7 @@ export default function Home() {
               <h1 className="text-lg font-bold text-rose-800">无法载入業務数据</h1>
               <p role="alert" className="mt-2 text-sm text-gray-700">{dataLoadError}</p>
               <p className="mt-2 text-sm text-gray-600">
-                请检查 Supabase 环境变量、数据库迁移和当前账号的激活状態。
+                請检查 Supabase 环境变量、数据库迁移和当前账号的激活状態。
               </p>
               <button
                 type="button"
@@ -4337,7 +4337,7 @@ export default function Home() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
         <p role="alert" className="rounded border bg-white p-6 text-sm text-rose-800">
-          当前账号没有用户資料。请联系系统管理员。
+          当前账号没有用户資料。請联系系统管理员。
         </p>
       </main>
     );
@@ -4382,12 +4382,12 @@ export default function Home() {
     const targets = keys.map(key => ({ key, ...parseAccountingKey(key) }));
     if (targets.some(({ orderId, date }) => !allOrders.some(order => order.id === orderId &&
       getOrderDateKeys(order).includes(date)))) {
-      alert("訂単或用車日期已变化，请关闭财务窗口后重新打开。");
+      alert("訂単或用車日期已变化，請关闭财务窗口后重新打开。");
       return;
     }
     if (targets.some(({ key, orderId, date }) => accountingForm[key]?.driverPaymentType !==
       allOrders.find(order => order.id === orderId)?.financeByDate[date]?.driverPaymentType)) {
-      alert("費用类型尚未保存，请先保存财务数据后再選任運転士；未保存的金額不会自動提交。");
+      alert("費用类型尚未保存，請先保存财务数据后再選任運転士；未保存的金額不会自動提交。");
       return;
     }
     if (targets.some(({ key, orderId, date }) => {
@@ -4398,7 +4398,7 @@ export default function Home() {
         [finance, accountingForm[key]].some(entry => entry &&
           (withCompanyAdvanceDriver(entry, name).companyAdvancePaymentNote || "").length > 1000);
     })) {
-      alert("運転士姓名加入后外注運転士备注超过1000字，请先缩短备注再選任。");
+      alert("運転士姓名加入后外注運転士备注超过1000字，請先缩短备注再選任。");
       return;
     }
     setOrders(current => current.map(order => {
@@ -4500,7 +4500,7 @@ export default function Home() {
     setInvoiceStatusSavingIds(nextSavingIds);
     try {
       if (!(await waitForOrders())) {
-        alert("訂単有未确认的保存，请先检查页面顶部的保存错误并重新载入核对。");
+        alert("訂単有未确认的保存，請先检查页面顶部的保存错误并重新载入核对。");
         return false;
       }
 
@@ -4513,7 +4513,7 @@ export default function Home() {
           : order,
       ));
       if (!(await waitForOrders())) {
-        alert("状態保存未获服务器确认，请检查页面顶部的保存错误并重新载入核对。");
+        alert("状態保存未获服务器确认，請检查页面顶部的保存错误并重新载入核对。");
         return false;
       }
       return true;
@@ -4545,7 +4545,7 @@ export default function Home() {
     if (!dialog) return;
     const order = orders.find((candidate) => candidate.id === dialog.orderId);
     if (!order) {
-      alert("訂単已不存在，请刷新后重试。");
+      alert("訂単已不存在，請刷新后重试。");
       setInvoiceStatusDialog(null);
       return;
     }
@@ -4574,7 +4574,7 @@ export default function Home() {
       console.error("Failed to update invoice status.", error);
       const message = error instanceof Error ? error.message : "无法确认請求書状態保存结果。";
       setPersistenceError(message);
-      alert("請求書状態保存失败，请检查页面顶部的保存错误并重新载入核对。");
+      alert("請求書状態保存失败，請检查页面顶部的保存错误并重新载入核对。");
     }
   }
   const canViewVehicleAndBalanceReports =
@@ -4622,7 +4622,7 @@ export default function Home() {
     <main className={`dashboard min-h-screen bg-gray-100 text-gray-900${activeView === "calendar" ? " mobile-calendar-view" : ""}`}>
       {dialogSaving && <div role="status" aria-live="polite" aria-busy="true"
         className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
-        <p className="rounded-lg bg-white px-6 py-4 font-semibold shadow-xl">正在保存，请稍候…</p>
+        <p className="rounded-lg bg-white px-6 py-4 font-semibold shadow-xl">正在保存，請稍候…</p>
       </div>}
       <div className="contents" inert={dialogSaving}>
       {/* 顶部 */}
@@ -4733,7 +4733,7 @@ export default function Home() {
       {driverExecution.error && <p role="alert" className="mx-4 my-2 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">{driverExecution.error}</p>}
       {persistenceError && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-b border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-          <span>保存错误：{persistenceError} 本地显示可能尚未同步到服务器，请重新载入后核对数据。</span>
+          <span>保存错误：{persistenceError} 本地显示可能尚未同步到服务器，請重新载入后核对数据。</span>
           <button
             type="button"
             onClick={() => window.location.reload()}
@@ -4745,7 +4745,7 @@ export default function Home() {
       )}
       {vehicleMonthlyFinanceMigrationPending && (
         <p role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          車両月度費用功能尚未启用：请数据库管理员应用
+          車両月度費用功能尚未启用：請数据库管理员应用
           {" "}
           <code>supabase/migrations/20261018000000_vehicle_monthly_finance.sql</code>
           {" "}后再录入月度費用或車両固定月費；其余業務数据已正常载入。
@@ -4753,7 +4753,7 @@ export default function Home() {
       )}
       {balanceExpensesMigrationPending && (
         <p role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          收支平衡支出项目尚未启用：请数据库管理员应用
+          收支平衡支出项目尚未启用：請数据库管理员应用
           {" "}
           <code>supabase/migrations/20261019000000_balance_expenses.sql</code>
           {" "}后再新增项目或保存金額；其余業務数据已正常载入。
@@ -4761,7 +4761,7 @@ export default function Home() {
       )}
       {driverWageItemsMigrationPending && (
         <p role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          運転士工資手動项目尚未启用：请数据库管理员应用
+          運転士工資手動项目尚未启用：請数据库管理员应用
           {" "}
           <code>supabase/migrations/20261103000000_driver_wage_items.sql</code>
           {" "}后再录入；其余業務数据已正常载入。
@@ -4780,7 +4780,7 @@ export default function Home() {
             {[
               { id: "calendar", label: "カレンダー", icon: "▦" },
               { id: "orders", label: "予約管理", icon: "≡" },
-              { id: "operations", label: "运行管理", icon: "▤" },
+              { id: "operations", label: "運行管理", icon: "▤" },
               { id: "drivers", label: "運転士", icon: "♙" },
               { id: "vehicles", label: "車両", icon: "▰" },
               { id: "sources", label: "来源", icon: "↗" },
@@ -4853,7 +4853,7 @@ export default function Home() {
                 </button>
               </div>
               <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-                账号由管理员直接创建并设置初始密码，无需邮件邀请。普通用户只能管理所属地域的数据；管理员可以查看并管理全部地域。
+                账号由管理员直接创建并设置初始密码，无需邮件邀請。普通用户只能管理所属地域的数据；管理员可以查看并管理全部地域。
               </p>
               {accountMessage && <p role="status" className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">{accountMessage}</p>}
               {accountError && (
@@ -4933,8 +4933,8 @@ export default function Home() {
                     <div className="rounded border bg-slate-50 p-3 sm:col-span-2 xl:col-span-3">
                       <p className="mb-2 text-sm text-gray-600">
                         {editingLoginAccountId === null
-                          ? "设置初始登录密码（8 至 128 个字符），请通过安全方式告知用户。"
-                          : "如需重设密码，请填写两次并单独点击“设置新密码”。仅保存資料不会修改密码；设置密码会同時确认该用户邮箱。"}
+                          ? "设置初始登录密码（8 至 128 个字符），請通过安全方式告知用户。"
+                          : "如需重设密码，請填写两次并单独点击“设置新密码”。仅保存資料不会修改密码；设置密码会同時确认该用户邮箱。"}
                       </p>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <label className="text-sm font-medium">
@@ -5256,7 +5256,7 @@ export default function Home() {
                   type="button"
                   onClick={async () => {
                     if (activeRegionId === ALL_REGIONS_ID || !selectedDriverFinanceDriver) {
-                      alert("请先選択一个分区和一位運転士，再导出月度工資表。");
+                      alert("請先選択一个分区和一位運転士，再导出月度工資表。");
                       return;
                     }
                     if (
@@ -5275,7 +5275,7 @@ export default function Home() {
                         manualItems: selectedDriverWageItems,
                       });
                     } catch (error) {
-                      alert(error instanceof Error ? error.message : "工資表导出失败，请重试。");
+                      alert(error instanceof Error ? error.message : "工資表导出失败，請重试。");
                     }
                   }}
                   className="rounded border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
@@ -5395,7 +5395,7 @@ export default function Home() {
                             onClick={() => {
                               const order = orders.find((item) => item.id === row.orderId);
                               if (!order) {
-                                alert("未找到对应訂単，请刷新后重试。");
+                                alert("未找到对应訂単，請刷新后重试。");
                                 return;
                               }
                               openAccounting(order);
@@ -5446,11 +5446,11 @@ export default function Home() {
                 </div>
                 {!selectedDriverFinanceDriver ? (
                   <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    请先選択運転士，再录入手動工資项目。
+                    請先選択運転士，再录入手動工資项目。
                   </p>
                 ) : driverWageItemsMigrationPending ? (
                   <p role="alert" className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    手動工資项目尚未启用，请先应用数据库迁移后再录入。
+                    手動工資项目尚未启用，請先应用数据库迁移后再录入。
                   </p>
                 ) : driverWageItemDrafts.length === 0 ? (
                   <p className="text-sm text-gray-500">当前月份暂无手動工資项目。</p>
@@ -5486,7 +5486,7 @@ export default function Home() {
                               }
                               className="mt-1 w-full rounded border bg-white px-3 py-2"
                             >
-                              <option value="__select_company__">请選択所属会社</option>
+                              <option value="__select_company__">請選択所属会社</option>
                               <option value="__unassigned_company__">未设置所属会社</option>
                               {driverFinanceCompanies.map((company) => (
                                 <option key={company} value={company}>{company}</option>
@@ -5801,7 +5801,7 @@ export default function Home() {
                   </>
                 ) : (
                   <p className="text-sm text-gray-600">
-                    请先在右上角選択車両番号，再录入该車両的月度費用和公里数。
+                    請先在右上角選択車両番号，再录入该車両的月度費用和公里数。
                   </p>
                 )}
               </section>
@@ -6142,7 +6142,7 @@ export default function Home() {
                 </div>
                 {balanceCompanyFilter === "" && (
                   <p className="border-b bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    请選択具体所属会社后添加项目或录入金額；全部会社视图仅用于查看汇総。
+                    請選択具体所属会社后添加项目或录入金額；全部会社视图仅用于查看汇総。
                   </p>
                 )}
                 <div className="overflow-x-auto">
@@ -7774,7 +7774,7 @@ export default function Home() {
                         <td className="px-4 py-3">{driver.whatsapp || "-"}</td>
                         <td className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
                         {driver.id.startsWith("unregistered-driver-")
-                          ? <td colSpan={2} className="px-4 py-3 text-gray-500">请先编辑保存为正式運転士记录</td>
+                          ? <td colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士记录</td>
                           : <DriverLoginFields driverId={driver.id} name={driver.name} regionId={driver.regionId} />}
                         <td className="px-4 py-3">
                           <div className="flex gap-3">
@@ -8209,7 +8209,7 @@ export default function Home() {
                   }}
                   className="mt-1 w-full rounded border px-3 py-2"
                 >
-                  <option value="">请選択所属公司</option>
+                  <option value="">請選択所属公司</option>
                   {companies.map((company) => (
                     <option key={company} value={company}>{company}</option>
                   ))}
@@ -8220,7 +8220,7 @@ export default function Home() {
                     type="text"
                     value={batchOrderCompany}
                     onChange={(event) => setBatchOrderCompany(event.target.value)}
-                    placeholder="请输入所属公司"
+                    placeholder="請输入所属公司"
                     className="mt-2 w-full rounded border px-3 py-2"
                   />
                 )}
@@ -8467,7 +8467,7 @@ export default function Home() {
                 }
               />
               {form.endDate !== form.date && <p className="text-xs text-gray-600">
-                上方为訂単默认車両，仅影响未单独换車的日期；某一天换車请在下方对应日期選択車両番号。
+                上方为訂単默认車両，仅影响未单独换車的日期；某一天换車請在下方对应日期選択車両番号。
               </p>}
 
               {/* 運転士 */}
@@ -8491,7 +8491,7 @@ export default function Home() {
                     onChange={(e) =>
                       setForm((current) => updateReservationDriver(current, e.target.value))
                     }
-                    placeholder="请输入運転士"
+                    placeholder="請输入運転士"
                   />
                 </label>
               )}
@@ -8652,7 +8652,7 @@ export default function Home() {
                   inputMode="numeric"
                   maxLength={5}
                   pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
-                  title="请输入 0930 或 09:30 格式的有效時間"
+                  title="請输入 0930 或 09:30 格式的有效時間"
                   aria-describedby="order-time-hint"
                   placeholder="0930"
                   className="mt-1 w-full rounded border p-2"
@@ -8716,7 +8716,7 @@ export default function Home() {
                     }
                   }}
                 >
-                  <option value="" disabled>请選択所属会社</option>
+                  <option value="" disabled>請選択所属会社</option>
                   {companies.map((company) => (
                     <option key={company} value={company}>{company}</option>
                   ))}
@@ -8733,7 +8733,7 @@ export default function Home() {
                     className="mt-1 w-full rounded border p-2"
                     value={form.company}
                     onChange={(e) => setForm({ ...form, company: e.target.value })}
-                    placeholder="请输入公司名称"
+                    placeholder="請输入公司名称"
                   />
                 </label>
               )}
@@ -9032,7 +9032,7 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, ownerCompany: event.target.value })
                   }
                 >
-                  <option value="">请選択所属会社</option>
+                  <option value="">請選択所属会社</option>
                   {companyRecords.map((company) => (
                     <option key={company.id} value={company.name}>{company.name}</option>
                   ))}
@@ -9051,7 +9051,7 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, seats: event.target.value })
                   }
                 >
-                  <option value="">请選択座位数</option>
+                  <option value="">請選択座位数</option>
                   {["5", "7", "8", "10"].map((seats) => (
                     <option key={seats} value={seats}>{seats}座</option>
                   ))}
@@ -9069,7 +9069,7 @@ export default function Home() {
                     setVehicleForm({ ...vehicleForm, fuelType: event.target.value })
                   }
                 >
-                  <option value="">请選択燃油类型</option>
+                  <option value="">請選択燃油类型</option>
                   {fuelTypes.map((fuelType) => (
                     <option key={fuelType} value={fuelType}>
                       {fuelType}
@@ -9503,7 +9503,7 @@ export default function Home() {
                 order.id === driverSelectionOrder.id ? { id: order.id, ...updateReservationDriver(order, name) } : order));
               void finishDialogSave([waitForOrders()], () => {});
             } else {
-              alert("訂単已不存在，请刷新后重试。");
+              alert("訂単已不存在，請刷新后重试。");
             }
           }}
         />
@@ -9593,11 +9593,11 @@ export default function Home() {
                   const company = companyRecords.find((item) =>
                     item.regionId === accountingPreviewOrder.regionId && item.name === companyName);
                   if (!source || !company) {
-                    alert("请先为訂単设置同分区的来源和所属会社。");
+                    alert("請先为訂単设置同分区的来源和所属会社。");
                     return;
                   }
                   if (!company.bankAccount || !/^T[0-9]{13}$/.test(company.taxRegistrationNumber) || !company.phone || !company.rollCallAddress) {
-                    alert("请先在所属会社登记振込口座、有效T番号、电话和営業所地址。");
+                    alert("請先在所属会社登记振込口座、有效T番号、电话和営業所地址。");
                     return;
                   }
                   const price = primaryAccountingOrderPrice;
@@ -9653,7 +9653,7 @@ export default function Home() {
                       ),
                     });
                   } catch (error) {
-                    alert(error instanceof Error ? error.message : "請求書导出失败，请重试。");
+                    alert(error instanceof Error ? error.message : "請求書导出失败，請重试。");
                   }
                 }}
               >
@@ -9689,7 +9689,7 @@ export default function Home() {
                       }),
                     });
                   } catch (error) {
-                    alert(error instanceof Error ? error.message : "导出失败，请重试。");
+                    alert(error instanceof Error ? error.message : "导出失败，請重试。");
                   }
                 }}
               >
@@ -9743,7 +9743,7 @@ export default function Home() {
                     ["driver", "運転士（全部统一）", accountingBatchDriverOptions, accountingBatchCommon.driver, "未安排運転士"],
                     ["orderSource", "訂単来源（全部统一）", accountingSourceOptions, accountingBatchCommon.orderSource, "未填写"],
                     ["company", "訂単所属（全部统一）", accountingCompanyOptions, accountingBatchCommon.company, "未设置"],
-                    ["status", "訂単状態（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "请選択訂単状態"],
+                    ["status", "訂単状態（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "請選択訂単状態"],
                   ] as const).map(([field, label, options, common, emptyLabel]) => (
                     <label key={field} className="block min-w-0 font-medium text-indigo-900">
                       {label}
@@ -9996,7 +9996,7 @@ export default function Home() {
                               current[financeKey] || emptyOrderFinance, type,
                               getServiceDriver({ driver: "", financeByDate: { day: current[financeKey] } }, "day")) }));
                           }}>
-                          <option value="" disabled>请選択運転士費用类型</option>
+                          <option value="" disabled>請選択運転士費用类型</option>
                           <option value="wage">運転士工資</option>
                           <option value="company_advance">運転士外注</option>
                         </select>
@@ -10365,7 +10365,7 @@ export default function Home() {
                   value={accountingAssignee}
                   onChange={(event) => setAccountingAssignee(event.target.value)}
                 >
-                  <option value="">请選択核算担当</option>
+                  <option value="">請選択核算担当</option>
                   {accountingAccounts.map((account) => (
                     <option key={account.id} value={account.email}>
                       {account.fullName.trim() || "未填写姓名"}
@@ -10656,7 +10656,7 @@ export default function Home() {
                 className="text-2xl text-gray-500"
               >×</button>
             </div>
-            {deleteCompleted && <p role="status" className="mt-3 text-sm text-emerald-700">删除已完成，请点右上角 × 关闭。</p>}
+            {deleteCompleted && <p role="status" className="mt-3 text-sm text-emerald-700">删除已完成，請点右上角 × 关闭。</p>}
             <p className="mt-3 text-sm text-gray-700">{pendingDelete.message}</p>
             <label className="mt-4 block text-sm font-medium">
               删除密码

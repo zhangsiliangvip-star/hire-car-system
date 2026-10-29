@@ -18,7 +18,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   const { rows, expenses, incomes, totals } = data.summary;
   const { requestAmount, incomeTotal, expenseTotal, net } = totals;
   if (!Object.values(totals).every(Number.isSafeInteger)) {
-    throw new Error("收支合计超出金額范围，请缩小筛选范围。");
+    throw new Error("收支合计超出金額范围，請缩小筛选范围。");
   }
   const resultLabel = net < 0 ? "当月亏损" : "当月利润";
   const resultClass = net < 0 ? "loss" : "profit";
@@ -84,7 +84,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   請求按訂単所属会社归集，手動收入和支出按项目所属会社及录入月份归集；其他统计和工資算法不变。<br>
   請求按訂単入金方式細分为口座入金、現金入金及未设置入金方式，不以入金日期判断实收；三项之和等于請求総和，不重复计入利润。<br>
   本表沿用页面所选月份、分区与所属会社范围。收入和支出金額采用当前页面输入值，空白按0计算，导出不会自動保存。<br>
-  内部财务資料，请妥善保管。</p>
+  内部财务資料，請妥善保管。</p>
   </article></div></body></html>`;
 }
 

@@ -121,7 +121,7 @@ function controller({ mode = "ok", blocked = false } = {}) {
       const row = body.fuelId ? rows[2] : rows.find(item => item.kind === "finance" &&
         item.claim.assignmentId === body.assignmentId && item.claim.category === body.category);
       const claim = { ...row.claim, status: body.decision, version: mode === "mismatch" ? 99 : row.claim.version + 1 };
-      const response = mode === "conflict" ? Response.json({ error: "状態已变化，请刷新。" }, { status: 409 }) :
+      const response = mode === "conflict" ? Response.json({ error: "状態已变化，請刷新。" }, { status: 409 }) :
         Response.json(row.kind === "fuel" ? { fuelClaim: claim } : { claim });
       if (mode === "late") return new Promise(done => { resolve = () => done(response); });
       return response;

@@ -205,7 +205,7 @@ test("operation list includes required columns, first/last stops, open reports a
   assert.doesNotMatch(renderToStaticMarkup(tree), />状態<|>已归库<|>出库中</);
   assert.ok(renderToStaticMarkup(tree).includes("第一经由地"));
   const source = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(source, /id: "orders", label: "予約管理"[^]*?id: "operations", label: "运行管理"/);
+  assert.match(source, /id: "orders", label: "予約管理"[^]*?id: "operations", label: "運行管理"/);
   assert.match(source, /activeView === "operations"/);
 });
 test("monthly reads reject wrong scope and late hidden or signed-out responses", async () => {

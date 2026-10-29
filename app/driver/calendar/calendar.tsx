@@ -41,9 +41,9 @@ export default function DriverCalendar() {
         ]);
         if (calendar.status === 401 || shifts.status === 401) { location.replace("/driver/login?next=%2Fdriver%2Fcalendar"); return; }
         const result = await calendar.json();
-        if (!calendar.ok) throw new Error(result.error || "无法读取日历，请重试。");
+        if (!calendar.ok) throw new Error(result.error || "无法读取日历，請重试。");
         const parsed = driverCalendarSchema.parse(result);
-        if (parsed.month !== month) throw new Error("月份不一致，请重试。");
+        if (parsed.month !== month) throw new Error("月份不一致，請重试。");
         let rest: string[] = [];
         if (shifts.ok) {
           const shift = shiftDataSchema.safeParse(await shifts.json());

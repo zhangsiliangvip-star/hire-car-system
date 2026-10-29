@@ -30,14 +30,14 @@ export default function DriverTripNotes({ assignmentId, notes, disabled, onSavin
       if (!response.ok) {
         if (response.status === 409) onConflict();
         throw new Error(typeof data === "object" && data !== null && "error" in data && typeof data.error === "string"
-          ? data.error : "備考未保存，请重试。");
+          ? data.error : "備考未保存，請重试。");
       }
       if (typeof data !== "object" || data === null || !("notes" in data) || data.notes !== draft.notes)
-        throw new Error("備考保存未获确认，请重试或联系调度。");
+        throw new Error("備考保存未获确认，請重试或联系调度。");
       onSaved(draft.notes); setDraft(null); setNotice("備考已保存并同步。");
     } catch (cause) {
       console.error("Driver trip notes save failed.", cause);
-      setError(cause instanceof Error ? cause.message : "備考未保存，请重试。");
+      setError(cause instanceof Error ? cause.message : "備考未保存，請重试。");
     } finally {
       savingRef.current = false; setSaving(false); onSavingChange(false);
     }

@@ -22,7 +22,7 @@ export default async function LoginPage({
   const params = await searchParams;
   const errorMessage =
     params.error === "auth_callback_failed"
-      ? "邮箱验证链接已失效或无法验证，请联系管理员重新邀请。"
+      ? "邮箱验证链接已失效或无法验证，請联系管理员重新邀請。"
       : "";
 
   return (

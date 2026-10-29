@@ -20,7 +20,7 @@ export default function DriverBrand() {
       location.replace("/driver/login");
     } catch (cause) {
       console.error("Driver logout failed.", cause);
-      setError("退出失败，请重试，勿将设备交给他人。");
+      setError("退出失败，請重试，勿将设备交给他人。");
       setBusy(false);
     }
   }

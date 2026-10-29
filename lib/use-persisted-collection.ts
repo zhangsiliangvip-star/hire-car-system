@@ -64,7 +64,7 @@ export function usePersistedCollection<T extends Identified>(
     }));
     if (next.some((item) => !item.regionId)) {
       persistenceFailed.current = true;
-      reportError("新增業務数据前，请先選択一个具体地域。");
+      reportError("新增業務数据前，請先選択一个具体地域。");
       return;
     }
 
@@ -102,7 +102,7 @@ export function usePersistedCollection<T extends Identified>(
         }
         if (typeof result !== "object" || result === null || !("saved" in result) ||
           !Array.isArray(result.saved)) {
-          throw new Error("保存后未收到操作信息，请重新载入核对。");
+          throw new Error("保存后未收到操作信息，請重新载入核对。");
         }
         const operations = new Map(result.saved.map((record: unknown) => {
           if (typeof record !== "object" || record === null ||

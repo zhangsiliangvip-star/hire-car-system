@@ -10,7 +10,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   try {
     const { supabase, user, profile } = await getAuthenticatedProfile();
-    if (!user || !profile) return jsonResponse({ error: "请先登录。" }, { status: 401 });
+    if (!user || !profile) return jsonResponse({ error: "請先登录。" }, { status: 401 });
     let body: unknown;
     try {
       body = await request.json();
@@ -35,6 +35,6 @@ export async function POST(request: Request) {
     return jsonResponse({ number: data });
   } catch (error) {
     console.error("Invoice number request failed:", error);
-    return jsonResponse({ error: "請求書编号分配失败，请刷新后重试。" }, { status: 500 });
+    return jsonResponse({ error: "請求書编号分配失败，請刷新后重试。" }, { status: 500 });
   }
 }

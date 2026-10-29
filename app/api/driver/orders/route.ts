@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const date = params.get("date");
     if ((assignment !== null && date !== null) || (assignment === null && date === null) ||
         (assignment !== null ? !assignmentIdSchema.safeParse(assignment).success : !serviceDateSchema.safeParse(date).success)) {
-      return jsonResponse({ error: "请選択有效日期或行程。" }, { status: 400 });
+      return jsonResponse({ error: "請選択有效日期或行程。" }, { status: 400 });
     }
     async function withVehicleNumbers(trips: DriverTrip[]) {
       if (!trips.length) return trips;
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       const { data, error } = await identity.supabase.rpc("driver_trip_detail", { target_assignment: assignment });
       if (error || !data) {
         console.error("Driver trip detail query failed.", { code: error?.code });
-        return jsonResponse({ error: "无法读取行程，请重试。" }, { status: 503 });
+        return jsonResponse({ error: "无法读取行程，請重试。" }, { status: 503 });
       }
       if (data.length === 0) return jsonResponse({ error: "行程不存在或已撤派。" }, { status: 404 });
       if (data.length !== 1 || data[0].assignment_id !== assignment) throw new Error("Unexpected trip detail.");
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     const { data, error } = await identity.supabase.rpc("driver_orders", { target_date: date ?? undefined });
     if (error || !data) {
       console.error("Driver orders query failed.", { code: error?.code });
-      return jsonResponse({ error: "无法读取行程，请重试。" }, { status: 503 });
+      return jsonResponse({ error: "无法读取行程，請重试。" }, { status: 503 });
     }
     const trips: DriverTrip[] = [];
     for (let offset = 0; offset < data.length; offset += 10) {
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     const { data: historyRows, error: historyError } = await supabase.rpc("driver_historical_orders", { target_date: date! });
     if (historyError || !historyRows) {
       console.error("Driver historical orders query failed.", { code: historyError?.code });
-      return jsonResponse({ error: "无法读取历史行程，请重试。" }, { status: 503 });
+      return jsonResponse({ error: "无法读取历史行程，請重试。" }, { status: 503 });
     }
     const historicalTrips = historyRows.map(projectHistoricalDriverTrip);
     const orderIds = new Set(trips.map(trip => trip.orderId));

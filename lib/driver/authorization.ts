@@ -13,14 +13,14 @@ export async function requireDriver() {
     console.error("Driver session verification failed.", { code: authError.code });
     return { response: jsonResponse({ error: "无法核验登录状態。" }, { status: 503 }) };
   }
-  if (!user) return { response: jsonResponse({ error: "请先登录。" }, { status: 401 }) };
+  if (!user) return { response: jsonResponse({ error: "請先登录。" }, { status: 401 }) };
   const { data, error } = await supabase.rpc("driver_identity");
   if (error || !data || data.length > 1) {
     console.error("Driver identity verification failed.", { code: error?.code });
     return { response: jsonResponse({ error: "无法核验運転士身份。" }, { status: 503 }) };
   }
   if (data.length !== 1) {
-    return { response: jsonResponse({ error: "運転士身份未启用或已撤销，请联系管理员。" }, { status: 403 }) };
+    return { response: jsonResponse({ error: "運転士身份未启用或已撤销，請联系管理员。" }, { status: 403 }) };
   }
   return { response: null, supabase, identity: data[0] };
 }

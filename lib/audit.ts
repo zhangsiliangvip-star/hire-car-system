@@ -84,7 +84,7 @@ const fieldLabels: Record<string, string> = {
   parking_fee: "停車场費", insurance_fee: "保险費", inspection_fee: "点检費",
   repair_fee: "维修費", supplies: "备品", start_odometer: "起始里程", end_odometer: "结束里程",
   company_name: "会社", short_name: "簡称", monthly_amounts: "各月金額", contact_name: "联系人",
-  contact_info: "联系方式", address: "地址", color: "颜色", operations_manager: "运行管理者",
+  contact_info: "联系方式", address: "地址", color: "颜色", operations_manager: "運行管理者",
   maintenance_manager: "整备管理者", roll_call_address: "営業所地址", garage_address: "車库地址",
   bank_account: "口座", tax_registration_number: "T番号", seal_image: "印章",
   order_id: "訂単编号", company_id: "会社编号", serial_number: "請求書流水号",

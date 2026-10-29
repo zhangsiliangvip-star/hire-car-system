@@ -10,7 +10,7 @@ export function summarizeRequestAmounts(
       totals.cash += row.requestAmount;
     }
     else if (row.depositMethod === "") totals.unassigned += row.requestAmount;
-    else throw new Error("訂単入金方式无效，请检查訂単資料。");
+    else throw new Error("訂単入金方式无效，請检查訂単資料。");
   }
   return totals;
 }

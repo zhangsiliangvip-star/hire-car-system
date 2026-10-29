@@ -17,13 +17,13 @@ async function submitCommand(command: Command, signal: AbortSignal) {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify(command), signal });
   const body: unknown = await response.json();
   if (!response.ok) throw new Error(typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
-    ? body.error : "操作结果未获确认，请刷新核对。");
+    ? body.error : "操作结果未获确认，請刷新核对。");
   const result = operationResultSchema.parse(body);
   const id = command.action === "edit" ? command.report.id : command.reportId;
   if (result.action !== command.action || (result.action === "edit" ? result.report.id : result.deletedId) !== id)
-    throw new Error("操作返回不一致，请刷新核对。");
+    throw new Error("操作返回不一致，請刷新核对。");
   if (result.action === "edit" && command.action === "edit" && result.report.version <= command.report.version)
-    throw new Error("日報保存版本未获确认，请刷新核对。");
+    throw new Error("日報保存版本未获确认，請刷新核对。");
   return result;
 }
 
@@ -97,7 +97,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
       if (controller.current?.signal.aborted) return;
       console.error("Operations report edit failed.", cause instanceof Error ? cause.name : "UnknownError");
       setError(cause instanceof Error && cause.name !== "ZodError" ? cause.message :
-        "请检查日期時間、点呼先后、公里数、每个经由地的配对字段和修改原因。");
+        "請检查日期時間、点呼先后、公里数、每个经由地的配对字段和修改原因。");
     } finally { lock.current = false; setBusy(false); }
   }
   const input = (name: string, label: string, value: string | number | null | undefined,
@@ -109,9 +109,9 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
   return <dialog ref={dialog} aria-labelledby="operation-editor-title"
     className="m-auto max-h-[92dvh] w-[min(1100px,96vw)] overflow-y-auto rounded-lg p-4 shadow-xl backdrop:bg-black/40"
     onCancel={event => { event.preventDefault(); close(); }}>
-    <h2 id="operation-editor-title" className="mb-2 text-lg font-bold">编辑运行日報 · {row.driverName}</h2>
+    <h2 id="operation-editor-title" className="mb-2 text-lg font-bold">编辑運行日報 · {row.driverName}</h2>
     <p className="mb-3 text-sm text-gray-600">全部日期時間为日本時間。修改不改变運転士归属；出库日期须与日報日期一致。归库后经由地须填写完整。
-      旧日報点呼日期会预填，请核对后保存。切换到其他应用／标签页会清除未保存的编辑。</p>
+      旧日報点呼日期会预填，請核对后保存。切换到其他应用／标签页会清除未保存的编辑。</p>
     <form onSubmit={save} onInput={markDirty} className="space-y-4" onChange={event => {
       if (event.target instanceof HTMLInputElement && event.target.name === "serviceDate") {
         const link = event.currentTarget.elements.namedItem("assignmentId");
@@ -130,7 +130,7 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
             }
             markDirty();
           }}>
-          <option value="">未关联（保留原車牌，请人工确认）</option>
+          <option value="">未关联（保留原車牌，請人工确认）</option>
           {r.header?.assignmentId && !r.orderOptions?.some(item => item.assignmentId === r.header?.assignmentId) &&
             <option value={r.header.assignmentId}>原关联訂単（历史派单）</option>}
           {r.orderOptions?.map(item => <option key={item.assignmentId} value={item.assignmentId}>
@@ -225,17 +225,17 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
       try {
         const query = new URLSearchParams({ month }); if (region) query.set("region", region);
         const response = await fetch(`/api/operations-reports?${query}`, { cache: "no-store", signal: current.signal });
-        if (!response.ok) throw new Error("无法读取运行日報，请刷新重试。");
+        if (!response.ok) throw new Error("无法读取運行日報，請刷新重试。");
         const result = operationDataSchema.parse(await response.json());
         if (!active || current.signal.aborted || document.visibilityState !== "visible") return;
         if (result.rows.some(row => !row.report.serviceDate.startsWith(`${month}-`) || (region && row.regionId !== region)) ||
-          new Set(result.rows.map(row => row.report.id)).size !== result.rows.length) throw new Error("日報日期或地域不一致，请刷新。");
+          new Set(result.rows.map(row => row.report.id)).size !== result.rows.length) throw new Error("日報日期或地域不一致，請刷新。");
         setData(result); setError("");
         if (result.enabled) timer = setTimeout(() => void load(), 10000);
       } catch (cause) {
         if (!active || current.signal.aborted) return;
         console.error("Operations report refresh failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setData(null); setError(cause instanceof Error ? cause.message : "运行日報读取失败。");
+        setData(null); setError(cause instanceof Error ? cause.message : "運行日報读取失败。");
         timer = setTimeout(() => void load(), 10000);
       }
     }
@@ -246,7 +246,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
     function visibility() {
       clear();
       if (active && document.visibilityState === "visible") {
-        setNotice("正在重新读取日報；未保存修改已清除，刚提交的操作请核对结果。");
+        setNotice("正在重新读取日報；未保存修改已清除，刚提交的操作請核对结果。");
         void load();
       }
     }
@@ -281,7 +281,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
     } catch (cause) {
       if (!current.signal.aborted) {
         console.error("Operations report deletion failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setError(cause instanceof Error ? cause.message : "删除结果未获确认，请刷新核对。");
+        setError(cause instanceof Error ? cause.message : "删除结果未获确认，請刷新核对。");
       }
     } finally { lock.current = false; setBusy(false); }
   }
@@ -293,7 +293,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
     catch (cause) {
       if (!current.signal.aborted) {
         console.error("Operations report print failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setError(cause instanceof Error ? cause.message : "打印失败，请重试。");
+        setError(cause instanceof Error ? cause.message : "打印失败，請重试。");
       }
     } finally { lock.current = false; setBusy(false); }
   }
@@ -314,14 +314,14 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
         disabled={busy || Boolean(editing)} onChange={e => setDate(e.target.value)} /></label>
       <button className={buttonClass} disabled={busy || Boolean(editing)} onClick={() => { setData(null); setRevision(v => v + 1); }}>刷新</button>
       <button className={buttonClass} disabled={busy || Boolean(editing) || !filtered.length}
-        onClick={() => void output(filtered, `${month.slice(5)}月 运行日報`)}>月批量打印（{filtered.length}份）</button>
+        onClick={() => void output(filtered, `${month.slice(5)}月 運行日報`)}>月批量打印（{filtered.length}份）</button>
     </div>
     <p className="text-xs text-gray-600">日本時間 · 每10秒同步。工時＝退勤点呼－出勤点呼；日期或時間缺失時不计算。
       月批量打印遵循当前会社、車両番号和日期筛选，每份日報一页；清空日期可打印整月。导出PDF時在打印窗口選択“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
     {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {!data && !error && <p role="status">正在读取運転士日報…</p>}
-    {data && !data.enabled && <p role="status">运行管理尚未在此环境启用，目前仅在隔离测试版开放。</p>}
+    {data && !data.enabled && <p role="status">運行管理尚未在此环境启用，目前仅在隔离测试版开放。</p>}
     {data?.enabled && <><p className="text-sm text-gray-600">共 {filtered.length} 份日報（含出库中）</p>
       <div className="overflow-x-auto rounded border bg-white"><table className="w-full min-w-[1700px] border-collapse text-sm">
         <thead className="bg-gray-50"><tr>{["日期", "車両番号", "運転手", "出勤点呼時間", "出库地点", "出発時間",
@@ -335,12 +335,12 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
             duty(r, "End"), hours === null ? "点呼未完整" : durationLabel(hours)];
           return <tr key={r.id}>{cells.map((value, i) => <td key={i} className="max-w-56 whitespace-pre-wrap break-words border-b p-2 text-center">{value}
             {i === 1 && r.orderOptions && !r.header?.assignmentId &&
-              <span className="block text-xs text-amber-800">未关联訂単 · 请人工确认</span>}
+              <span className="block text-xs text-amber-800">未关联訂単 · 請人工确认</span>}
           </td>)}
             <td className="border-b p-2 text-center"><div className="flex justify-center gap-2 whitespace-nowrap">
               <button className={buttonClass} disabled={busy} onClick={() => setEditing(row)}>编辑</button>
               <button className={`${buttonClass} text-red-700`} disabled={busy} onClick={() => void remove(row)}>删除</button>
-              <button className={buttonClass} disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 运行日報`)}>导出PDF</button>
+              <button className={buttonClass} disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 運行日報`)}>导出PDF</button>
             </div></td></tr>;
         })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
       </table></div></>}
@@ -351,8 +351,8 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
 
 export function OperationsReports({ region }: { region: string }) {
   const [month, setMonth] = useState(() => japanDate().slice(0, 7));
-  return <section className="space-y-4 p-4 md:p-6" aria-label="运行管理">
-    <div className="flex flex-wrap items-center gap-4"><h2 className="text-lg font-bold">运行管理</h2>
+  return <section className="space-y-4 p-4 md:p-6" aria-label="運行管理">
+    <div className="flex flex-wrap items-center gap-4"><h2 className="text-lg font-bold">運行管理</h2>
       <label className="flex items-center gap-2 text-sm">月份<input className={fieldClass} type="month" aria-label="筛选月份"
         required value={month} onChange={e => { if (/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value); }} /></label></div>
     <OperationMonth key={`${month}-${region}`} month={month} region={region} />

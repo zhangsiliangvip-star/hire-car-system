@@ -67,7 +67,7 @@ export function summarizeVehicles(
       (matches.length === 1 ? matches[0].id : nameKey);
     namesByKey.set(key, detail.vehicleName);
     const unknownLabel = ambiguous
-      ? `番号未指定（${detail.vehicleName} 有多台，请在予約中選択車両番号）`
+      ? `番号未指定（${detail.vehicleName} 有多台，請在予約中選択車両番号）`
       : "番号未知（車両資料未找到）";
     const group = groups.get(key) || {
       key, month, regionId: detail.regionId,

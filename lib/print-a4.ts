@@ -15,7 +15,7 @@ export async function printA4Html(html: string, title: string) {
       try {
         await image.decode();
       } catch {
-        throw new Error("打印图片载入失败，请检查会社印章后重试。");
+        throw new Error("打印图片载入失败，請检查会社印章后重试。");
       }
     }));
     const content = printDocument.querySelector<HTMLElement>(".content");

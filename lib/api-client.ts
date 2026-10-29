@@ -24,7 +24,7 @@ export function buildApiErrorMessage(
   fallback: string,
 ) {
   if (isErrorPayload(payload)) return payload.error;
-  if (response.status === 401) return "登录状態已失效，请重新登录后重试。";
+  if (response.status === 401) return "登录状態已失效，請重新登录后重试。";
   if (response.status === 403) return "当前账号没有权限执行此操作。";
   return `${fallback}（HTTP ${response.status}）`;
 }

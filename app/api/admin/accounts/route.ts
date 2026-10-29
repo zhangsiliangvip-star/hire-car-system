@@ -61,7 +61,7 @@ function toAccountProfile(row: {
 async function requireAdmin() {
   const identity = await getAuthenticatedProfile();
   if (!identity.profile) {
-    return { identity, response: jsonResponse({ error: "请先登录。" }, { status: 401 }) };
+    return { identity, response: jsonResponse({ error: "請先登录。" }, { status: 401 }) };
   }
   if (identity.profile.role !== "admin") {
     return { identity, response: jsonResponse({ error: "仅管理员可以管理账号。" }, { status: 403 }) };
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     }
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonResponse({ error: "请填写有效的账号資料；设置密码時需为 8 至 128 个字符。" }, { status: 400 });
+      return jsonResponse({ error: "請填写有效的账号資料；设置密码時需为 8 至 128 个字符。" }, { status: 400 });
     }
 
     const admin = createAdminClient();
@@ -123,28 +123,28 @@ export async function POST(request: Request) {
     if (error || !data.user) {
       console.error("Failed to create account.", { code: error?.code, status: error?.status });
       if (error?.code === "weak_password") {
-        return jsonResponse({ error: "密码不符合认证服务的强度要求，请使用更强的密码。" }, { status: 400 });
+        return jsonResponse({ error: "密码不符合认证服务的强度要求，請使用更强的密码。" }, { status: 400 });
       }
       if (error?.status === 429 || error?.code === "over_request_rate_limit") {
         return jsonResponse(
-          { error: "账号创建請求过于频繁，请勿连续重试，稍后再试。" },
+          { error: "账号创建請求过于频繁，請勿连续重试，稍后再试。" },
           { status: 429 },
         );
       }
       if (error?.code === "email_exists" || error?.code === "user_already_exists") {
         return jsonResponse(
-          { error: "该邮箱已注册，请在账号列表中编辑该用户并设置密码，不要重复新增。" },
+          { error: "该邮箱已注册，請在账号列表中编辑该用户并设置密码，不要重复新增。" },
           { status: 409 },
         );
       }
       if (error?.message.includes("Database error saving new user")) {
         return jsonResponse(
-          { error: "认证服务保存新用户時発生数据库错误。请管理员检查 Supabase 的 Auth／Postgres 日志、用户資料触発器及数据库迁移。" },
+          { error: "认证服务保存新用户時発生数据库错误。請管理员检查 Supabase 的 Auth／Postgres 日志、用户資料触発器及数据库迁移。" },
           { status: 500 },
         );
       }
       return jsonResponse(
-        { error: "无法创建账号，请管理员检查 Supabase 认证日志。" },
+        { error: "无法创建账号，請管理员检查 Supabase 认证日志。" },
         { status: error?.status && error.status >= 500 ? 502 : 400 },
       );
     }
@@ -161,7 +161,7 @@ export async function POST(request: Request) {
     if (profileError || !savedProfile) {
       console.error("Account created but profile setup failed.", { code: profileError?.code });
       return jsonResponse(
-        { error: "认证账号已创建，但用户資料配置失败。请勿重复新增；修复 profiles 权限或触発器后，在账号列表核对地域和角色。", userId: data.user.id },
+        { error: "认证账号已创建，但用户資料配置失败。請勿重复新增；修复 profiles 权限或触発器后，在账号列表核对地域和角色。", userId: data.user.id },
         { status: 500 },
       );
     }
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: true, userId: data.user.id }, { status: 201 });
   } catch (error) {
     console.error("Failed to create account.", { name: error instanceof Error ? error.name : "UnknownError" });
-    return jsonResponse({ error: "创建账号請求未完成，请先核对账号列表再重试。" }, { status: 500 });
+    return jsonResponse({ error: "创建账号請求未完成，請先核对账号列表再重试。" }, { status: 500 });
   }
 }
 
@@ -185,7 +185,7 @@ export async function PUT(request: Request) {
     }
     const parsed = passwordSchema.safeParse(body);
     if (!parsed.success) {
-      return jsonResponse({ error: "请提供有效的用户编号及 8 至 128 个字符的新密码。" }, { status: 400 });
+      return jsonResponse({ error: "請提供有效的用户编号及 8 至 128 个字符的新密码。" }, { status: 400 });
     }
     const admin = createAdminClient();
     const { data: target, error: targetError } = await admin
@@ -194,8 +194,8 @@ export async function PUT(request: Request) {
       console.error("Failed to read password reset target profile.", { code: targetError.code });
       return jsonResponse(
         { error: targetError.code === "42501"
-          ? "设置密码未执行：服务端没有 profiles 表的读取权限（42501）。请在 Supabase SQL Editor 应用 20261029000000_account_profile_service_permissions.sql 后重试。"
-          : "设置密码未执行：无法读取目标用户資料，请管理员检查数据库日志。" },
+          ? "设置密码未执行：服务端没有 profiles 表的读取权限（42501）。請在 Supabase SQL Editor 应用 20261029000000_account_profile_service_permissions.sql 后重试。"
+          : "设置密码未执行：无法读取目标用户資料，請管理员检查数据库日志。" },
         { status: 500 },
       );
     }
@@ -208,15 +208,15 @@ export async function PUT(request: Request) {
       console.error("Failed to set user password.", { code: error.code, status: error.status });
       return jsonResponse(
         { error: error.code === "weak_password"
-          ? "密码不符合认证服务的强度要求，请使用更强的密码。"
-          : "设置密码失败，请检查认证服务日志；如用户已被删除，请刷新账号列表。" },
+          ? "密码不符合认证服务的强度要求，請使用更强的密码。"
+          : "设置密码失败，請检查认证服务日志；如用户已被删除，請刷新账号列表。" },
         { status: error.status && error.status >= 500 ? 502 : 400 },
       );
     }
     return jsonResponse({ ok: true });
   } catch (error) {
     console.error("Failed to set user password.", { name: error instanceof Error ? error.name : "UnknownError" });
-    return jsonResponse({ error: "设置密码失败，请检查账号資料权限及认证服务。" }, { status: 500 });
+    return jsonResponse({ error: "设置密码失败，請检查账号資料权限及认证服务。" }, { status: 500 });
   }
 }
 
@@ -225,7 +225,7 @@ export async function PATCH(request: Request) {
     const { identity, response } = await requireAdmin();
     if (response) return response;
     if (!identity.profile) {
-      return jsonResponse({ error: "请先登录。" }, { status: 401 });
+      return jsonResponse({ error: "請先登录。" }, { status: 401 });
     }
 
     let body: unknown;
@@ -272,7 +272,7 @@ export async function DELETE(request: Request) {
     const { identity, response } = await requireAdmin();
     if (response) return response;
     if (!identity.profile) {
-      return jsonResponse({ error: "请先登录。" }, { status: 401 });
+      return jsonResponse({ error: "請先登录。" }, { status: 401 });
     }
 
     let body: unknown;
@@ -290,7 +290,7 @@ export async function DELETE(request: Request) {
       return jsonResponse({ error: "服务器尚未配置删除专用密码。" }, { status: 503 });
     }
     if (!passwordCheck.valid) {
-      return jsonResponse({ error: "删除专用密码错误，请检查后重试。" }, { status: 403 });
+      return jsonResponse({ error: "删除专用密码错误，請检查后重试。" }, { status: 403 });
     }
     if (parsed.data.userId === identity.profile.id) {
       return jsonResponse({ error: "不能删除当前登录的管理员账号。" }, { status: 400 });

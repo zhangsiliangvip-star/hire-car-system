@@ -1576,9 +1576,9 @@ test("vehicle list can be filtered by owner company", () => {
 
 test("vehicle form selects start empty so the first fuel type, seat count, and company can be saved", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  assert.match(source, /<option value="">请選択燃油类型<\/option>\s*\{fuelTypes\.map/);
-  assert.match(source, /<option value="">请選択座位数<\/option>/);
-  assert.match(source, /<option value="">请選択所属会社<\/option>/);
+  assert.match(source, /<option value="">請選択燃油类型<\/option>\s*\{fuelTypes\.map/);
+  assert.match(source, /<option value="">請選択座位数<\/option>/);
+  assert.match(source, /<option value="">請選択所属会社<\/option>/);
 });
 
 test("orders link vehicles by plate so vehicle names may repeat, while plates stay unique", () => {
@@ -1910,7 +1910,7 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   const shared = [...vehicles, { ...vehicles[0], id: "duplicate", plate: "品川 400" }];
   view = render("Alphard 01", shared);
   assert.equal(view.select.props.value, "");
-  assert.ok(view.html.includes("请選択具体的車両番号"));
+  assert.ok(view.html.includes("請選択具体的車両番号"));
   assert.equal(render("Alphard 01", shared, false, "品川 400").select.props.value, "duplicate");
   view.select.props.onChange({ target: { value: "duplicate" } });
   assert.deepEqual(changes.at(-1), { name: "Alphard 01", plate: "品川 400" });
@@ -2086,7 +2086,7 @@ test("account creation distinguishes rate limits, existing users and database fa
     "@/lib/delete-password": {},
   }, { Response, Request });
   for (const [error, status, text] of [
-    [{ status: 429, code: "over_request_rate_limit" }, 429, "请勿连续重试"],
+    [{ status: 429, code: "over_request_rate_limit" }, 429, "請勿连续重试"],
     [{ status: 422, code: "email_exists" }, 409, "该邮箱已注册"],
     [{ status: 500, message: "Database error saving new user" }, 500, "数据库错误"],
     [{ status: 500, code: "unexpected_failure", message: "Service unavailable" }, 502, "认证日志"],
@@ -3105,7 +3105,7 @@ test("manual driver wage items can be entered with all-company filtering", () =>
   assert.match(save, /draft\.companyName === undefined/);
   assert.match(save, /companyName: draft\.companyName \?\? ""/);
   assert.match(panel, /driverFinanceCompanyFilter === "" && \(/);
-  assert.match(panel, /请選択所属会社/);
+  assert.match(panel, /請選択所属会社/);
   assert.match(panel, /未设置所属会社/);
 });
 
@@ -3269,7 +3269,7 @@ test("dialog completion waits for every write, retains failures and releases the
     assert.equal(errors.length, outcome === "throw" ? 1 : 0);
   }
   assert.match(source, /inert=\{dialogSaving\}/);
-  assert.doesNotMatch(source, /预约已保存，请点右上角/);
+  assert.doesNotMatch(source, /预约已保存，請点右上角/);
 });
 
 test("save confirmation reflects queued failures even after no-op or later successful writes", async () => {

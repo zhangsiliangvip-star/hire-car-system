@@ -82,7 +82,7 @@ export function buildOrderFinancePrintHtml(data: OrderFinancePrintData) {
   <tfoot><tr><td colspan="7">筛选范围合计</td>${cell(sum("requestAmount"))}${cell(sum("driverAdvances"))}${cell(sum("companyExpenses"))}${cell(sum("driverWages"))}${cell(sum("profit"))}</tr></tfoot></table>
   <p class="notes">依据当前月份、分区及筛选条件的已保存记录生成，金額口径与経理統計列表一致。<br>
   総請求金額按訂単入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列，三项之和等于総請求金額。<br>
-  運転士総立替与運転士工資分别列示。财务数据仅供内部核对，请妥善保管。</p>
+  運転士総立替与運転士工資分别列示。财务数据仅供内部核对，請妥善保管。</p>
   </article></div></body></html>`;
 }
 

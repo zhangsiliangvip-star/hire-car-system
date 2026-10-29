@@ -28,13 +28,13 @@ export default function ForgotPasswordPage() {
       const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
       const status = typeof error === "object" && error !== null && "status" in error ? error.status : undefined;
       if (code === "over_email_send_rate_limit") {
-        setErrorMessage("重设邮件請求受到発送频率限制。请先检查收件箱和垃圾邮件，稍后再试，勿连续点击発送。");
+        setErrorMessage("重设邮件請求受到発送频率限制。請先检查收件箱和垃圾邮件，稍后再试，勿连续点击発送。");
       } else if (status === 429) {
-        setErrorMessage("請求过于频繁，登录服务暂時限制発送。请稍后再试；如持续出現，请管理员检查邮件発送额度。");
+        setErrorMessage("請求过于频繁，登录服务暂時限制発送。請稍后再试；如持续出現，請管理员检查邮件発送额度。");
       } else if (status === 500 || code === "unexpected_failure") {
-        setErrorMessage("登录服务未能発送邮件，请管理员检查开発环境的邮件服务配置和认证日志。");
+        setErrorMessage("登录服务未能発送邮件，請管理员检查开発环境的邮件服务配置和认证日志。");
       } else {
-        setErrorMessage("発送重设邮件失败，请检查网络或联系管理员核查登录服务。");
+        setErrorMessage("発送重设邮件失败，請检查网络或联系管理员核查登录服务。");
       }
     } finally {
       setIsSubmitting(false);

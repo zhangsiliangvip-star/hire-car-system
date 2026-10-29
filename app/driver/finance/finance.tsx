@@ -10,7 +10,7 @@ import "./finance.css";
 import { fuelClaimSchema, fuelSubmissionSchema } from "@/lib/driver/fuel";
 
 const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
-const labels = { pending: "待后台确认", approved: "已确认入账", rejected: "已退回，请修改后提交" };
+const labels = { pending: "待后台确认", approved: "已确认入账", rejected: "已退回，請修改后提交" };
 export default function DriverFinance() {
   const [month, setMonth] = useState(() => japanDate().slice(0, 7));
   const [date, setDate] = useState(() => japanDate());
@@ -129,13 +129,13 @@ export default function DriverFinance() {
     if (!files?.length || lock.current || (!isFuel && !trip)) return;
     const selectedFiles = Array.from(files);
     const expense = expenses.find(item => item.id === id);
-    if (!isFuel && (!expense || !trip)) { setError("请先選択訂単和費用明細。"); return; }
+    if (!isFuel && (!expense || !trip)) { setError("請先選択訂単和費用明細。"); return; }
     const receiptCount = isFuel ? fuelReceipts.length : expense?.receipts.length || 0;
     if (receiptCount + selectedFiles.length > 5) { setError("每条明細最多5张票据。"); return; }
     const pathPrefix = isFuel ? date : trip && expense ? `${trip.assignmentId}/${expense.type}` : "";
     if (!pathPrefix) { setError("无法确定票据所属訂単。"); return; }
     if (selectedFiles.some(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5242880)) {
-      setError("票据请使用5MB以内的JPG、PNG或WebP照片。"); return;
+      setError("票据請使用5MB以内的JPG、PNG或WebP照片。"); return;
     }
     lock.current = true; setBusy(true); setError("");
     const current = generation.current;
@@ -143,14 +143,14 @@ export default function DriverFinance() {
       const supabase = createClient();
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (current !== generation.current) return;
-      if (authError || !auth.user) throw new Error("登录已失效，请重新登录。");
+      if (authError || !auth.user) throw new Error("登录已失效，請重新登录。");
       for (const file of selectedFiles) {
         const extension = file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : "webp";
         const path = `${auth.user.id}/${pathPrefix}/${createDriverRequestId()}.${extension}`;
         const { error: uploadError } = await supabase.storage.from(isFuel ? "driver-fuel-receipts" : "driver-finance-receipts")
           .upload(path, file, { contentType: file.type, upsert: false });
         if (current !== generation.current) return;
-        if (uploadError) throw new Error(`票据上传失败：${uploadError.message}；已上传的票据仍保留，请核对后重试。`);
+        if (uploadError) throw new Error(`票据上传失败：${uploadError.message}；已上传的票据仍保留，請核对后重试。`);
         if (isFuel) setFuelReceipts(items => [...items, path]);
         else setExpenses(items => items.map(item => item.id === id ? { ...item, receipts: [...item.receipts, path] } : item));
       }
@@ -164,7 +164,7 @@ export default function DriverFinance() {
     try {
       const { data: signed, error: signingError } = await createClient().storage.from(bucket).createSignedUrl(path, 60);
       if (current !== generation.current) return;
-      if (signingError || !signed) throw new Error("票据读取失败，请重试。");
+      if (signingError || !signed) throw new Error("票据读取失败，請重试。");
       setReceipt(signed.signedUrl);
     } catch (cause) { if (current === generation.current) { console.error("Receipt read failed.", cause); setError(cause instanceof Error ? cause.message : "票据读取失败。"); } }
   }
@@ -182,7 +182,7 @@ export default function DriverFinance() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = fuelSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请選択当天关联訂単，填写正整数燃油費并检查油票。"); return; }
+    if (!parsed.success) { setError("請選択当天关联訂単，填写正整数燃油費并检查油票。"); return; }
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -209,7 +209,7 @@ export default function DriverFinance() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = financeSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请填写每条費用明細及正整数金額；超時为0–999小時，最多两位小数。"); return; }
+    if (!parsed.success) { setError("請填写每条費用明細及正整数金額；超時为0–999小時，最多两位小数。"); return; }
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -218,7 +218,7 @@ export default function DriverFinance() {
       });
       const result = await response.json();
       if (current !== generation.current) return;
-      if (!response.ok) throw new Error(result.error || "提交未获确认，请刷新核对。");
+      if (!response.ok) throw new Error(result.error || "提交未获确认，請刷新核对。");
       const claim = financeClaimSchema.parse(result.claim);
       setData(current => current ? { ...current, trips: current.trips.map(item =>
         item.assignmentId === claim.assignmentId ? { ...item, claims: [
@@ -244,7 +244,7 @@ export default function DriverFinance() {
       <button type="button" aria-pressed={view === "claims"} onClick={() => { setView("claims"); setReceipt(""); }}>立替申報</button>
       <button type="button" aria-pressed={view === "wages"} onClick={() => { setView("wages"); setReceipt(""); }}>月工資</button>
     </div>
-    <p className="driver-muted">本人有效行程可申報社報／旅報、超時和燃油費；历史訂単可补录社報／旅報及超時。后台审核后入账。切后台会清除未提交草稿，请先提交。</p>
+    <p className="driver-muted">本人有效行程可申報社報／旅報、超時和燃油費；历史訂単可补录社報／旅報及超時。后台审核后入账。切后台会清除未提交草稿，請先提交。</p>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy}
       onChange={event => { if (event.target.value && canLeave()) {
         setLoading(true); setData(null); setSelected(""); setExpenses([]); setHours(""); setError(""); setNotice(""); setReceipt("");
@@ -278,7 +278,7 @@ export default function DriverFinance() {
         onChange={event => changeDate(event.target.value)} /></label>
         <button className="driver-link" type="button" disabled={busy} onClick={() => changeDate(japanDate())}>当日</button></div>
       <label className="driver-field">選択当天訂単<select value={selected} disabled={busy} onChange={event => choose(event.target.value)}>
-        <option value="">请選択当天訂単</option>{dayTrips.map(item =>
+        <option value="">請選択当天訂単</option>{dayTrips.map(item =>
           <option key={item.assignmentId} value={item.assignmentId}>{item.historical ? "历史訂単 · " : ""}{item.pickup} → {item.destination}</option>)}
       </select></label>
       {!dayTrips.length && <p className="driver-empty">当天暂无本人可申報的行程。</p>}
@@ -323,11 +323,11 @@ export default function DriverFinance() {
         {!overtimeReadOnly && <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超時并提交</button>}
       </section>}
       <section className="driver-card"><h2>当日燃油費</h2>
-        <p className="driver-muted">公司支付／油卡。每天统一申報一次，指定当天一张訂単；审核后追加到该訂単当天燃油費，不计運転士立替及应発金額。请勿重复手工录入。</p>
+        <p className="driver-muted">公司支付／油卡。每天统一申報一次，指定当天一张訂単；审核后追加到该訂単当天燃油費，不计運転士立替及应発金額。請勿重复手工录入。</p>
         {fuelClaim && <p className="driver-muted">{labels[fuelClaim.status]} {fuelClaim.reviewNote}</p>}
         <fieldset className="finance-fields" disabled={busy || fuelReadOnly || !fuelTrips.length}>
           <label className="driver-field">燃油費关联訂単<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
-            <option value="">请選択当天一张訂単</option>
+            <option value="">請選択当天一张訂単</option>
             {fuelClaim && !dayTrips.some(item => item.assignmentId === fuelClaim.assignmentId) &&
               <option value={fuelClaim.assignmentId}>原关联訂単（当前不可选）</option>}
             {fuelTrips.map(item => <option value={item.assignmentId} key={item.assignmentId}>{item.pickup} → {item.destination}</option>)}

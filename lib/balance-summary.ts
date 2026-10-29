@@ -31,7 +31,7 @@ export function getBalanceServiceMonth(
 ) {
   const offDates = new Set(order.offDates);
   const firstServiceDate = dateKeys.filter((date) => !offDates.has(date)).sort()[0];
-  if (!firstServiceDate) throw new Error("訂単没有服务日，请检查用車日期和休运日。");
+  if (!firstServiceDate) throw new Error("訂単没有服务日，請检查用車日期和休运日。");
   return firstServiceDate.slice(0, 7);
 }
 
@@ -53,7 +53,7 @@ export function summarizeBalance(
     return row;
   };
   const check = (amount: number) => {
-    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error("收支金額无效或超出范围，请检查财务记录。");
+    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error("收支金額无效或超出范围，請检查财务记录。");
     return amount;
   };
   const matches = (name: string) => companyFilter === "" ||
@@ -68,7 +68,7 @@ export function summarizeBalance(
       row.cashRequestAmount += order.requestAmount;
     }
     else if (order.depositMethod === "") row.unassignedRequestAmount += order.requestAmount;
-    else throw new Error("訂単入金方式无效，请检查訂単資料。");
+    else throw new Error("訂単入金方式无效，請检查訂単資料。");
   }
   const expenses = manualExpenses.filter((row) => matches(row.companyName));
   for (const item of expenses) groupFor(item.companyName).expenseTotal += check(item.amount);
@@ -79,9 +79,9 @@ export function summarizeBalance(
   for (const row of rows) {
     row.net = row.requestAmount + row.incomeTotal - row.expenseTotal;
     for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
-      if (!Number.isSafeInteger(row[key])) throw new Error("收支合计超出金額范围，请缩小筛选范围。");
+      if (!Number.isSafeInteger(row[key])) throw new Error("收支合计超出金額范围，請缩小筛选范围。");
       totals[key] += row[key];
-      if (!Number.isSafeInteger(totals[key])) throw new Error("收支合计超出金額范围，请缩小筛选范围。");
+      if (!Number.isSafeInteger(totals[key])) throw new Error("收支合计超出金額范围，請缩小筛选范围。");
     }
   }
   const paymentAmounts = { paypay: 0, 微信: 0, 支付宝: 0, 口座: 0, "": 0 };
@@ -89,11 +89,11 @@ export function summarizeBalance(
     .slice().sort((a, b) => a.date.localeCompare(b.date) || a.customer.localeCompare(b.customer));
   let paymentTotal = 0;
   for (const item of payments) {
-    if (!Object.hasOwn(paymentAmounts, item.method)) throw new Error("会社立替出金方式无效，请检查财务记录。");
+    if (!Object.hasOwn(paymentAmounts, item.method)) throw new Error("会社立替出金方式无效，請检查财务记录。");
     paymentAmounts[item.method] += check(item.amount);
     paymentTotal += item.amount;
     if (!Number.isSafeInteger(paymentAmounts[item.method]) || !Number.isSafeInteger(paymentTotal)) {
-      throw new Error("会社立替出金合计超出金額范围，请缩小筛选范围。");
+      throw new Error("会社立替出金合计超出金額范围，請缩小筛选范围。");
     }
   }
   return { rows, expenses, incomes, totals, payments, paymentAmounts, paymentTotal };

@@ -49,7 +49,7 @@ function PendingPhotos({ row }: { row: OrderReviewRow }) {
       } catch (cause) {
         if (!active) return;
         console.error("Pending receipt read failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setError("无法读取申報小票，请刷新小票后再核对。");
+        setError("无法读取申報小票，請刷新小票后再核对。");
       }
     }
     void load();
@@ -64,7 +64,7 @@ function PendingPhotos({ row }: { row: OrderReviewRow }) {
           aria-label={`${receipt.detail}小票 ${index + 1}，点击放大`} title={receipt.detail} onClick={() => setSelected(receipt)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={receipt.url} alt={receipt.detail} loading="lazy"
-            onError={() => setError("小票加载失败，请刷新小票后再核对。")} />
+            onError={() => setError("小票加载失败，請刷新小票后再核对。")} />
         </button>)}</div>}
     <button type="button" className="mt-1 text-xs text-blue-700" onClick={() => {
       setReceipts(null); setSelected(null); setError(""); setRevision(value => value + 1);
@@ -102,7 +102,7 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
       <p className="mb-3 text-xs text-gray-600">仅审核待审核申報。批准才入账；驳回相当于从訂単待审核区删除，不计入金額，但保留记录并允许運転士重報。已批准申報不能在此撤销。</p>
       {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mb-3 text-sm text-emerald-800">{notice}</p>}
-      {blocked && <p role="alert" className="mb-3 text-sm text-red-700">訂単有未完成保存或保存错误，请先处理后再审核。</p>}
+      {blocked && <p role="alert" className="mb-3 text-sm text-red-700">訂単有未完成保存或保存错误，請先处理后再审核。</p>}
       {!rows.length && <p className="py-4 text-sm text-gray-500">本訂単本月没有待审核申報。</p>}
       <div className="space-y-3">{rows.map(row => {
         const key = orderReviewKey(row);
@@ -169,7 +169,7 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
       } catch (cause) {
         if (!active || request.signal.aborted) return;
         console.error("Order finance review load failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setError("无法读取待审核申報，请点“刷新待审核”重试。");
+        setError("无法读取待审核申報，請点“刷新待审核”重试。");
       }
     }
     function clear() {
@@ -189,8 +189,8 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
   }, [month, enabled, revision]);
   async function review(row: OrderReviewRow, decision: "approved" | "rejected", note: string) {
     if (lock.current || blocked) return;
-    if (decision === "rejected" && !note.trim()) { setError("驳回時请填写原因，便于運転士重新申報。"); return; }
-    if (!window.confirm(decision === "approved" ? `确认${row.date}的${label(row)}入账？请核对是否已手工录入相同数据。` :
+    if (decision === "rejected" && !note.trim()) { setError("驳回時請填写原因，便于運転士重新申報。"); return; }
+    if (!window.confirm(decision === "approved" ? `确认${row.date}的${label(row)}入账？請核对是否已手工录入相同数据。` :
       "确认驳回并从待审核区移除？不计入金額，保留审核记录，運転士可重新申報。")) return;
     const current = generation.current;
     const controller = new AbortController();
@@ -204,12 +204,12 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
       });
       const result = await response.json();
       if (current !== generation.current) return;
-      if (!response.ok) throw new Error(result.error || "审核未获确认，请刷新核对后再操作。");
+      if (!response.ok) throw new Error(result.error || "审核未获确认，請刷新核对后再操作。");
       const saved = row.kind === "fuel" ? fuelClaimSchema.parse(result.fuelClaim) : financeClaimSchema.parse(result.claim);
       if (saved.status !== decision || saved.version !== row.claim.version + 1 ||
         saved.assignmentId !== row.claim.assignmentId ||
         (row.kind === "fuel" ? !("id" in saved) || saved.id !== row.claim.id :
-          !("category" in saved) || saved.category !== row.claim.category)) throw new Error("审核返回结果不匹配，请刷新核对。");
+          !("category" in saved) || saved.category !== row.claim.category)) throw new Error("审核返回结果不匹配，請刷新核对。");
       setData(previous => previous ? { ...previous, rows: previous.rows.filter(item => orderReviewKey(item) !== orderReviewKey(row)) } : previous);
       setNotice(decision === "approved" ? "已批准入账。" : "已驳回并移出待审核区，未计入金額；记录保留，運転士可重新申報。");
       if (decision === "approved") {
@@ -217,13 +217,13 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
         catch (cause) {
           if (current !== generation.current) return;
           console.error("Approved order totals refresh failed.", cause instanceof Error ? cause.name : "UnknownError");
-          setError("已批准入账，但列表金額刷新失败，请刷新页面核对，勿重复批准。");
+          setError("已批准入账，但列表金額刷新失败，請刷新页面核对，勿重复批准。");
         }
       }
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Order finance review failed.", cause instanceof Error ? cause.name : "UnknownError");
-      setError(cause instanceof Error ? cause.message : "审核未获确认，请刷新核对。");
+      setError(cause instanceof Error ? cause.message : "审核未获确认，請刷新核对。");
     } finally {
       if (current === generation.current) { lock.current = false; setBusy(false); }
     }

@@ -149,13 +149,13 @@ export default function DriverReport() {
       try {
         const response = await fetch("/api/driver/reports", { cache: "no-store", signal: controller.signal });
         if (response.status === 401) { location.replace("/driver/login"); return; }
-        if (!response.ok) throw new Error("无法读取日報，请重试或联系管理员。");
+        if (!response.ok) throw new Error("无法读取日報，請重试或联系管理员。");
         const result = reportDataSchema.parse(await response.json());
         if (active && document.visibilityState === "visible") { setData(result); setDirty(false); setBusy(false); }
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Report load failed.", cause);
-        if (active) { setError("无法读取日報，请刷新重试。"); setBusy(false); }
+        if (active) { setError("无法读取日報，請刷新重试。"); setBusy(false); }
       }
     }
     function revalidate() { setData(null); setDefaults(null); setAssignment(""); setDefaultsError(""); setBusy(true); setError(""); setRevision(v => v + 1); }
@@ -194,7 +194,7 @@ export default function DriverReport() {
       try {
         const response = await fetch("/api/driver/reports", { cache: "no-store", signal: controller.signal });
         if (response.status === 401) { location.replace("/driver/login"); return; }
-        if (!response.ok) throw new Error("日報同步失败，请刷新核对最新車両番号。");
+        if (!response.ok) throw new Error("日報同步失败，請刷新核对最新車両番号。");
         const result = reportDataSchema.parse(await response.json());
         if (active && !dirtyRef.current && !lock.current && document.visibilityState === "visible") {
           setData(result); setError("");
@@ -202,7 +202,7 @@ export default function DriverReport() {
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Driver report synchronization failed.", cause);
-        if (active) setError("日報同步失败，请刷新核对最新車両番号。");
+        if (active) setError("日報同步失败，請刷新核对最新車両番号。");
       } finally { loading = false; }
     }
     const timer = setInterval(() => void refreshSavedReports(), 10_000);
@@ -217,7 +217,7 @@ export default function DriverReport() {
         const response = await fetch(`/api/driver/report-defaults?date=${encodeURIComponent(serviceDate)}`,
           { cache: "no-store", signal: controller.signal });
         if (response.status === 401) { location.replace("/driver/login"); return; }
-        if (!response.ok) throw new Error("无法读取当天訂単和車库，请重试。");
+        if (!response.ok) throw new Error("无法读取当天訂単和車库，請重试。");
         const result = reportDefaultsSchema.parse(await response.json());
         if (result.serviceDate !== serviceDate) throw new Error("日報默认信息日期不匹配。");
         if (active && document.visibilityState === "visible") {
@@ -227,14 +227,14 @@ export default function DriverReport() {
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Driver report defaults load failed.", cause);
-        if (active) setDefaultsError("无法读取当天訂単和車库，请点“刷新日報”重试。");
+        if (active) setDefaultsError("无法读取当天訂単和車库，請点“刷新日報”重试。");
       }
     }
     void loadDefaults();
     return () => { active = false; controller.abort(); };
   }, [canLoadDefaults, serviceDate, revision]);
   function readHeader() {
-    if (!headerForm.current || !headerForm.current.reportValidity()) throw new Error("请检查日期、点呼時間、車両番号、運転手和客数。");
+    if (!headerForm.current || !headerForm.current.reportValidity()) throw new Error("請检查日期、点呼時間、車両番号、運転手和客数。");
     const fields = new FormData(headerForm.current);
     return reportHeaderSchema.parse({ serviceDate: String(fields.get("serviceDate") ?? ""),
       dutyStartTime: String(fields.get("dutyStartTime") ?? "") || null,
@@ -257,7 +257,7 @@ export default function DriverReport() {
       const key = JSON.stringify(command);
       if (pending.current?.key !== key) pending.current = { key, requestId: createDriverRequestId() };
       const parsed = reportCommandSchema.safeParse({ ...command, requestId: pending.current.requestId });
-      if (!parsed.success) throw new Error("请填写有效地址和公里表；补录的時間与公里表须成对填写。");
+      if (!parsed.success) throw new Error("請填写有效地址和公里表；补录的時間与公里表须成对填写。");
       const response = await fetch("/api/driver/reports", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed.data),
       });
@@ -265,7 +265,7 @@ export default function DriverReport() {
       if (!response.ok) {
         if ([400,401,403,404,409,422].includes(response.status)) pending.current = null;
         if (response.status === 409 && action !== "edit_stops" && !(["add_stop", "remove_stop"].includes(action) && dirty)) { setData(null); setBusy(true); setRevision(v => v + 1); }
-        throw new Error(typeof result.error === "string" ? result.error : "日報保存未获确认，请刷新核对。");
+        throw new Error(typeof result.error === "string" ? result.error : "日報保存未获确认，請刷新核对。");
       }
       pending.current = null;
       const updated = reportSchema.parse(result.report);
@@ -274,7 +274,7 @@ export default function DriverReport() {
       setData(current => current ? { ...current, reports: [updated,
         ...current.reports.filter(r => r.id !== updated.id)].sort((a, b) => b.departedAt.localeCompare(a.departedAt)).slice(0, 31) } : current);
       if (action !== "add_stop" && action !== "remove_stop") setDirty(false);
-      setNotice(action === "add_stop" ? "空白经由地已保存，填写修改后请点“保存修改”。" :
+      setNotice(action === "add_stop" ? "空白经由地已保存，填写修改后請点“保存修改”。" :
         action === "remove_stop" ? "已删除一条空白经由地，其他未保存的修改仍保留。" : "已保存。");
       return true;
     } catch (cause) {
@@ -290,7 +290,7 @@ export default function DriverReport() {
       for (const stop of [...report.stops].reverse()) {
         if (!isBlankReportStop(stop)) continue;
         const form = table.current.querySelector<HTMLFormElement>(`form[data-stop-id="${stop.id}"]`);
-        if (!form) throw new Error("表格内容不完整，请刷新后核对。");
+        if (!form) throw new Error("表格内容不完整，請刷新后核对。");
         if (!form.checkValidity()) continue;
         const fields = new FormData(form);
         if (["address", "km", "arrivedAt", "departedAt"].some(name => String(fields.get(name) ?? "").trim())) continue;
@@ -307,23 +307,23 @@ export default function DriverReport() {
     if (!report || !table.current || lock.current) return;
     try {
       const departureForm = table.current.querySelector<HTMLFormElement>("form[data-departure]");
-      if (!departureForm || !departureForm.reportValidity()) throw new Error("请检查出库地点、公里数和時間。");
+      if (!departureForm || !departureForm.reportValidity()) throw new Error("請检查出库地点、公里数和時間。");
       const header = readHeader();
       const dated = reportOnDate(report, header.serviceDate);
       const departure = departureFromForm(dated, new FormData(departureForm));
       let previous = departure.departedAt;
       const stops = dated.stops.map(stop => {
         const form = table.current?.querySelector<HTMLFormElement>(`form[data-stop-id="${stop.id}"]`);
-        if (!form) throw new Error("表格内容不完整，请刷新后核对。");
-        if (!form.reportValidity()) throw new Error("请检查表格中的地点、公里数和日期時間。");
+        if (!form) throw new Error("表格内容不完整，請刷新后核对。");
+        if (!form.reportValidity()) throw new Error("請检查表格中的地点、公里数和日期時間。");
         const updated = stopFromForm(stop, new FormData(form), previous);
         previous = updated.departedAt ?? updated.arrivedAt ?? previous;
         return updated;
       });
       const returnForm = table.current.querySelector<HTMLFormElement>("form[data-return]");
-      if (!returnForm || !returnForm.reportValidity()) throw new Error("请检查归库地点、公里数和時間。");
+      if (!returnForm || !returnForm.reportValidity()) throw new Error("請检查归库地点、公里数和時間。");
       const returned = returnFromForm(dated, new FormData(returnForm), stops.length ? previous : departure.departedAt);
-      if (returned && stops.some(stop => !stop.departedAt)) throw new Error("请先补完所有经由地的到着、出発時間及公里数，再保存归库。");
+      if (returned && stops.some(stop => !stop.departedAt)) throw new Error("請先补完所有经由地的到着、出発時間及公里数，再保存归库。");
       const timeError = reportTimeOrderError({
         header, departedAt: departure.departedAt, returnedAt: returned?.returnedAt ?? dated.returnedAt,
       });
@@ -331,7 +331,7 @@ export default function DriverReport() {
       await save("edit_stops", { stops, departure, header, ...(returned ? { return: returned } : {}) });
     } catch (cause) {
       console.error("Report table validation failed.", cause);
-      setError(cause instanceof Error ? cause.message : "表格内容无效，请检查日期時間。");
+      setError(cause instanceof Error ? cause.message : "表格内容无效，請检查日期時間。");
     }
   }
   const addStop = report ? <AddStopForm key={report.id}
@@ -347,8 +347,8 @@ export default function DriverReport() {
         setData(null); setDefaults(null); setAssignment(""); setDefaultsError(""); setBusy(true); setError(""); setRevision(v => v + 1);
       }}>刷新日報</button></div>
     {error && <p className="driver-error" role="alert">{error}</p>}
-    {dirty && <p className="driver-muted">{report ? "有未保存的修改，请点表格末尾“保存修改”；＋和−仅保存空白行的增减。" :
-      "有未保存的日報信息，请点“出库打卡”保存。"}</p>}
+    {dirty && <p className="driver-muted">{report ? "有未保存的修改，請点表格末尾“保存修改”；＋和−仅保存空白行的增减。" :
+      "有未保存的日報信息，請点“出库打卡”保存。"}</p>}
     {busy ? <p className="driver-empty">正在读取日報…</p> : data && <>
       {!report && <div className="driver-card">
         {!currentDefaults && !defaultsError && <p role="status">正在读取当天訂単和車库…</p>}
@@ -358,12 +358,12 @@ export default function DriverReport() {
             if (dirty && !window.confirm("更换訂単会重新带入車両番号及車库地址，是否继续？")) return;
             setAssignment(e.target.value); setDirty(true);
           }}>
-            <option value="">请選択当天訂単</option>
+            <option value="">請選択当天訂単</option>
             {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
               {order.time} · {order.pickup} → {order.destination} · {order.vehicleNumber || "未填車両番号"}
             </option>)}
-          </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和車库地址请手動填写。</p>)}
-        {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，请手動填写。</p>}
+          </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和車库地址請手動填写。</p>)}
+        {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，請手動填写。</p>}
       </div>}
       <form ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
         aria-label="日報基本信息" onInput={() => setDirty(true)} onSubmit={e => { e.preventDefault(); if (report) void saveChanges(); }}>
@@ -387,7 +387,7 @@ export default function DriverReport() {
           </select>
           <span className="driver-muted">{report.header?.assignmentId
             ? "車両番号与关联訂単按服务日同步；修改并保存也会更新訂単。"
-            : "尚未确认訂単关联，保留原車牌；请人工選択后保存以开启同步。"}</span>
+            : "尚未确认訂単关联，保留原車牌；請人工選択后保存以开启同步。"}</span>
           <input name="vehicleBaseline" type="hidden" defaultValue={report.header?.vehicleNumber ?? ""} />
         </label>}
         <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
@@ -421,9 +421,9 @@ export default function DriverReport() {
             <th scope="col">到着</th><th scope="col">出発</th></tr></thead>
           {!report && <LocationRows key={serviceDate} locationKey={assignment} depot={selectedOrder?.depot ?? null}
             disabled={saving || !currentDefaults || needsOrder} save={async p => {
-            if (!currentDefaults || needsOrder) { setError("请先读取当天訂単并選択訂単。"); return false; }
+            if (!currentDefaults || needsOrder) { setError("請先读取当天訂単并選択訂単。"); return false; }
             try { return await save("checkout", { ...p, header: readHeader() }); }
-            catch (cause) { console.error("Invalid report header.", cause); setError("请检查日期、点呼時間、車両番号、運転手和客数。"); return false; }
+            catch (cause) { console.error("Invalid report header.", cause); setError("請检查日期、点呼時間、車両番号、運転手和客数。"); return false; }
           }} />}
           {report && <>
           <DepartureRow key={`departure-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} />
@@ -459,6 +459,6 @@ export default function DriverReport() {
           {data.reports.map(r => <option key={r.id} value={r.id}>{r.serviceDate} {reportTime(r.departedAt).slice(11, 16)} {r.returnedAt ? "已归库" : "出库中"}</option>)}
         </select></label></details>}
     </>}
-    <p className="driver-muted">请在安全停車后操作。新日報按所选当天訂単带入車両番号、本人姓名及車両所属会社車库地址，均可手動修改；已保存日報不自動覆盖。不采集定位。</p>
+    <p className="driver-muted">請在安全停車后操作。新日報按所选当天訂単带入車両番号、本人姓名及車両所属会社車库地址，均可手動修改；已保存日報不自動覆盖。不采集定位。</p>
   </main>;
 }

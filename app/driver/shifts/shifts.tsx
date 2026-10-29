@@ -34,7 +34,7 @@ export default function DriverShifts() {
         if (controller.signal.aborted || current !== generation.current) return;
         if (!response.ok) throw new Error(result.error || "休息日期读取失败。");
         const data = shiftDataSchema.parse(result);
-        if (data.month !== month) throw new Error("月份不一致，请刷新核对。");
+        if (data.month !== month) throw new Error("月份不一致，請刷新核对。");
         setSaved(data); setDates(data.dates); setNote(data.note);
       } catch (cause) {
         if (controller.signal.aborted) return;
@@ -73,7 +73,7 @@ export default function DriverShifts() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = shiftSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请检查所选日期及备注。"); return; }
+    if (!parsed.success) { setError("請检查所选日期及备注。"); return; }
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -81,15 +81,15 @@ export default function DriverShifts() {
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed.data) });
       const result = await response.json();
       if (current !== generation.current) return;
-      if (!response.ok) throw new Error(result.error || "提交未获确认，请刷新核对。");
+      if (!response.ok) throw new Error(result.error || "提交未获确认，請刷新核对。");
       const data = shiftDataSchema.parse(result);
-      if (data.month !== month) throw new Error("提交月份不一致，请刷新核对。");
+      if (data.month !== month) throw new Error("提交月份不一致，請刷新核对。");
       setSaved(data); setDates(data.dates); setNote(data.note); pending.current = null;
-      setNotice("シフト已提交，休息提示立即生效；仍可被選任，最终安排请与调度确认。");
+      setNotice("シフト已提交，休息提示立即生效；仍可被選任，最终安排請与调度确认。");
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver shift submit failed.", cause);
-      setError(cause instanceof Error ? cause.message : "提交失败，请重试。");
+      setError(cause instanceof Error ? cause.message : "提交失败，請重试。");
     } finally { if (current === generation.current) { lock.current = false; setBusy(false); } }
   }
   return <main className="driver-main driver-shifts">

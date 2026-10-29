@@ -31,7 +31,7 @@ export default function ResetPasswordPage() {
       router.replace("/");
     } catch (error) {
       console.error("Failed to update the user's password.", error);
-      setErrorMessage("密码更新失败，请重新打开邮件中的链接后重试。");
+      setErrorMessage("密码更新失败，請重新打开邮件中的链接后重试。");
     } finally {
       setIsSubmitting(false);
     }

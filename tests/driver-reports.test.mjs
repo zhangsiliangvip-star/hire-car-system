@@ -149,7 +149,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   function render() { cursor = 0; refCursor = 0; return renderToStaticMarkup(React.createElement(Component)); }
   let html = render();
   assert.equal(checkoutProps.disabled, true);
-  assert.match(html, /请選択当天訂単/);
+  assert.match(html, /請選択当天訂単/);
   select.onChange({ target: { value: id } });
   html = render();
   assert.equal(checkoutProps.disabled, false);
@@ -160,7 +160,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   select.onChange({ target: { value: defaultsFixture.orders[1].assignmentId } });
   html = render();
   assert.match(html, /value="Second plate"/);
-  assert.match(html, /请手動填写/);
+  assert.match(html, /請手動填写/);
   assert.doesNotMatch(html, /value="Owner garage"/);
   assert.equal(await checkoutProps.save({ useDefault: false, address: "Manual garage", km: 100 }), true);
   assert.equal(sent.payload.useDefault, false);
@@ -748,7 +748,7 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
   assert.equal(states[6], 0);
   assert.equal(states[9], !success || ["add_stop", "remove_stop"].includes(action));
   assert.equal(states[3], success ? action === "add_stop" ?
-    "空白经由地已保存，填写修改后请点“保存修改”。" : action === "remove_stop" ?
+    "空白经由地已保存，填写修改后請点“保存修改”。" : action === "remove_stop" ?
       "已删除一条空白经由地，其他未保存的修改仍保留。" : "已保存。" : "");
   if (!success) {
     assert.match(states[2], action === "remove_stop" ? /没有可删除/ : /Version conflict/);

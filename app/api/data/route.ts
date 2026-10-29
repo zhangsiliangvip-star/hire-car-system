@@ -797,7 +797,7 @@ async function applyMutation(
           error.code === "PGRST204" && error.message.includes("short_name");
         if (!shortNameColumnMissing) throw error;
         if (rows.some((row) => row.short_name)) {
-          throw new Error("数据库尚未添加来源簡称字段，请先执行 order_source_short_name 迁移后再保存簡称。");
+          throw new Error("数据库尚未添加来源簡称字段，請先执行 order_source_short_name 迁移后再保存簡称。");
         }
         const { data: fallbackData, error: fallbackError } = await supabase
           .from("order_sources")
@@ -842,7 +842,7 @@ export async function GET() {
   try {
     const { supabase, profile } = await getAuthenticatedProfile();
     if (!profile) {
-      return jsonResponse({ error: "请先登录。" }, { status: 401 });
+      return jsonResponse({ error: "請先登录。" }, { status: 401 });
     }
 
     const [regions, orders, drivers, vehicles, orderSources, companies] = await Promise.all([
@@ -981,7 +981,7 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to load dashboard data.", error);
     return jsonResponse(
-      { error: "无法读取業務数据，请检查 Supabase 配置和数据库迁移。" },
+      { error: "无法读取業務数据，請检查 Supabase 配置和数据库迁移。" },
       { status: 500 },
     );
   }
@@ -991,7 +991,7 @@ export async function POST(request: Request) {
   try {
     const { supabase, profile } = await getAuthenticatedProfile();
     if (!profile) {
-      return jsonResponse({ error: "请先登录。" }, { status: 401 });
+      return jsonResponse({ error: "請先登录。" }, { status: 401 });
     }
 
     let body: unknown;
@@ -1018,7 +1018,7 @@ export async function POST(request: Request) {
         return jsonResponse({ error: "服务器尚未配置删除专用密码。" }, { status: 503 });
       }
       if (!passwordCheck.valid) {
-        return jsonResponse({ error: "删除专用密码错误，请检查后重试。" }, { status: 403 });
+        return jsonResponse({ error: "删除专用密码错误，請检查后重试。" }, { status: 403 });
       }
     }
 
@@ -1040,7 +1040,7 @@ export async function POST(request: Request) {
     console.error("Failed to persist dashboard data.", error);
     if (typeof error === "object" && error !== null && "code" in error && error.code === "PDR01") {
       return jsonResponse(
-        { error: "訂単已关联運転士派单或执行历史，不能永久删除；请改为取消訂単。历史记录和小票会保留。" },
+        { error: "訂単已关联運転士派单或执行历史，不能永久删除；請改为取消訂単。历史记录和小票会保留。" },
         { status: 409 },
       );
     }
@@ -1051,12 +1051,12 @@ export async function POST(request: Request) {
       /import_batch_(id|index)/.test(error.message)
     ) {
       return jsonResponse(
-        { error: "数据库尚未添加导入批次字段，请先执行 20261102000000_order_import_batches.sql 迁移后再保存訂単。" },
+        { error: "数据库尚未添加导入批次字段，請先执行 20261102000000_order_import_batches.sql 迁移后再保存訂単。" },
         { status: 500 },
       );
     }
     return jsonResponse(
-      { error: "保存失败，数据尚未确认写入，请检查网络和数据库权限。" },
+      { error: "保存失败，数据尚未确认写入，請检查网络和数据库权限。" },
       { status: 500 },
     );
   }

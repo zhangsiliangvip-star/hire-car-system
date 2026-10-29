@@ -27,7 +27,7 @@ export async function assignmentAction(
       return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     }
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
-      return jsonResponse({ error: "请使用 JSON 提交。" }, { status: 415 });
+      return jsonResponse({ error: "請使用 JSON 提交。" }, { status: 415 });
     }
     const { id } = await context.params;
     if (!assignmentIdSchema.safeParse(id).success) {
@@ -42,7 +42,7 @@ export async function assignmentAction(
     const parsed = action === "acknowledge"
       ? acknowledgeSchema.transform((value) => ({ ...value, state: "acknowledged" })).safeParse(body)
       : tripEventSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "行程参数无效，请刷新行程。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "行程参数无效，請刷新行程。" }, { status: 400 });
     const args = {
       target_assignment: id, expected_version: parsed.data.expectedVersion,
       target_request: parsed.data.requestId,
@@ -55,8 +55,8 @@ export async function assignmentAction(
       const status = error.code === "P0002" ? 404 : error.code === "42501" ? 403 :
         ["40001", "23505"].includes(error.code) ? 409 : error.code === "22023" ? 422 : 503;
       console.error("Driver assignment action rejected.", { action, code: error.code });
-      return jsonResponse({ error: status === 409 ? "行程已变化，请刷新后重试。" :
-        status === 404 ? "行程不存在或已撤派。" : "无法更新行程，请刷新或联系调度。" }, { status });
+      return jsonResponse({ error: status === 409 ? "行程已变化，請刷新后重试。" :
+        status === 404 ? "行程不存在或已撤派。" : "无法更新行程，請刷新或联系调度。" }, { status });
     }
     if (!Number.isSafeInteger(data) || data === null || data < 1) {
       throw new Error("Invalid assignment action version.");
@@ -64,6 +64,6 @@ export async function assignmentAction(
     return jsonResponse({ version: data, status: state });
   } catch (error) {
     console.error("Driver assignment action failed.", error);
-    return jsonResponse({ error: "无法更新行程，请稍后重试。" }, { status: 500 });
+    return jsonResponse({ error: "无法更新行程，請稍后重试。" }, { status: 500 });
   }
 }

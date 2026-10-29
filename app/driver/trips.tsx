@@ -37,16 +37,16 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
       if (loading || savingRef.current) return;
       loading = true;
       try {
-        if (detail && !assignmentIdSchema.safeParse(assignmentId).success) throw new Error("行程链接无效，请返回列表重新選択。");
+        if (detail && !assignmentIdSchema.safeParse(assignmentId).success) throw new Error("行程链接无效，請返回列表重新選択。");
         const query = detail ? `assignmentId=${encodeURIComponent(assignmentId!)}` : `date=${date}`;
         const [me, response] = await Promise.all([
           fetch("/api/driver/me", { cache: "no-store", signal: controller.signal }),
           fetch(`/api/driver/orders?${query}`, { cache: "no-store", signal: controller.signal }),
         ]);
         if (me.status === 401 || response.status === 401) { location.replace("/driver/login"); return; }
-        if (!me.ok) throw new Error("運転士身份不可用，请联系管理员或重新登录。");
+        if (!me.ok) throw new Error("運転士身份不可用，請联系管理员或重新登录。");
         const profile: Identity = await me.json();
-        if (!response.ok) throw new Error(response.status === 404 ? "行程已撤派或不存在。" : "无法读取行程，请重试。");
+        if (!response.ok) throw new Error(response.status === 404 ? "行程已撤派或不存在。" : "无法读取行程，請重试。");
         const data: { trips: DriverTrip[] } = await response.json();
         if (detail && (data.trips.length !== 1 || data.trips[0].orderId !== orderId)) throw new Error("行程不存在或无权查看。");
         if (active && !savingRef.current && document.visibilityState === "visible") {
@@ -108,7 +108,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
         const failure: { error?: unknown } = await response.json();
         if ([401,403,404,409].includes(response.status)) { pendingRequest.current = null; refresh(); }
         throw new Error(typeof failure.error === "string" ? failure.error :
-          response.status === 409 ? "派单状態已变化，正在刷新，请核对后重试。" : `行程更新未获确认（${response.status}），请重试或联系调度。`);
+          response.status === 409 ? "派单状態已变化，正在刷新，請核对后重试。" : `行程更新未获确认（${response.status}），請重试或联系调度。`);
       }
       pendingRequest.current = null; setNotice("操作已记录，正在刷新最新行程状態。"); refresh();
     } catch (cause) {
@@ -151,7 +151,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
           <p className="driver-muted driver-daily-plate">車両番号：{trip.vehicleNumber || "未填写"}</p>
         </div>)}</div>
       </section>}
-      {!trips.length && !error && <div className="driver-card driver-empty">暂无获派行程，请等待调度安排。</div>}
+      {!trips.length && !error && <div className="driver-card driver-empty">暂无获派行程，請等待调度安排。</div>}
       {trips.map((trip) => <article className="driver-card" key={trip.assignmentId ?? `${trip.orderId}-${trip.date}`}>
         <div className="driver-toolbar"><div><span className="driver-muted">配車時間</span>
           <time className="driver-time block">{trip.time || "待定"}</time></div>
@@ -172,7 +172,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
               }} />}
         </div>
         <div className="driver-row"><span>服务日期</span><strong>{trip.date}</strong></div>
-        <div className="driver-row"><span>車両</span><strong>{trip.vehicle || "请联系调度确认"}</strong></div>
+        <div className="driver-row"><span>車両</span><strong>{trip.vehicle || "請联系调度确认"}</strong></div>
         <div className="driver-row"><span>車両番号</span><strong className="break-words">{trip.vehicleNumber || "未填写"}</strong></div>
         {detail && trip.details && <div className="space-y-3 break-words">
           <div className="driver-row"><span>訂単名称</span><strong>{trip.details.orderName || "未填写"}</strong></div>

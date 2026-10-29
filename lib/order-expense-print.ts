@@ -93,7 +93,7 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     <div class="card">会社立替合计<strong>${number(sum("companyAdvanceCompany") + sum("companyAdvanceTrip"))}</strong></div>
     <div class="card">運転士工資合计<strong>${number(sum("wages"))}</strong></div></div>
     <h2>备注</h2><div class="note">${escapeHtml(data.note)}</div>
-    <footer>按当前财务编辑内容生成（未自動保存）。油价合计按総燃油費 ÷ 総消耗计算。超時工資已包含在運転士工資中，请勿重复计入。</footer>
+    <footer>按当前财务编辑内容生成（未自動保存）。油价合计按総燃油費 ÷ 総消耗计算。超時工資已包含在運転士工資中，請勿重复计入。</footer>
     </article></div></body></html>`;
 }
 

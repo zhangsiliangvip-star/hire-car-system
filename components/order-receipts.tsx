@@ -26,7 +26,7 @@ export function ReceiptDialog({ receipt, close }: { receipt: Receipt; close: () 
         <strong>{orderReceiptLabels[receipt.category]} · {receipt.detail}</strong>
         <button type="button" onClick={close} autoFocus className={styles.close}>关闭</button>
       </header>
-      {failed ? <p role="alert">图片加载失败，请关闭后点击“小票刷新”重试。</p> :
+      {failed ? <p role="alert">图片加载失败，請关闭后点击“小票刷新”重试。</p> :
         // Private short-lived signed URLs must not go through an image optimization cache.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={receipt.url} alt={`${orderReceiptLabels[receipt.category]}：${receipt.detail}`}
@@ -52,7 +52,7 @@ export function OrderReceipts({ orderId, date }: { orderId: string; date: string
         const response = await fetch(`/api/order-receipts?orderId=${encodeURIComponent(orderId)}&date=${encodeURIComponent(date)}`,
           { cache: "no-store", signal: request.signal });
         const result: unknown = await response.json();
-        if (!response.ok) throw new Error("无法读取已批准的小票，请刷新重试。");
+        if (!response.ok) throw new Error("无法读取已批准的小票，請刷新重试。");
         const parsed = orderReceiptDataSchema.parse(result);
         if (!active || request.signal.aborted || document.visibilityState !== "visible") return;
         setData(parsed); setError(""); setSelected(null);
@@ -60,7 +60,7 @@ export function OrderReceipts({ orderId, date }: { orderId: string; date: string
       } catch (cause) {
         if (!active || request.signal.aborted) return;
         console.error("Order receipts load failed.", cause);
-        setError("无法读取已批准的小票，请点“小票刷新”重试。");
+        setError("无法读取已批准的小票，請点“小票刷新”重试。");
       }
     }
     function clear() { controller?.abort(); clearTimeout(timer); setData(null); setSelected(null); setError(""); }
@@ -100,7 +100,7 @@ export function OrderReceipts({ orderId, date }: { orderId: string; date: string
                 onClick={() => setSelected(receipt)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={receipt.url} alt={receipt.detail} loading="lazy"
-                  onError={() => setError("部分小票图片加载失败，请点“小票刷新”重试。")} />
+                  onError={() => setError("部分小票图片加载失败，請点“小票刷新”重试。")} />
               </button>)}</div>
           </div>;
         })}

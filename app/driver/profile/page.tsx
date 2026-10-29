@@ -50,7 +50,7 @@ export default function DriverProfile() {
     if (action === "skip" && !canLeave()) return;
     const parsed = driverProfileCommandSchema.safeParse(action === "skip" ? { action, expectedVersion: profile.version }
       : { action, expectedVersion: profile.version, phone: profile.phone, wechat: profile.wechat, whatsapp: profile.whatsapp, licenseExpiry: profile.licenseExpiry });
-    if (!parsed.success) { setError("请检查联系方式及免許日期，所有项目均可留空。"); return; }
+    if (!parsed.success) { setError("請检查联系方式及免許日期，所有项目均可留空。"); return; }
     const current = generation.current;
     lock.current = true; setBusy(true); setError("");
     try {

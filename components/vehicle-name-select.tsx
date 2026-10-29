@@ -32,7 +32,7 @@ function readOptions() {
     console.error("Failed to read local vehicle name options.", error);
     return {
       options: DEFAULT_VEHICLE_NAME_OPTIONS,
-      error: "无法读取本浏览器的車名设置，请点击“恢复默认”重试。",
+      error: "无法读取本浏览器的車名设置，請点击“恢复默认”重试。",
     };
   }
 }
@@ -61,7 +61,7 @@ export function VehicleNameSelect({
       console.error("Failed to save local vehicle name options.", error);
       setSettings((current) => ({
         ...current,
-        error: "車名设置保存失败，请检查浏览器是否允许本地存储。此次更改未生效。",
+        error: "車名设置保存失败，請检查浏览器是否允许本地存储。此次更改未生效。",
       }));
       return false;
     }

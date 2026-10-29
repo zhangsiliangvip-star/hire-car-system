@@ -13,7 +13,7 @@ export async function GET() {
     return jsonResponse(driverProfileSchema.parse(data));
   } catch (error) {
     console.error("Driver profile read failed.", error);
-    return jsonResponse({ error: "无法读取本人資料，请重试。" }, { status: 503 });
+    return jsonResponse({ error: "无法读取本人資料，請重试。" }, { status: 503 });
   }
 }
 export async function POST(request: Request) {
@@ -23,13 +23,13 @@ export async function POST(request: Request) {
     if (!isDriverActionOrigin(request, process.env.NODE_ENV === "development" && isDriverPwaTestMode()))
       return jsonResponse({ error: "請求来源无效。" }, { status: 403 });
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
-      return jsonResponse({ error: "请使用JSON提交。" }, { status: 415 });
+      return jsonResponse({ error: "請使用JSON提交。" }, { status: 415 });
     const text = await request.text();
     if (text.length > 8192) return jsonResponse({ error: "資料过长。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = driverProfileCommandSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "请检查联系方式及免許日期，所有项目均可留空。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "請检查联系方式及免許日期，所有项目均可留空。" }, { status: 400 });
     const item = parsed.data;
     const { data, error } = await identity.supabase.rpc("update_driver_own_profile", {
       expected_version: item.expectedVersion, action: item.action,
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver profile update rejected.", { code: error.code });
-      return jsonResponse({ error: error.code === "40001" ? "資料已变化，请刷新后核对再保存。" : "資料未保存，请重试。" },
+      return jsonResponse({ error: error.code === "40001" ? "資料已变化，請刷新后核对再保存。" : "資料未保存，請重试。" },
         { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : 503 });
     }
     return jsonResponse(driverProfileSchema.parse(data));

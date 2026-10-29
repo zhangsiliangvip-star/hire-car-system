@@ -62,7 +62,7 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
       .filter((supply) => supply.description.trim() || supply.amount.trim())
       .map((supply) => {
         if (!supply.description.trim() || !supply.amount.trim()) {
-          throw new Error("请为每条备品填写名称和非负整数金額后再导出。");
+          throw new Error("請为每条备品填写名称和非负整数金額后再导出。");
         }
         if (supply.description.trim().length > 300) throw new Error("备品名称最多300个字符。");
         return { description: supply.description.trim(), amount: amount(supply.amount, "备品金額") };
@@ -123,8 +123,8 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
   ${monthlyHtml}
   <p class="notes">${data.monthly
     ? "运营明細采用已保存的日财务记录；月度費用和里程采用当前页面填写内容，导出不会自動保存。扣除費用后利润＝訂単利润総和－月度費用；每公里利润＝扣除費用后利润÷走行公里数。"
-    : "全部車両模式仅汇総运营明細，不包含車両月度固定費用、备品和里程。请筛选具体車両查看完整月度費用及净利润。"}
-  <br>運転士立替与工資分别列示，财务口径与車両統計列表一致。内部資料，请妥善保管。</p>
+    : "全部車両模式仅汇総运营明細，不包含車両月度固定費用、备品和里程。請筛选具体車両查看完整月度費用及净利润。"}
+  <br>運転士立替与工資分别列示，财务口径与車両統計列表一致。内部資料，請妥善保管。</p>
   </article></div></body></html>`;
 }
 
@@ -173,7 +173,7 @@ export function buildVehicleSummaryPrintHtml(data: VehicleSummaryPrintData) {
   <tfoot><tr><td colspan="2">合计／利润汇総</td>${cell(totals.requestAmount)}${cell(totals.driverAdvances)}${cell(totals.companyExpenses)}${cell(totals.driverWages)}${cell(totals.fixedExpenses)}${cell(totals.profit)}</tr></tfoot></table>
   <p class="notes">訂単利润＝請求総金額－運転士立替－会社支付－運転士工資－固定費用与备品。<br>
   月度費用优先采用所选月份已保存的记录；未登记時仅采用車両資料的默认停車场費及保险費。无运营记录車両仍列示固定成本；未匹配到車両資料的历史记录单独标注，固定成本未知，暂记0。<br>
-  本表包含外注車両，番号旁标注“外注”；未登记番号時明确提示。按車両及分区归集，未保存的单車費用编辑不计入。内部财务資料，请妥善保管。</p>
+  本表包含外注車両，番号旁标注“外注”；未登记番号時明确提示。按車両及分区归集，未保存的单車費用编辑不计入。内部财务資料，請妥善保管。</p>
   </article></div></body></html>`;
 }
 

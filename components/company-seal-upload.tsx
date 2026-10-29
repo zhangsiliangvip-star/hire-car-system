@@ -27,31 +27,31 @@ export function CompanySealUpload({ value, onChange, onBusyChange, standalone = 
     onBusyChange(true);
     try {
       if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-        throw new Error("请選択 PNG、JPG 或 WebP 图片，不支持 SVG 等格式。");
+        throw new Error("請選択 PNG、JPG 或 WebP 图片，不支持 SVG 等格式。");
       }
       if (file.size > 2 * 1024 * 1024) throw new Error("印章原图不能超过2MB。");
       const bitmap = await createImageBitmap(file);
       let data: string;
       try {
         if (bitmap.width > 10000 || bitmap.height > 10000 || bitmap.width * bitmap.height > 20_000_000) {
-          throw new Error("印章图片尺寸过大，请缩小后重试。");
+          throw new Error("印章图片尺寸过大，請缩小后重试。");
         }
         const scale = Math.min(1, 512 / bitmap.width, 512 / bitmap.height);
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(bitmap.width * scale));
         canvas.height = Math.max(1, Math.round(bitmap.height * scale));
         const context = canvas.getContext("2d");
-        if (!context) throw new Error("无法处理印章图片，请更换浏览器后重试。");
+        if (!context) throw new Error("无法处理印章图片，請更换浏览器后重试。");
         context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         data = canvas.toDataURL("image/png");
       } finally {
         bitmap.close();
       }
-      if (!isCompanySealDataUrl(data)) throw new Error("处理后的印章图片过大或无效，请使用更簡洁的印章图片。");
+      if (!isCompanySealDataUrl(data)) throw new Error("处理后的印章图片过大或无效，請使用更簡洁的印章图片。");
       if (request === sequence.current) onChange(data);
     } catch (error) {
       if (request === sequence.current) {
-        setError(error instanceof Error ? error.message : "印章图片读取失败，请重新選択。");
+        setError(error instanceof Error ? error.message : "印章图片读取失败，請重新選択。");
       }
     } finally {
       if (request === sequence.current) {

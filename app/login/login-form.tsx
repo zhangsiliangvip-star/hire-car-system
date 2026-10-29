@@ -31,15 +31,15 @@ export default function LoginForm({
       if (error) {
         console.error("Sign-in rejected.", { code: error.code, status: error.status });
         if (error.code === "invalid_credentials") {
-          setErrorMessage("登录邮箱或密码不正确。请确认使用的是本地开発环境的密码；如忘记密码，请点击下方“忘记密码？”。");
+          setErrorMessage("登录邮箱或密码不正确。請确认使用的是本地开発环境的密码；如忘记密码，請点击下方“忘记密码？”。");
         } else if (error.code === "email_not_confirmed") {
-          setErrorMessage("邮箱尚未验证，请先完成邀请邮件中的验证。");
+          setErrorMessage("邮箱尚未验证，請先完成邀請邮件中的验证。");
         } else if (error.status === 429) {
-          setErrorMessage("登录請求过于频繁，请稍后再试。");
+          setErrorMessage("登录請求过于频繁，請稍后再试。");
         } else if (!error.status || error.status >= 500) {
-          setErrorMessage("暂時无法连接登录服务，请检查网络或稍后重试。");
+          setErrorMessage("暂時无法连接登录服务，請检查网络或稍后重试。");
         } else {
-          setErrorMessage(`登录服务拒绝了請求（${error.code ?? error.status}），请联系管理员核查。`);
+          setErrorMessage(`登录服务拒绝了請求（${error.code ?? error.status}），請联系管理员核查。`);
         }
         return;
       }
@@ -47,7 +47,7 @@ export default function LoginForm({
     } catch (error) {
       console.error("Failed to sign in.", error);
       setErrorMessage(
-        error instanceof Error ? error.message : "登录失败，请检查网络和 Supabase 配置。",
+        error instanceof Error ? error.message : "登录失败，請检查网络和 Supabase 配置。",
       );
     } finally {
       setIsSubmitting(false);
@@ -80,7 +80,7 @@ export default function LoginForm({
             className="min-w-0 px-6 py-8 sm:px-10 sm:py-10 lg:p-12">
         <p className="text-xs font-semibold tracking-[0.18em] text-blue-700">WELCOME BACK</p>
         <h2 className="mt-3 text-2xl font-bold tracking-tight">欢迎登录</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-500">请使用管理员创建的邮箱账号和密码，进入工作台。</p>
+        <p className="mt-2 text-sm leading-6 text-slate-500">請使用管理员创建的邮箱账号和密码，进入工作台。</p>
         <label className="mt-8 block text-sm font-medium text-slate-700">
           邮箱
           <input
@@ -89,7 +89,7 @@ export default function LoginForm({
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
-            placeholder="请输入登录邮箱"
+            placeholder="請输入登录邮箱"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="mt-2 min-h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
@@ -101,7 +101,7 @@ export default function LoginForm({
             required
             type="password"
             autoComplete="current-password"
-            placeholder="请输入密码"
+            placeholder="請输入密码"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="mt-2 min-h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"

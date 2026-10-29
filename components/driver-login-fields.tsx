@@ -70,7 +70,7 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
       if (current !== generation.current) return;
       setPassword(""); setVisible(false);
       if (!response.ok) throw new Error(result.error || "账号操作未确认。");
-      setNotice(account ? "密码已重置，请告知運転士。" : "账号已创建并绑定。"); reload();
+      setNotice(account ? "密码已重置，請告知運転士。" : "账号已创建并绑定。"); reload();
     } catch (cause) {
       if (current !== generation.current) return;
       setPassword(""); setVisible(false);

@@ -62,9 +62,9 @@ export default function Review() {
   async function review(row: Row, decision: "approved" | "rejected") {
     if (lock.current) return;
     const note = notes[`${row.claim.assignmentId}-${row.claim.category}`] || "";
-    if (decision === "rejected" && !note.trim()) { setError("退回時请填写原因。"); return; }
+    if (decision === "rejected" && !note.trim()) { setError("退回時請填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      `确认${financeCategoryLabels[row.claim.category]}入账？仅处理此分类；请核对是否已手工录入相同費用。` : "确认退回给運転士修改？")) return;
+      `确认${financeCategoryLabels[row.claim.category]}入账？仅处理此分类；請核对是否已手工录入相同費用。` : "确认退回给運転士修改？")) return;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     const current = generation.current;
     try {
@@ -85,9 +85,9 @@ export default function Review() {
   async function reviewFuel(row: z.infer<typeof fuelReviewRowSchema>, decision: "approved" | "rejected") {
     if (lock.current) return;
     const note = notes[row.claim.id] || "";
-    if (decision === "rejected" && !note.trim()) { setError("退回時请填写原因。"); return; }
+    if (decision === "rejected" && !note.trim()) { setError("退回時請填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      "确认将燃油費追加到指定訂単当天的燃油費？公司支付／油卡，不加到運転士立替和应発金額。请核对是否已手工录入。" : "确认退回燃油費？")) return;
+      "确认将燃油費追加到指定訂単当天的燃油費？公司支付／油卡，不加到運転士立替和应発金額。請核对是否已手工录入。" : "确认退回燃油費？")) return;
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -126,7 +126,7 @@ export default function Review() {
       setBusy(true); setRows([]); setError(""); setReceipt(""); setNotes({}); setRevision(value => value + 1);
       setFuelRows([]);
     }}>刷新</button>
-    <p className="driver-muted">立替金額作为新增費用追加；超時小時数替换当日原值，单价仍由后台设定。确认前请核对重复票据。運転士月工資只读，包含后台手動加减项目。</p>
+    <p className="driver-muted">立替金額作为新增費用追加；超時小時数替换当日原值，单价仍由后台设定。确认前請核对重复票据。運転士月工資只读，包含后台手動加减项目。</p>
     {error && <p role="alert" className="driver-error">{error}</p>}
     {notice && <p role="status" className="driver-notice">{notice}</p>}
     {busy && <p className="driver-muted">正在处理…</p>}

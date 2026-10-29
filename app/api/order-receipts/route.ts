@@ -38,6 +38,6 @@ export async function GET(request: Request) {
     return jsonResponse({ enabled: true, receipts });
   } catch (error) {
     console.error("Order receipts read failed.", error instanceof Error ? error.name : "UnknownError");
-    return jsonResponse({ error: "小票读取失败，请重试。" }, { status: 503 });
+    return jsonResponse({ error: "小票读取失败，請重试。" }, { status: 503 });
   }
 }
