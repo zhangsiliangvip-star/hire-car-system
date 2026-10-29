@@ -7470,7 +7470,12 @@ export default function Home() {
                               <button
                                 type="button"
                                 onClick={() => openAccounting(order)}
-                                className="inline-flex w-14 items-center justify-center whitespace-nowrap rounded border py-1 border-emerald-200 bg-emerald-50 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                className={`inline-flex w-14 items-center justify-center whitespace-nowrap rounded border py-1 text-xs font-semibold transition-colors ${
+                                  order.accountingStatus === "完成核算"
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                    : "border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                                }`}
+                                aria-label={`${order.customer} 核算状态：${order.accountingStatus === "完成核算" ? "核算完成" : "未完成，财务统计"}`}
                               >
                                 {order.accountingStatus === "完成核算" ? "核算完成" : "财务统计"}
                               </button>

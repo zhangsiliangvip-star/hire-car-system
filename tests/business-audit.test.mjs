@@ -374,6 +374,16 @@ test("reservation table renders only the first imported order with the exact tot
   assert.doesNotMatch(markup, /Hidden route|aria-expanded|展开/);
 });
 
+test("reservation accounting action distinguishes completed and incomplete status colors", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const start = source.indexOf('onClick={() => openAccounting(order)}', source.indexOf("{activeView === \"orders\""));
+  const button = source.slice(source.lastIndexOf("<button", start), source.indexOf("</button>", start));
+  assert.match(button, /order\.accountingStatus === "完成核算"/);
+  assert.match(button, /border-emerald-200 bg-emerald-50 text-emerald-700/);
+  assert.match(button, /border-amber-300 bg-amber-100 text-amber-900/);
+  assert.match(button, /核算状态：\$\{order\.accountingStatus === "完成核算" \? "核算完成" : "未完成，财务统计"\}/);
+});
+
 test("accounting uses exact new import batches but preserves historical same-day grouping", () => {
   const { getAccountingBatchOrders } = load("lib\\order-batches.ts");
   const base = {
@@ -2533,7 +2543,7 @@ test("reservation table centers fields and shows order and request status in the
   assert.doesNotMatch(table, /同来源批量/);
   assert.match(table, /flex flex-nowrap items-center justify-center gap-2/);
   const actionButtons = table.slice(table.lastIndexOf('<td className="px-2 py-3">'), table.indexOf("</tr>", table.lastIndexOf('<td className="px-2 py-3">')));
-  assert.equal((actionButtons.match(/inline-flex w-14 items-center justify-center whitespace-nowrap rounded border py-1 border-/g) || []).length, 2);
+  assert.equal((actionButtons.match(/inline-flex w-14 items-center justify-center whitespace-nowrap rounded border py-1/g) || []).length, 2);
   assert.doesNotMatch(actionButtons, /编辑/);
   assert.doesNotMatch(actionButtons, /hover:underline/);
   assert.doesNotMatch(table, /text-left/);
