@@ -593,8 +593,36 @@ test("reservation date filter includes service ranges, excludes off days and pre
   assert.deepEqual(evaluate("", "A", "S"), ["multi", "off", "single", "later", "cross-month"]);
   assert.deepEqual(evaluate("2026-10-31"), []);
   assert.deepEqual(evaluate("2026-10-02", "B"), ["other-company"]);
-  assert.match(source, /setOrderMonth\(event\.target\.value\);\s*setOrderDateFilter\(""\);/);
+  assert.match(source, /选择预约年份，当前\$\{orderMonth\.slice\(0, 4\)\}年/);
+  assert.match(source, /setOrderMonth\(`\$\{year\}-\$\{orderMonth\.slice\(5, 7\)\}`\);[\s\S]*setOrderDateFilter\(""\)/);
   assert.match(source, /aria-haspopup="dialog"/);
+});
+
+test("reservation management puts the year first and shows all twelve month buttons without a month picker", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const start = source.indexOf('{activeView === "orders"');
+  const end = source.indexOf("{activeView === \"operations\"", start);
+  const controls = source.slice(start, end);
+  const monthControlsStart = controls.indexOf("calendar-date-controls mb-3 mt-0");
+  const monthControlsEnd = controls.indexOf('<div className="overflow-x-auto border bg-white">', monthControlsStart);
+  const monthControls = controls.slice(monthControlsStart, monthControlsEnd);
+  assert.ok(controls.indexOf('id="order-company-filter"') < controls.indexOf("选择预约年份，当前"));
+  assert.ok(controls.indexOf("选择预约年份，当前") < controls.indexOf('aria-label="选择预约月份"'));
+  assert.match(monthControls, /aria-label=\{`选择预约年份，当前\$\{orderMonth\.slice\(0, 4\)\}年`\}[\s\S]*setOrderYearPickerStart/);
+  assert.match(monthControls, /role="dialog"[\s\S]*aria-labelledby="order-year-dialog-title"/);
+  assert.match(monthControls, /选择预约年份/);
+  assert.match(monthControls, /aria-label="上一组预约年份"[\s\S]*Math\.max\(2020, \(start \?\? 2020\) - 12\)/);
+  assert.match(monthControls, /aria-label="下一组预约年份"[\s\S]*Math\.min\(2089, \(start \?\? 2020\) \+ 12\)/);
+  assert.match(monthControls, /Array\.from\(\{ length: 12 \}, \(_, index\) => orderYearPickerStart \+ index\)/);
+  assert.match(monthControls, /setOrderMonth\(`\$\{year\}-\$\{orderMonth\.slice\(5, 7\)\}`\);[\s\S]*setOrderDateFilter\(""\);[\s\S]*setOrderYearPickerStart\(null\)/);
+  assert.match(monthControls, /role="group" aria-label="选择预约月份"[\s\S]*Array\.from\(\{ length: 12 \}/);
+  assert.match(monthControls, /aria-pressed=\{selected\}/);
+  assert.match(monthControls, /setOrderMonth\(`\$\{orderMonth\.slice\(0, 4\)\}-\$\{month\}`\)/);
+  assert.match(monthControls, /calendar-date-controls mb-3 mt-0[^"]*rounded-2xl[^"]*bg-slate-50/);
+  assert.match(monthControls, /calendar-year-button[^"]*rounded-full border border-slate-200[^"]*px-3 py-1[^"]*text-xs font-semibold/);
+  assert.match(monthControls, /calendar-month-buttons grid[^"]*grid-cols-6[^"]*sm:grid-cols-12/);
+  assert.match(monthControls, /min-w-0 rounded-full border py-1 text-center text-xs font-semibold transition-colors sm:flex-1/);
+  assert.doesNotMatch(monthControls, /type="month"|id="order-month"|<select/);
 });
 
 test("reservation date dialog renders a month calendar instead of a dropdown", () => {
@@ -696,7 +724,7 @@ test("all dashboard modal backdrops are inert and cancel buttons are removed", (
     ts.forEachChild(node, visit);
   };
   visit(ast);
-  assert.equal(overlays.length, 14);
+  assert.equal(overlays.length, 15);
   for (const [start, end, closing] of [
     ["function importBatchOrders()", "function openNewDriver()", "setShowBatchOrderForm(false)"],
     ["function saveDriver()", "function deleteDriver(", "setShowDriverForm(false)"],
@@ -1281,7 +1309,7 @@ test("mobile calendar dates contain whole contiguous months across year and leap
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const functions = source.slice(
     source.indexOf("function createCalendarDates("),
-    source.indexOf("function formatCalendarDate("),
+    source.indexOf("function formatOrderDate("),
   );
   const context = {
     Date, Intl,
@@ -1312,7 +1340,7 @@ test("mobile calendar dates contain whole contiguous months across year and leap
 
 test("mobile timeline starts with today at the left and preserves visible dates while extending", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  const dateFunctions = source.slice(source.indexOf("function createCalendarDates("), source.indexOf("function formatCalendarDate("));
+  const dateFunctions = source.slice(source.indexOf("function createCalendarDates("), source.indexOf("function formatOrderDate("));
   const now = new Date();
   let month = new Date(now.getFullYear(), now.getMonth() - 2, 1);
   let days = [];
@@ -1443,6 +1471,10 @@ test("mobile timeline starts with today at the left and preserves visible dates 
 test("mobile calendar shows only the region control and calendar without changing other views", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const css = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  assert.match(source, /<header className="dashboard-header [^"]*bg-slate-900 px-4 py-2 text-white sm:px-6 sm:py-2">/);
+  const header = source.slice(source.indexOf('<header className="dashboard-header'), source.indexOf("</header>"));
+  assert.doesNotMatch(header, />\s*当日\s*</);
+  assert.match(header, /type="date"\s+aria-label="日历快速查询日期"[\s\S]*setCalendarCenterDate\(selectedDate\)/);
   assert.match(source, /activeView === "calendar" \? " mobile-calendar-view" : ""/);
   for (const name of ["calendar-region-selector", "calendar-toolbar", "calendar-vehicle-filters", "calendar-scroll"]) {
     assert.ok(source.includes(`className="${name} `), name);
@@ -3366,24 +3398,51 @@ test("calendar uses a year dialog, tiles month buttons on desktop and keeps the 
   assert.match(controls, /className="calendar-month-buttons hidden [^"]*sm:flex" role="group" aria-label="选择月份"/);
   assert.match(controls, /Array\.from\(\{ length: 12 \}/);
   assert.match(controls, /aria-pressed=\{selected\}/);
-  assert.match(controls, /calendar-date-controls mt-3 flex flex-wrap items-center justify-center/);
+  assert.match(controls, /calendar-date-controls flex flex-wrap items-center justify-center/);
   assert.match(controls, /calendar-month-buttons hidden min-w-0 flex-\[12_1_44px\] flex-nowrap/);
   assert.match(controls, /calendar-year-button [^"]*py-1 text-center text-xs font-semibold[^"]*sm:flex-\[1_1_0px\] sm:px-0/);
   assert.match(controls, /min-w-0 flex-1 rounded-full border py-1/);
   assert.match(controls, /aria-label="上一月"/); assert.match(controls, /aria-label="下一月"/);
+  const slider = source.slice(source.indexOf('<div className="calendar-day-slider'), source.indexOf("</div>", source.indexOf('<div className="calendar-day-slider')));
+  assert.match(slider, /className="calendar-day-slider fixed bottom-4 left-1\/2 z-40 w-\[calc\(100%-2rem\)\] max-w-\[640px\] -translate-x-1\/2"/);
+  assert.doesNotMatch(slider, /bg-white|border-slate|shadow-lg|rounded-full/);
+  const css = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  assert.match(css, /\.calendar-day-slider,\s*\.calendar-day-slider input \{\s*background: transparent !important;\s*background-color: transparent !important;/);
+  assert.match(css, /\.calendar-day-slider input::-webkit-slider-runnable-track \{[\s\S]*transparent var\(--calendar-progress\)/);
+  assert.match(css, /\.calendar-day-slider input::-moz-range-track \{\s*height: 4px;\s*border: 0;[\s\S]*background: transparent;/);
+  assert.match(source, /"--calendar-progress": `\$\{\(\(calendarCenterDate\.getDate\(\) - 1\) \/ Math\.max\(1, calendarDaysInMonth - 1\)\) \* 100\}%`/);
 });
 
-test("calendar source filter sits right of 外注 and hides reservations from other sources", () => {
+test("calendar vehicle quick filters follow the date controls and hide reservations from other sources", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  const filters = source.slice(source.indexOf('<div className="calendar-vehicle-filters'), source.indexOf("{/* 日期控制 */}"));
+  const filtersStart = source.indexOf('<div className="calendar-vehicle-filters');
+  const toolbarStart = source.indexOf('<div className="calendar-toolbar');
+  const scrollStart = source.indexOf('className="calendar-scroll');
+  const filters = source.slice(filtersStart, scrollStart);
+  assert.ok(filtersStart > toolbarStart, "quick filters should be below the date controls");
+  assert.ok(source.indexOf("calendar-date-controls", toolbarStart) < filtersStart);
   assert.ok(filters.indexOf('["external", "外注"]') < filters.indexOf('aria-label="筛选预约来源"'));
-  assert.ok(filters.indexOf('aria-label="筛选预约来源"') < filters.indexOf("拖动车辆左侧"));
+  assert.ok(filters.indexOf('aria-label="筛选预约来源"') < filters.indexOf('aria-label="回到今天"'));
+  assert.match(filters, /calendar-vehicle-filters flex flex-wrap items-center gap-1[^"]*px-3 py-0\.5/);
+  assert.match(filters, /rounded-full border px-4 py-1\.5 text-sm font-medium transition-colors/);
+  assert.match(filters, /calendar-today-button rounded-full border border-blue-200 bg-blue-50 px-4 py-1\.5 text-sm/);
   assert.match(filters, /setSourceSelectionOpen\("calendar-filter"\)/);
+  const toolbar = source.slice(toolbarStart, filtersStart);
+  assert.doesNotMatch(toolbar, /拖动车辆左侧 ⠿ 可调整顺序/);
+  assert.doesNotMatch(filters, /恢复默认顺序/);
+  assert.doesNotMatch(toolbar, /formatCalendarDate\(calendarStartDate\)/);
+  assert.doesNotMatch(source, /查看前后共 11 天/);
   const rows = source.slice(source.indexOf("{filteredCalendarVehicleRecords.map((vehicleRecord)"));
   const visible = rows.slice(rows.indexOf("const visibleOrders = orders"), rows.indexOf("const orderLanes"));
   assert.match(visible, /calendarSourceFilter === "" \|\|\s*\(calendarSourceFilter === UNSOURCED_ORDER\s*\? !order\.orderSource\s*: order\.orderSource === calendarSourceFilter\)/);
   assert.match(source, /sourceSelectionOpen === "calendar-filter"\) \{\s*setCalendarSourceFilter\(name\);/);
   assert.match(source, /if \(calendarSourceFilter === source\.companyName\) setCalendarSourceFilter\(""\);/);
+  assert.match(source, /className="calendar-scroll max-h-\[calc\(100dvh-122px\)\] overflow-auto p-0"/);
+  assert.doesNotMatch(source, /className="calendar-scroll[^"]*pb-24/);
+  assert.match(source, /className="calendar-grid min-w-\[1320px\] border bg-white"/);
+  const css = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  assert.match(css, /\.calendar-scroll \{\s*scrollbar-width: none;/);
+  assert.match(css, /\.calendar-scroll::-webkit-scrollbar \{\s*display: none;/);
 });
 
 test("calendar date headers list drivers' submitted rest days in red", () => {
@@ -3393,6 +3452,10 @@ test("calendar date headers list drivers' submitted rest days in red", () => {
   const header = source.slice(source.indexOf('className="calendar-date-header'), source.indexOf("{filteredCalendarVehicleRecords.map((vehicleRecord)"));
   assert.ok(header.indexOf("休日") < header.indexOf("calendar-rest-drivers"));
   assert.match(header, /calendar-rest-drivers[^"]*text-red-600/);
+  assert.match(header, /calendar-vehicle-column border-b border-r bg-gray-100 p-2 font-bold/);
+  const css = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  assert.match(css, /\.calendar-date-header \[data-calendar-date\] \{\s*padding: calc\(6px \* var\(--calendar-scale, 1\)\);/);
+  assert.doesNotMatch(css, /\.calendar-date-header \[data-calendar-date\] \{[^}]*height:/);
   const hook = fs.readFileSync(path.join(root, "lib\\use-driver-rest-days.ts"), "utf8");
   assert.match(hook, /fetch\("\/api\/driver-shifts\/status"/);
   assert.match(hook, /shiftStatusSchema\.parse/);

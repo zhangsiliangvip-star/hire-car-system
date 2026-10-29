@@ -369,10 +369,6 @@ function createMobileCalendarDates(firstMonth: Date) {
   return createCalendarDates(firstMonth, dayCount);
 }
 
-function formatCalendarDate(date: Date) {
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
 function formatOrderDate(date: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
@@ -1000,16 +996,6 @@ export default function Home() {
     calendarCenterDate.getMonth() + 1,
     0,
   ).getDate();
-  const calendarStartDate = new Date(
-    calendarCenterDate.getFullYear(),
-    calendarCenterDate.getMonth(),
-    1,
-  );
-  const calendarEndDate = new Date(
-    calendarCenterDate.getFullYear(),
-    calendarCenterDate.getMonth() + 1,
-    0,
-  );
   const [isDataReady, setIsDataReady] = useState(false);
   const [dataLoadError, setDataLoadError] = useState("");
   const [vehicleMonthlyFinanceMigrationPending, setVehicleMonthlyFinanceMigrationPending] =
@@ -1325,6 +1311,7 @@ export default function Home() {
     calendarTodayRequest,
   ]);
   const [orderMonth, setOrderMonth] = useState(getCurrentMonthKey);
+  const [orderYearPickerStart, setOrderYearPickerStart] = useState<number | null>(null);
   const [orderDateFilter, setOrderDateFilter] = useState("");
   const [orderVehicleFilter, setOrderVehicleFilter] = useState("");
   const [orderDriverFilter, setOrderDriverFilter] = useState("");
@@ -1753,9 +1740,6 @@ export default function Home() {
     }))
     .sort(compareCalendarVehicles)
     .map(({ vehicle }) => vehicle);
-  const hasManualCalendarOrder = vehicleRecords.some(
-    (vehicle) => vehicle.calendarOrder !== null && vehicle.calendarOrder !== undefined,
-  );
   const filteredCalendarVehicleRecords = calendarSortedVehicleRecords.filter(({ name: vehicle }) => {
     const modelOrder = getVehicleModelOrder(vehicle);
     const isOutsourced = isOutsourcedVehicle(vehicle);
@@ -2878,18 +2862,6 @@ export default function Home() {
           ? vehicle
           : { ...vehicle, calendarOrder: position };
       }),
-    );
-  }
-
-  function resetCalendarVehicleOrder() {
-    if (!window.confirm("恢复カレンダー默认车辆顺序？所有人看到的顺序都会恢复。")) return;
-    const ids = new Set(vehicleRecords.map((vehicle) => vehicle.id));
-    setVehicleRecords((current) =>
-      current.map((vehicle) =>
-        ids.has(vehicle.id) && vehicle.calendarOrder !== null && vehicle.calendarOrder !== undefined
-          ? { ...vehicle, calendarOrder: null }
-          : vehicle,
-      ),
     );
   }
 
@@ -4653,7 +4625,7 @@ export default function Home() {
       </div>}
       <div className="contents" inert={dialogSaving}>
       {/* 顶部 */}
-      <header className="dashboard-header flex flex-wrap items-center justify-between gap-3 bg-slate-900 px-4 py-3 text-white sm:px-6 sm:py-4">
+      <header className="dashboard-header flex flex-wrap items-center justify-between gap-3 bg-slate-900 px-4 py-2 text-white sm:px-6 sm:py-2">
         <div>
           <h1 className="text-xl font-bold">ハイヤー配車管理</h1>
         </div>
@@ -4690,7 +4662,7 @@ export default function Home() {
                   setAccountingPreviewOrder(null);
                   setShowLoginAccountForm(false);
                 }}
-                className="max-w-36 rounded border border-slate-600 bg-slate-800 px-2 py-2 text-white"
+                className="max-w-36 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-white"
               >
                 <option value={ALL_REGIONS_ID}>全部地域</option>
                 {regions.map((region) => (
@@ -4700,34 +4672,13 @@ export default function Home() {
             </label>
           )}
           {activeView === "calendar" && (
-            <button
-              type="button"
-              className="calendar-today-button rounded border border-slate-500 px-3 py-2 text-sm font-semibold hover:bg-slate-800"
-              onClick={() => {
-                const today = new Date();
-                calendarQueryDateRef.current = null;
-                setCalendarQueryDate("");
-                if (isMobileCalendar) {
-                  calendarTodayRequestedRef.current = true;
-                  calendarAnchorRef.current = null;
-                  setMobileCalendarFirstMonth(new Date(today.getFullYear(), today.getMonth() - 2, 1));
-                  setCalendarTodayRequest((request) => request + 1);
-                } else {
-                  setCalendarCenterDate(today);
-                }
-              }}
-            >
-              当日
-            </button>
-          )}
-          {activeView === "calendar" && (
             <label className="calendar-quick-date flex items-center gap-1 text-sm">
               <span>日期</span>
               <input
                 type="date"
                 aria-label="日历快速查询日期"
                 value={calendarQueryDate}
-                className="min-w-0 rounded border border-slate-500 bg-slate-800 px-2 py-2 text-white"
+                className="min-w-0 rounded border border-slate-500 bg-slate-800 px-2 py-1 text-white"
                 onChange={(event) => {
                   const dateKey = event.target.value;
                   setCalendarQueryDate(dateKey);
@@ -4756,7 +4707,7 @@ export default function Home() {
           <button
             type="button"
             onClick={signOut}
-            className="rounded border border-slate-500 px-3 py-2 text-sm font-semibold hover:bg-slate-800"
+            className="rounded border border-slate-500 px-3 py-1 text-sm font-semibold hover:bg-slate-800"
           >
             退出
           </button>
@@ -4764,14 +4715,14 @@ export default function Home() {
             type="button"
             onClick={openBatchOrderImport}
             disabled={activeRegionId === ALL_REGIONS_ID || availableVehicleRecords.length === 0}
-            className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-bold text-blue-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-blue-300 px-4 py-1 text-sm font-bold text-blue-100 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             批量导入
           </button>
           <button
             onClick={() => openNewOrder(availableVehicleRecords[0], toDateKey(calendarCenterDate))}
             disabled={activeRegionId === ALL_REGIONS_ID || availableVehicleRecords.length === 0}
-            className="rounded-lg bg-blue-600 px-5 py-2 font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue-600 px-5 py-1 font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             ＋ 新建订单
           </button>
@@ -6312,79 +6263,9 @@ export default function Home() {
 
           {activeView === "calendar" && (
             <>
-      <div className="calendar-vehicle-filters flex flex-wrap gap-2 border-b bg-white px-4 pt-4">
-        {([
-          ["all", "全体车辆"],
-          ["alphard", "Alphard"],
-          ["hiace", "Hiace"],
-          ["tesla", "Tesla"],
-          ["external", "外注"],
-        ] as const).map(([filter, label]) => (
-          <button
-            key={filter}
-            type="button"
-            aria-pressed={calendarVehicleFilter === filter}
-            onClick={() => setCalendarVehicleFilter(filter)}
-            className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-              calendarVehicleFilter === filter
-                ? "border-blue-700 bg-blue-700 text-white"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-        <button
-          type="button"
-          aria-label="筛选预约来源"
-          aria-haspopup="dialog"
-          onClick={() => setSourceSelectionOpen("calendar-filter")}
-          title={calendarSourceFilter && calendarSourceFilter !== UNSOURCED_ORDER ? calendarSourceFilter : undefined}
-          className={`max-w-[16rem] truncate rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-            calendarSourceFilter
-              ? "border-blue-700 bg-blue-700 text-white"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-          }`}
-        >
-          来源：{calendarSourceFilter === ""
-            ? "全部"
-            : calendarSourceFilter === UNSOURCED_ORDER
-              ? "未填写"
-              : getSourceDisplayName(calendarSourceFilter, activeRegionId === ALL_REGIONS_ID ? undefined : activeRegionId)}
-        </button>
-        <span className="ml-auto self-center text-xs text-slate-500">拖动车辆左侧 ⠿ 可调整顺序</span>
-        {hasManualCalendarOrder && (
-          <button
-            type="button"
-            onClick={resetCalendarVehicleOrder}
-            className="self-center rounded border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100"
-          >
-            恢复默认顺序
-          </button>
-        )}
-      </div>
       {/* 日期控制 */}
-      <div className="calendar-toolbar border-b bg-white px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                const today = new Date();
-                setCalendarCenterDate(today);
-              }}
-              className="rounded border border-blue-200 bg-blue-50 px-4 py-1.5 font-medium text-blue-700"
-            >
-              今天
-            </button>
-            <span className="text-sm font-medium text-gray-600">查看前后共 11 天</span>
-          </div>
-
-          <span className="font-bold text-slate-800">
-            {formatCalendarDate(calendarStartDate)} ～ {formatCalendarDate(calendarEndDate)}
-          </span>
-        </div>
-
-        <div className="calendar-date-controls mt-3 flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-1.5 shadow-sm">
+      <div className="calendar-toolbar border-b bg-white px-3 py-0.5">
+        <div className="calendar-date-controls flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-0.5 shadow-sm">
           <button
             type="button"
             onClick={() => setCalendarCenterDate((date) => new Date(date.getFullYear(), date.getMonth() - 1, date.getDate()))}
@@ -6536,7 +6417,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="calendar-day-slider fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-[640px] -translate-x-1/2 rounded-full border border-slate-200 bg-white/95 px-5 py-3 shadow-lg backdrop-blur">
+        <div className="calendar-day-slider fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-[640px] -translate-x-1/2">
           <input
             type="range"
             min={1}
@@ -6544,6 +6425,9 @@ export default function Home() {
             value={calendarCenterDate.getDate()}
             aria-label="选择本月日期"
             aria-valuetext={`${calendarCenterDate.getMonth() + 1}月${calendarCenterDate.getDate()}日`}
+            style={{
+              "--calendar-progress": `${((calendarCenterDate.getDate() - 1) / Math.max(1, calendarDaysInMonth - 1)) * 100}%`,
+            } as CSSProperties}
             onChange={(event) => {
               const selectedDay = Number(event.target.value);
               setCalendarCenterDate(
@@ -6555,10 +6439,60 @@ export default function Home() {
         </div>
       </div>
 
+      <div className="calendar-vehicle-filters flex flex-wrap items-center gap-1 border-b bg-white px-3 py-0.5">
+        {([
+          ["all", "全体车辆"],
+          ["alphard", "Alphard"],
+          ["hiace", "Hiace"],
+          ["tesla", "Tesla"],
+          ["external", "外注"],
+        ] as const).map(([filter, label]) => (
+          <button
+            key={filter}
+            type="button"
+            aria-pressed={calendarVehicleFilter === filter}
+            onClick={() => setCalendarVehicleFilter(filter)}
+            className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+              calendarVehicleFilter === filter
+                ? "border-blue-700 bg-blue-700 text-white"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-label="筛选预约来源"
+          aria-haspopup="dialog"
+          onClick={() => setSourceSelectionOpen("calendar-filter")}
+          title={calendarSourceFilter && calendarSourceFilter !== UNSOURCED_ORDER ? calendarSourceFilter : undefined}
+          className={`max-w-[16rem] truncate rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+            calendarSourceFilter
+              ? "border-blue-700 bg-blue-700 text-white"
+              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+          }`}
+        >
+          来源：{calendarSourceFilter === ""
+            ? "全部"
+            : calendarSourceFilter === UNSOURCED_ORDER
+              ? "未填写"
+              : getSourceDisplayName(calendarSourceFilter, activeRegionId === ALL_REGIONS_ID ? undefined : activeRegionId)}
+        </button>
+        <button
+          type="button"
+          aria-label="回到今天"
+          onClick={() => setCalendarCenterDate(new Date())}
+          className="calendar-today-button rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+        >
+          今天
+        </button>
+      </div>
+
       {/* 排班表 */}
       <div
         ref={setCalendarScroller}
-        className="calendar-scroll max-h-[75vh] overflow-auto px-4 pb-24 pt-4"
+        className="calendar-scroll max-h-[calc(100dvh-122px)] overflow-auto p-0"
         onScroll={(event) => {
           const scroller = event.currentTarget;
           if (isCalendarPinching) return;
@@ -6585,7 +6519,7 @@ export default function Home() {
         }}
       >
         <div
-          className="calendar-grid min-w-[1320px] rounded-2xl border bg-white shadow-sm"
+          className="calendar-grid min-w-[1320px] border bg-white"
           style={{
             minWidth: Math.max(1320, 135 + dates.length * 130) * calendarScale,
             "--calendar-scale": calendarScale,
@@ -6597,7 +6531,7 @@ export default function Home() {
               gridTemplateColumns: `calc(var(--calendar-vehicle-width, 135px) * ${calendarScale}) repeat(${dates.length}, minmax(${130 * calendarScale}px, 1fr))`,
             }}
           >
-            <div className="calendar-vehicle-column border-b border-r bg-gray-100 p-4 font-bold">
+            <div className="calendar-vehicle-column border-b border-r bg-gray-100 p-2 font-bold">
               <div className="calendar-vehicle-content">車両</div>
             </div>
 
@@ -7252,19 +7186,6 @@ export default function Home() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold">予約管理</h2>
                 <div className="flex flex-wrap items-center gap-3">
-                  <label htmlFor="order-month" className="text-sm font-medium text-gray-600">
-                    月份
-                  </label>
-                  <input
-                    id="order-month"
-                    type="month"
-                    value={orderMonth}
-                    onChange={(event) => {
-                      setOrderMonth(event.target.value);
-                      setOrderDateFilter("");
-                    }}
-                    className="rounded border bg-white px-3 py-2 text-sm"
-                  />
                   <span className="text-sm font-medium text-gray-600">日期</span>
                   <button
                     type="button"
@@ -7356,6 +7277,108 @@ export default function Home() {
                   <span className="whitespace-nowrap text-sm text-gray-500">
                     共 {monthlyOrders.length} 笔
                   </span>
+                </div>
+              </div>
+              <div className="calendar-date-controls mb-3 mt-0 flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-1.5 shadow-sm">
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-label={`选择预约年份，当前${orderMonth.slice(0, 4)}年`}
+                  onClick={() => setOrderYearPickerStart(
+                    Math.min(2089, Math.max(2020, Number(orderMonth.slice(0, 4)) - 5)),
+                  )}
+                  className="calendar-year-button rounded-full border border-slate-200 bg-white px-3 py-1 text-center text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                >
+                  {orderMonth.slice(0, 4)}年
+                </button>
+                {orderYearPickerStart !== null && (
+                  <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4">
+                    <section
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="order-year-dialog-title"
+                      onKeyDown={(event) => { if (event.key === "Escape") setOrderYearPickerStart(null); }}
+                      className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl"
+                    >
+                      <div className="dialog-floating-header mb-4 flex items-center justify-between gap-3">
+                        <h2 id="order-year-dialog-title" className="text-lg font-bold">选择预约年份</h2>
+                        <button type="button" aria-label="关闭" onClick={() => setOrderYearPickerStart(null)} className="text-2xl text-gray-500">
+                          ×
+                        </button>
+                      </div>
+                      <div className="mb-3 flex items-center justify-between">
+                        <button
+                          type="button"
+                          aria-label="上一组预约年份"
+                          disabled={orderYearPickerStart <= 2020}
+                          onClick={() => setOrderYearPickerStart((start) => Math.max(2020, (start ?? 2020) - 12))}
+                          className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                        >
+                          ‹
+                        </button>
+                        <span className="text-sm font-semibold text-slate-600">
+                          {orderYearPickerStart} ～ {Math.min(2100, orderYearPickerStart + 11)}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="下一组预约年份"
+                          disabled={orderYearPickerStart + 12 > 2100}
+                          onClick={() => setOrderYearPickerStart((start) => Math.min(2089, (start ?? 2020) + 12))}
+                          className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                        >
+                          ›
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {Array.from({ length: 12 }, (_, index) => orderYearPickerStart + index)
+                          .filter((year) => year <= 2100)
+                          .map((year) => {
+                            const selected = year === Number(orderMonth.slice(0, 4));
+                            return (
+                              <button
+                                key={year}
+                                type="button"
+                                aria-pressed={selected}
+                                autoFocus={selected}
+                                onClick={() => {
+                                  setOrderMonth(`${year}-${orderMonth.slice(5, 7)}`);
+                                  setOrderDateFilter("");
+                                  setOrderYearPickerStart(null);
+                                }}
+                                className={`rounded-lg border py-2 text-sm font-semibold transition-colors ${selected ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"}`}
+                              >
+                                {year}年
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </section>
+                  </div>
+                )}
+                <div className="calendar-month-buttons grid min-w-0 flex-1 grid-cols-6 gap-1 sm:grid-cols-12 sm:flex-nowrap sm:items-center sm:justify-center" role="group" aria-label="选择预约月份">
+                  {Array.from({ length: 12 }, (_, index) => {
+                    const month = String(index + 1).padStart(2, "0");
+                    const selected = orderMonth.slice(5, 7) === month;
+                    return (
+                      <button
+                        key={month}
+                        type="button"
+                        aria-label={`${Number(month)}月`}
+                        aria-pressed={selected}
+                        onClick={() => {
+                          setOrderMonth(`${orderMonth.slice(0, 4)}-${month}`);
+                          setOrderDateFilter("");
+                        }}
+                        className={`min-w-0 rounded-full border py-1 text-center text-xs font-semibold transition-colors sm:flex-1 ${
+                          selected
+                            ? "border-blue-600 bg-blue-600 text-white"
+                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {Number(month)}月
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="overflow-x-auto border bg-white">
