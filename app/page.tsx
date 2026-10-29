@@ -84,6 +84,7 @@ import { DriverLoginFields, DriverLoginProvider } from "@/components/driver-logi
 import { OrderReceipts } from "@/components/order-receipts";
 import { OrderFinanceReviewButton, OrderFinanceReviewProvider } from "@/components/order-finance-review";
 import { DriverExecutionBadge } from "@/components/driver-execution-badge";
+import { DriverNameLabel, OrderDriverLabels } from "@/components/driver-name-label";
 import { OperationsReports } from "@/components/operations-reports";
 import { useDriverExecutionStatus } from "@/lib/use-driver-execution-status";
 import { useDriverRestDays } from "@/lib/use-driver-rest-days";
@@ -5244,7 +5245,7 @@ export default function Home() {
                           <td className="px-4 py-3">
                             <button type="button" onClick={() => setDriverSelectionTarget(order.id)}
                               className="font-medium text-blue-700 hover:underline">
-                              {getOrderDriverLabel(order)}
+                              <OrderDriverLabels order={order} />
                             </button>
                           </td>
                           <td className="px-4 py-3">{getOrderVehicleNumber(order, financeMonth)}</td>
@@ -7122,9 +7123,8 @@ export default function Home() {
                           <span className="min-w-0 max-w-full font-bold">
                             {order.customer}
                           </span>
-                          <span className={`min-w-0 font-semibold ${segment.expired ? "bg-white text-red-600" : ""}`}>
-                            {segment.driver || "未安排"}
-                          </span>
+                          <DriverNameLabel name={segment.label || "未安排"} isExternal={segment.isExternal}
+                            className={`font-semibold ${segment.expired ? "bg-white text-red-600" : ""}`} />
                           <div className="grid w-full min-w-0"
                             style={{ gridTemplateColumns: `repeat(${segment.end - segment.start}, minmax(0, 1fr))` }}>
                             {barDates.slice(segment.start, segment.end).map(day => {
@@ -7159,9 +7159,8 @@ export default function Home() {
                               {(order.orderSource || getOrderDriverNames(order).some(Boolean)) && (
                                 <div className="grid grid-cols-2 gap-1 break-all">
                                   <span>{orderSourceShortNameByRegion.get(`${order.regionId}:${order.orderSource}`) || order.orderSource || "未填写"}</span>
-                                  <span className={orderDriverExpired ? "bg-white font-semibold text-red-600" : ""}>
-                                    {getOrderDriverLabel(order)}
-                                  </span>
+                                  <OrderDriverLabels order={order}
+                                    className={orderDriverExpired ? "bg-white font-semibold text-red-600" : ""} />
                                 </div>
                               )}
                             </div>
@@ -7207,12 +7206,8 @@ export default function Home() {
                               >
                                 {orderSourceShortNameByRegion.get(`${order.regionId}:${order.orderSource}`) || order.orderSource || "未填写"}
                               </div>
-                              <div
-                                className={`min-w-0 truncate ${segment.expired ? "rounded bg-white px-1 font-semibold text-red-600" : ""}`}
-                                title={segment.driver || "未安排"}
-                              >
-                                {segment.driver || "未安排"}
-                              </div>
+                              <DriverNameLabel name={segment.label || "未安排"} isExternal={segment.isExternal}
+                                className={`min-w-0 truncate ${segment.expired ? "rounded bg-white px-1 font-semibold text-red-600" : ""}`} />
                             </div>
                           )}
                           <CalendarInvoiceStatus status={order.invoiceStatus} />
@@ -7451,7 +7446,7 @@ export default function Home() {
                               onClick={() => setDriverSelectionTarget(order.id)}
                               className="font-medium text-blue-700 hover:underline"
                             >
-                              {getOrderDriverLabel(order)}
+                              <OrderDriverLabels order={order} />
                             </button>
                           </td>
                           <td className="break-words px-2 py-3">{order.orderSource || "未填写"}</td>

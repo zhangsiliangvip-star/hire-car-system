@@ -102,8 +102,8 @@ test("finance dialog groups driver selection and wage quick entry below daily fa
   assert.equal(salaryInput, undefined);
 });
 
-test("company advance external names stay in notes and are excluded from driver assignments", () => {
-  const { getOrderDriverNames, getOrderDriverLabel } = load("lib\\order-drivers.ts");
+test("company advance external names appear in order labels but stay excluded from driver assignments", () => {
+  const { getOrderDriverNames, getOrderDriverLabel, getOrderDriverLabelEntries } = load("lib\\order-drivers.ts");
   const { rankDriversByRecentService } = load("lib\\driver-selection.ts");
   const { findOrderConflicts } = load("lib\\order-conflicts.ts");
   const order = { id, regionId: region, date: "2026-10-25", endDate: "2026-10-27",
@@ -112,7 +112,18 @@ test("company advance external names stay in notes and are excluded from driver 
       "2026-10-27": { driver: "", driverPaymentType: "company_advance",
         companyAdvancePaymentNote: "外注司机：External" } } };
   assert.deepEqual(plain(getOrderDriverNames(order)), ["Daily", ""]);
-  assert.equal(getOrderDriverLabel(order), "Daily／未安排");
+  assert.equal(getOrderDriverLabel(order), "Daily／未安排／External");
+  assert.deepEqual(plain(getOrderDriverLabelEntries(order)), [
+    { label: "Daily", isExternal: false },
+    { label: "", isExternal: false },
+    { label: "External", isExternal: true },
+  ]);
+  assert.equal(getOrderDriverLabel({ ...order, date: "2026-10-27", endDate: "2026-10-27" }), "External");
+  assert.equal(getOrderDriverLabel({ ...order, financeByDate: {
+    "2026-10-25": { driver: "Daily" }, "2026-10-26": { driver: "" },
+    "2026-10-27": { driver: "", driverPaymentType: "company_advance",
+      companyAdvancePaymentNote: "普通备注，没有外注司机姓名" },
+  } }), "Daily／未安排");
   assert.deepEqual(plain(getOrderDriverNames(order, date => date === "2026-10-27")), [""]);
   const ranked = rankDriversByRecentService(["Old default", "Daily", "External"].map((name, index) =>
     ({ id: `${index}`, name, regionId: region })), [order], "2026-10-27");
@@ -128,6 +139,22 @@ test("company advance external names stay in notes and are excluded from driver 
   assert.doesNotMatch(source, /form\[key\] = \{ \.\.\.finance, driver: defaultDriver \}/);
 });
 
+test("outsourced driver labels have a distinct badge while staff driver labels remain unbadged", () => {
+  const { OrderDriverLabels } = load("components\\driver-name-label.tsx");
+  const order = { date: "2026-10-27", endDate: "2026-10-27", offDates: [], driver: "",
+    financeByDate: { "2026-10-27": { driver: "", driverPaymentType: "company_advance",
+      companyAdvancePaymentNote: "外注司机：External" } } };
+  const externalMarkup = renderToStaticMarkup(React.createElement(OrderDriverLabels, { order }));
+  assert.match(externalMarkup, /bg-amber-600[^>]*>外注<\/span>/);
+  assert.match(externalMarkup, />External<\/span>/);
+
+  const staffMarkup = renderToStaticMarkup(React.createElement(OrderDriverLabels, {
+    order: { ...order, financeByDate: { "2026-10-27": { driver: "Staff" } } },
+  }));
+  assert.match(staffMarkup, />Staff<\/span>/);
+  assert.doesNotMatch(staffMarkup, />外注<\/span>/);
+});
+
 test("daily calendar driver groups exclude external names saved in company advance notes", () => {
   const { getServiceDriver, getDriverSegments } = load("lib\\order-drivers.ts");
   const order = { driver: "Default", offDates: ["2026-10-29"], financeByDate: {
@@ -139,9 +166,21 @@ test("daily calendar driver groups exclude external names saved in company advan
   assert.equal(getServiceDriver(order, "2026-11-02"), "Default");
   assert.deepEqual(plain(getDriverSegments(order, ["2026-10-27", "2026-10-28", "2026-10-29",
     "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"])), [
-    { driver: "A", start: 0, end: 2 }, { driver: "B", start: 3, end: 4 },
-    { driver: "", start: 4, end: 6 },
-    { driver: "Default", start: 6, end: 7 },
+    { driver: "A", label: "A", isExternal: false, start: 0, end: 2 },
+    { driver: "B", label: "B", isExternal: false, start: 3, end: 4 },
+    { driver: "", label: "", isExternal: false, start: 4, end: 5 },
+    { driver: "", label: "External", isExternal: true, start: 5, end: 6 },
+    { driver: "Default", label: "Default", isExternal: false, start: 6, end: 7 },
+  ]);
+  const externalSegments = getDriverSegments({ driver: "", offDates: [], financeByDate: {
+    "2026-11-01": { driver: "", driverPaymentType: "company_advance",
+      companyAdvancePaymentNote: "外注司机：External A" },
+    "2026-11-02": { driver: "", driverPaymentType: "company_advance",
+      companyAdvancePaymentNote: "外注司机：External B" },
+  } }, ["2026-11-01", "2026-11-02"]);
+  assert.deepEqual(plain(externalSegments), [
+    { driver: "", label: "External A", isExternal: true, start: 0, end: 1 },
+    { driver: "", label: "External B", isExternal: true, start: 1, end: 2 },
   ]);
 });
 
@@ -319,6 +358,7 @@ test("reservation table renders only the first imported order with the exact tot
     exports: {}, require: nodeRequire, groupReservationOrders, getAccountingBatchOrders,
     getMonthlySameSourceOrders, result: null,
     monthlyOrders, ordersInSelectedMonth: monthlyOrders, orderMonth: "2026-10",
+    OrderDriverLabels: load("components\\driver-name-label.tsx").OrderDriverLabels,
     invoiceStatusSavingIds: new Set(), openInvoiceStatusDialog() {},
     formatOrderDate: (date) => date, isOrderArranged: () => false, statusStyles: {},
     DriverExecutionBadge: load("components\\driver-execution-badge.tsx", {
@@ -1175,11 +1215,11 @@ test("mobile calendar centers one order name and daily driver group per continuo
   }
   const compactStart = source.indexOf("{isCompactCalendar && driverSegments.map(");
   const compact = source.slice(compactStart, source.indexOf("{isMobileCalendar && !isCompactCalendar && (", compactStart));
-  assert.match(compact, /segment\.driver \|\| "未安排"/);
-  assert.equal((compact.match(/segment\.driver \|\| "未安排"/g) || []).length, 1);
+  assert.match(compact, /segment\.label \|\| "未安排"/);
+  assert.equal((compact.match(/segment\.label \|\| "未安排"/g) || []).length, 1);
   assert.equal((compact.match(/order\.customer/g) || []).length, 1);
   assert.match(compact, /flex-col items-center justify-center break-all px-1 text-center text-xs leading-4/);
-  assert.ok(compact.indexOf("order.customer") < compact.indexOf("segment.driver"));
+  assert.ok(compact.indexOf("order.customer") < compact.indexOf("segment.label"));
   assert.match(compact, /items-center justify-center break-all px-1 text-center/);
   assert.match(compact, /top: \(orderCardHeight \/ 2 - 4\) \* calendarScale, transform: "translateY\(-50%\)"/);
   assert.match(source, /paddingTop: executionPadding \+ \(isSplittable \? 24 : 0\)/);
