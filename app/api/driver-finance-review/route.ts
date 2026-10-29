@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       });
       if (error) {
         console.error("Daily fuel review rejected.", { code: error.code });
-        return jsonResponse({ error: "燃油费审核未完成，订单燃油费或申报状态可能已变化，请刷新核对或退回重提。" },
+        return jsonResponse({ error: "燃油费审核未完成，訂単燃油费或申报状态可能已变化，请刷新核对或退回重提。" },
           { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : 503 });
       }
       return jsonResponse({ fuelClaim: fuelClaimSchema.parse(data) });
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver finance review rejected.", { code: error.code });
-      return jsonResponse({ error: "审核未完成：订单、司机或财务已变化，或申报已处理。请刷新；财务冲突请退回后重新申报。" }, { status: 409 });
+      return jsonResponse({ error: "审核未完成：訂単、司机或财务已变化，或申报已处理。请刷新；财务冲突请退回后重新申报。" }, { status: 409 });
     }
     return jsonResponse({ claim: financeClaimSchema.parse(data) });
   } catch (error) {

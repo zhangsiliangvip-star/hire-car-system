@@ -141,11 +141,11 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
     {notice && <p className="driver-notice" role="status">{notice}</p>}
     {busy ? <p className="driver-empty" role="status">正在核验并读取行程…</p> : <>
       {!detail && trips.length > 0 && <section className="driver-card driver-hero driver-daily-overview">
-        <span className="driver-muted">{date === japanDate() ? "当日全部订单行程" : `${date} 全部订单行程`}</span>
+        <span className="driver-muted">{date === japanDate() ? "当日全部訂単行程" : `${date} 全部訂単行程`}</span>
         <div className="driver-daily-orders">{trips.map((trip, index) => <div className="driver-daily-order" key={`${trip.orderId}-${trip.date}`}>
-          <span className="driver-muted driver-daily-number">订单 {index + 1}</span>
+          <span className="driver-muted driver-daily-number">訂単 {index + 1}</span>
           <div className="driver-daily-content">
-            <h2>{trip.details?.orderName || "订单内容未填写"}</h2>
+            <h2>{trip.details?.orderName || "訂単内容未填写"}</h2>
             <p className="driver-daily-summary">{trip.details?.tripSummary || "行程简概未填写"}</p>
           </div>
           <p className="driver-muted driver-daily-plate">車両番号：{trip.vehicleNumber || "未填写"}</p>
@@ -156,7 +156,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
         <div className="driver-toolbar"><div><span className="driver-muted">配車時間</span>
           <time className="driver-time block">{trip.time || "待定"}</time></div>
           <span className={`driver-status ${trip.status === "assigned" ? "pending" : ""}`}>
-            {"historical" in trip ? "历史订单（只读）" : tripStatusLabels[trip.status]}</span></div>
+            {"historical" in trip ? "历史訂単（只读）" : tripStatusLabels[trip.status]}</span></div>
         <div className="my-3 space-y-3">
           <TripLocation label="上车地点" address={trip.pickup} />
           <TripLocation label="下车地点" address={trip.destination} />
@@ -172,10 +172,10 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
               }} />}
         </div>
         <div className="driver-row"><span>服务日期</span><strong>{trip.date}</strong></div>
-        <div className="driver-row"><span>车辆</span><strong>{trip.vehicle || "请联系调度确认"}</strong></div>
+        <div className="driver-row"><span>車両</span><strong>{trip.vehicle || "请联系调度确认"}</strong></div>
         <div className="driver-row"><span>車両番号</span><strong className="break-words">{trip.vehicleNumber || "未填写"}</strong></div>
         {detail && trip.details && <div className="space-y-3 break-words">
-          <div className="driver-row"><span>订单名称</span><strong>{trip.details.orderName || "未填写"}</strong></div>
+          <div className="driver-row"><span>訂単名称</span><strong>{trip.details.orderName || "未填写"}</strong></div>
           <div><p className="driver-muted">行程简概</p><p className="whitespace-pre-wrap">{trip.details.tripSummary || "未填写"}</p></div>
         </div>}
         {detail ? <>

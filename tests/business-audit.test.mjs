@@ -520,7 +520,7 @@ test("orders API validates and round-trips persistent batch metadata", async () 
 
 test("vehicle statistics filter displays plates instead of vehicle names", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  const start = source.indexOf("value={vehicleFinanceVehicleFilter}", source.indexOf("导出车辆财务表（A4）"));
+  const start = source.indexOf("value={vehicleFinanceVehicleFilter}", source.indexOf("导出車両财务表（A4）"));
   assert.ok(start !== -1);
   const filter = source.slice(start, source.indexOf("</select>", start));
   assert.ok(filter.includes("全部車両番号"));
@@ -1058,7 +1058,7 @@ test("A4 report exports omit signature fields and preserve report content", () =
     }), "車両統計月度财务表", "2026-10"],
     [vehicles.buildVehicleSummaryPrintHtml({
       ...base, regionNames: {},
-    }), "全车辆月度统计表", "2026-10"],
+    }), "全車両月度统计表", "2026-10"],
     [accounting.buildOrderFinancePrintHtml({
       ...base, source: "All", depositStatus: "All", invoiceStatus: "All",
     }), "経理統計月度财务表", "月份：2026-10"],
@@ -1878,8 +1878,8 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   assert.equal(render("Hiace 01", vehicles, false, "品川 200").select.props.value, "b");
   assert.equal(render("Hiace 01").select.props.value, "", "a model alone must not select a plate");
   assert.equal(render("外注其他").select.props.value, "");
-  assert.ok(render("外注其他").html.includes("当前车辆未登记或未指定番号"));
-  assert.ok(render("Deleted").html.includes("当前车辆未登记或未指定番号"));
+  assert.ok(render("外注其他").html.includes("当前車両未登记或未指定番号"));
+  assert.ok(render("Deleted").html.includes("当前車両未登记或未指定番号"));
   view = render("Tesla 01", vehicles, false, "品川 300");
   assert.equal(view.select.props.value, "d");
   assert.equal(view.options.find((option) => option.props.value === "d").props.disabled, true);
@@ -2222,7 +2222,7 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   const startDate = source.indexOf("{/* 开始日期 */}");
   const endDate = source.indexOf("{/* 終了日期 */}", startDate);
   const offDate = source.indexOf('htmlFor="order-off-date"', endDate);
-  const customerField = source.indexOf("{/* 订单名称 */}");
+  const customerField = source.indexOf("{/* 訂単名称 */}");
   const departureTime = source.indexOf("value={form.time}", driverField);
   assert.ok(customerField < startDate && startDate < endDate && endDate < offDate &&
     offDate < sourceField && sourceField < statusField && statusField < vehicleField &&
@@ -2564,7 +2564,7 @@ test("reservation table centers fields and shows order and request status in the
   const table = source.slice(start, source.indexOf("</table>", start));
   const headers = [...table.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1]);
   assert.deepEqual(headers, [
-    "用车日期", "配車時間", "手配状態", "予約情報", "订单状态",
+    "用车日期", "配車時間", "手配状態", "予約情報", "訂単状态",
     "車両", "運転士", "来源", "請求書状态", "操作",
   ]);
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
@@ -2581,8 +2581,8 @@ test("reservation table centers fields and shows order and request status in the
   assert.doesNotMatch(table, /text-left/);
   const dialogStart = source.indexOf('aria-labelledby="invoice-status-dialog-title"');
   const dialog = source.slice(dialogStart, source.indexOf("</section>", dialogStart));
-  assert.match(dialog, /同来源订单/);
-  assert.match(dialog, /仅此订单/);
+  assert.match(dialog, /同来源訂単/);
+  assert.match(dialog, /仅此訂単/);
   assert.match(dialog, /确认变更/);
   assert.match(dialog, /invoiceStatusDialogChangedCount/);
 });
@@ -3428,7 +3428,7 @@ test("calendar vehicle quick filters follow the date controls and hide reservati
   assert.match(filters, /calendar-today-button rounded-full border border-blue-200 bg-blue-50 px-4 py-1\.5 text-sm/);
   assert.match(filters, /setSourceSelectionOpen\("calendar-filter"\)/);
   const toolbar = source.slice(toolbarStart, filtersStart);
-  assert.doesNotMatch(toolbar, /拖动车辆左侧 ⠿ 可调整顺序/);
+  assert.doesNotMatch(toolbar, /拖动車両左侧 ⠿ 可调整顺序/);
   assert.doesNotMatch(filters, /恢复默认顺序/);
   assert.doesNotMatch(toolbar, /formatCalendarDate\(calendarStartDate\)/);
   assert.doesNotMatch(source, /查看前后共 11 天/);

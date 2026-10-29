@@ -12,13 +12,13 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const parsed = orderReceiptQuerySchema.safeParse(Object.fromEntries(params));
     if (!parsed.success || [...params.keys()].some(key => params.getAll(key).length !== 1))
-      return jsonResponse({ error: "订单或日期无效。" }, { status: 400 });
+      return jsonResponse({ error: "訂単或日期无效。" }, { status: 400 });
     const { data, error } = await supabase.rpc("staff_order_receipts", {
       target_order: parsed.data.orderId, target_date: parsed.data.date,
     });
     if (error) {
       console.error("Order receipts read rejected.", { code: error.code });
-      return jsonResponse({ error: "无法读取该订单已批准的小票。" }, { status: error.code === "42501" ? 403 : 503 });
+      return jsonResponse({ error: "无法读取该訂単已批准的小票。" }, { status: error.code === "42501" ? 403 : 503 });
     }
     const rows = z.array(orderReceiptSchema).parse(data);
     const receipts = [];

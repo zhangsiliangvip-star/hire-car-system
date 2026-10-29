@@ -187,9 +187,9 @@ test("phone detail renders only the current legal action and never financial fie
     }).default;
     const html = renderToStaticMarkup(React.createElement(Component, { assignmentId: id, orderId: "order-a" }));
     assert.ok(html.includes(orders.tripStatusLabels[status]));
-    assert.ok(html.indexOf("车辆</span>") < html.indexOf("車両番号</span>"));
+    assert.ok(html.indexOf("車両</span>") < html.indexOf("車両番号</span>"));
     assert.ok(html.includes("足立300い4968"));
-    assert.ok(html.includes("订单名称")); assert.ok(html.includes("行程简概")); assert.ok(html.includes("備考"));
+    assert.ok(html.includes("訂単名称")); assert.ok(html.includes("行程简概")); assert.ok(html.includes("備考"));
     assert.ok(html.includes("&lt;Order&gt;")); assert.ok(html.includes("Airport\nHotel"));
     assert.ok(html.includes("&lt;script&gt;private notes&lt;/script&gt;"));
     assert.doesNotMatch(html, /<script>/);
@@ -222,12 +222,12 @@ test("home summarizes daily orders compactly with leading order numbers and bott
     "next/link": { default: "a" }, "@/lib/supabase/browser": {}, "@/lib/driver/orders": orders,
   }).default;
   const html = renderToStaticMarkup(React.createElement(Component, {}));
-  assert.match(html, /全部订单行程/);
+  assert.match(html, /全部訂単行程/);
   assert.match(html, /Home order/); assert.match(html, /Daily route\nSecond line/);
-  assert.match(html, /订单 1/); assert.match(html, /订单 2/);
+  assert.match(html, /訂単 1/); assert.match(html, /訂単 2/);
   assert.doesNotMatch(html, /序号/);
-  assert.ok(html.indexOf("订单 1") < html.indexOf("Home order"));
-  assert.ok(html.indexOf("订单 2") < html.indexOf("Second order"));
+  assert.ok(html.indexOf("訂単 1") < html.indexOf("Home order"));
+  assert.ok(html.indexOf("訂単 2") < html.indexOf("Second order"));
   assert.ok(html.indexOf("Daily route\nSecond line") < html.indexOf("車両番号：足立300い4968"));
   assert.match(html, /class="driver-daily-order"/);
   assert.match(html, /class="driver-muted driver-daily-plate"/);
@@ -235,7 +235,7 @@ test("home summarizes daily orders compactly with leading order numbers and bott
   assert.match(html, /車両番号：足立300い4968/); assert.match(html, /車両番号：品川500あ1234/);
   assert.match(html, /配車時間/); assert.match(html, /09:30/);
   assert.match(html, /Bring sign\nCall on arrival/);
-  assert.ok(html.indexOf("车辆</span>") < html.indexOf("車両番号</span>"));
+  assert.ok(html.indexOf("車両</span>") < html.indexOf("車両番号</span>"));
   assert.ok(html.includes("足立300い4968"));
   assert.equal((html.match(/打开Google Maps导航/g) || []).length, 4);
   assert.ok(html.includes(orders.tripNavigationUrl(trip.pickup).replaceAll("&", "&amp;")));
@@ -256,7 +256,7 @@ test("historical trip cards stay read-only without explanatory clutter", () => {
       "next/link": { default: "a" }, "@/lib/supabase/browser": {}, "@/lib/driver/orders": orders,
     }).default;
     const html = renderToStaticMarkup(React.createElement(Component, detail ? { orderId: trip.orderId } : {}));
-    assert.match(html, /历史订单（只读）/);
+    assert.match(html, /历史訂単（只读）/);
     assert.doesNotMatch(html, /历史记录仅供查看|仅在安全停车|行程状态不直接入账|驾驶中请勿操作手机/);
     assert.doesNotMatch(html, /查看行程 ›|退回上一步/);
     for (const action of Object.values(orders.tripActions)) {

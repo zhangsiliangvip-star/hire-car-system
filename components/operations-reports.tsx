@@ -118,8 +118,8 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
         if (link instanceof HTMLSelectElement) link.value = "";
       }
     }}>
-      {r.orderOptions && <label className="block text-sm">关联当天订单
-        <select name="assignmentId" aria-label="日报关联订单" className={`${fieldClass} ml-2 max-w-full`} disabled={busy}
+      {r.orderOptions && <label className="block text-sm">关联当天訂単
+        <select name="assignmentId" aria-label="日报关联訂単" className={`${fieldClass} ml-2 max-w-full`} disabled={busy}
           defaultValue={r.header?.assignmentId ?? ""} onChange={event => {
             const option = r.orderOptions?.find(item => item.assignmentId === event.target.value);
             const form = event.currentTarget.form;
@@ -132,16 +132,16 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
           }}>
           <option value="">未关联（保留原车牌，请人工确认）</option>
           {r.header?.assignmentId && !r.orderOptions?.some(item => item.assignmentId === r.header?.assignmentId) &&
-            <option value={r.header.assignmentId}>原关联订单（历史派单）</option>}
+            <option value={r.header.assignmentId}>原关联訂単（历史派单）</option>}
           {r.orderOptions?.map(item => <option key={item.assignmentId} value={item.assignmentId}>
             {item.label} · {item.vehicleNumber || "未填写"}
           </option>)}
         </select>
         <input type="hidden" name="vehicleBaseline" defaultValue={r.header?.vehicleNumber ?? ""} />
         <span className="mt-1 block text-amber-800">{r.header?.assignmentId
-          ? "关联车牌跟随订单最新选择；在此修改并保存，也会同步该日订单及其他页面。"
-          : "尚未确认订单关联，原车牌保持不变；选择并保存后开启同步。"}</span>
-        <span className="mt-1 block text-gray-600">修改日报日期会清除关联；先保存日期，再重新选择该日订单。</span>
+          ? "关联车牌跟随訂単最新选择；在此修改并保存，也会同步该日訂単及其他页面。"
+          : "尚未确认訂単关联，原车牌保持不变；选择并保存后开启同步。"}</span>
+        <span className="mt-1 block text-gray-600">修改日报日期会清除关联；先保存日期，再重新选择该日訂単。</span>
       </label>}
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <legend className="mb-2 font-semibold">基本信息与点呼</legend>
@@ -317,7 +317,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
         onClick={() => void output(filtered, `${month.slice(5)}月 运行日报`)}>月批量打印（{filtered.length}份）</button>
     </div>
     <p className="text-xs text-gray-600">日本时间 · 每10秒同步。工时＝退勤点呼－出勤点呼；日期或时间缺失时不计算。
-      月批量打印遵循当前会社、車両番号和日期筛选，每份日报一页；清空日期可打印整月。导出PDF时在打印窗口选择“另存为PDF”。会社按車両番号唯一匹配车辆所属会社，未匹配的保留显示。</p>
+      月批量打印遵循当前会社、車両番号和日期筛选，每份日报一页；清空日期可打印整月。导出PDF时在打印窗口选择“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
     {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {!data && !error && <p role="status">正在读取司机日报…</p>}
@@ -335,7 +335,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
             duty(r, "End"), hours === null ? "点呼未完整" : durationLabel(hours)];
           return <tr key={r.id}>{cells.map((value, i) => <td key={i} className="max-w-56 whitespace-pre-wrap break-words border-b p-2 text-center">{value}
             {i === 1 && r.orderOptions && !r.header?.assignmentId &&
-              <span className="block text-xs text-amber-800">未关联订单 · 请人工确认</span>}
+              <span className="block text-xs text-amber-800">未关联訂単 · 请人工确认</span>}
           </td>)}
             <td className="border-b p-2 text-center"><div className="flex justify-center gap-2 whitespace-nowrap">
               <button className={buttonClass} disabled={busy} onClick={() => setEditing(row)}>编辑</button>

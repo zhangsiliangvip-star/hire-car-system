@@ -277,7 +277,7 @@ test("historical claims show their source, submit with the history flag and excl
   h.states[2].trips = [h.states[2].trips[0]];
   h.states[2].trips[0].historical = true;
   const html = h.render();
-  assert.match(html, /历史订单/);
+  assert.match(html, /历史訂単/);
   assert.equal(h.buttons.find(button => button.children === "保存燃油费并提交").disabled, true);
   h.buttons.find(button => button.children === "保存社报立替并提交")
     .onClick({ currentTarget: { value: "company" } });
@@ -303,7 +303,7 @@ test("top buttons switch exclusive views while preserving the claim draft", () =
 });
 test("date then order then categories precede the final all-order driver advance summary", () => {
   const h = renderFinance();
-  const markers = ["用车日期", "选择当天订单", "<h2>社报立替</h2>", "<h2>旅报立替</h2>", "司机立替汇总"];
+  const markers = ["用车日期", "选择当天訂単", "<h2>社报立替</h2>", "<h2>旅报立替</h2>", "司机立替汇总"];
   let position = -1;
   for (const marker of markers) {
     const next = h.html.indexOf(marker, position + 1);

@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     });
     if (links.error) {
       console.error("Driver historical finance links rejected.", { code: links.error.code });
-      return jsonResponse({ error: "历史订单财务入口读取失败，请重试。" }, { status: 503 });
+      return jsonResponse({ error: "历史訂単财务入口读取失败，请重试。" }, { status: 503 });
     }
     const { data, error } = await identity.supabase.rpc("driver_finance_data", { target_month: parsed.data.month });
     if (error) {
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     });
     if (historical.error) {
       console.error("Driver historical finance read rejected.", { code: historical.error.code });
-      return jsonResponse({ error: "历史订单财务读取失败，请重试。" }, { status: 503 });
+      return jsonResponse({ error: "历史訂単财务读取失败，请重试。" }, { status: 503 });
     }
     const historicalTrips = z.array(financeDataSchema.shape.trips.element).parse(
       z.object({ trips: z.array(financeDataSchema.shape.trips.element) }).strict().parse(historical.data).trips,

@@ -82,8 +82,8 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
     assert.equal(states[0].reports[0].header.vehicleNumber, mode === "clean" ? "NEW" : "BASE");
     cleanup(); assert.equal(signal.aborted, true); assert.equal(cleared, true);
     const html = renderToStaticMarkup(tree);
-    assert.match(html, /日报关联订单/);
-    assert.match(html, /修改并保存也会更新订单/);
+    assert.match(html, /日报关联訂単/);
+    assert.match(html, /修改并保存也会更新訂単/);
   }
 });
 
@@ -128,7 +128,7 @@ test("new report requires order selection, permits manual defaults and clears wr
     vehicleNumber: "Manual plate", driverName: "Manual name", passengerCount: "" } };
   function capture(create) {
     return (type, props, ...rest) => {
-      if (props?.["aria-label"] === "关联当天订单") select = props;
+      if (props?.["aria-label"] === "关联当天訂単") select = props;
       if (props?.name === "serviceDate") date = props;
       if (typeof type === "function" && type.name === "LocationRows") checkoutProps = props;
       return create(type, props, ...rest);
@@ -149,7 +149,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   function render() { cursor = 0; refCursor = 0; return renderToStaticMarkup(React.createElement(Component)); }
   let html = render();
   assert.equal(checkoutProps.disabled, true);
-  assert.match(html, /请选择当天订单/);
+  assert.match(html, /请选择当天訂単/);
   select.onChange({ target: { value: id } });
   html = render();
   assert.equal(checkoutProps.disabled, false);
@@ -178,12 +178,12 @@ test("new report requires order selection, permits manual defaults and clears wr
   states[11] = { serviceDate: "2026-10-28", driverName: "Linked driver", orders: [] };
   html = render();
   assert.equal(checkoutProps.disabled, false);
-  assert.match(html, /当天没有已派给本人的订单/);
+  assert.match(html, /当天没有已派给本人的訂単/);
   states[0] = { reports: [{ ...fixture, header: { vehicleNumber: "Saved plate", driverName: "Saved name", passengerCount: null } }], depot: null };
   html = render();
   assert.match(html, /value="Saved plate"/);
   assert.match(html, /value="Saved name"/);
-  assert.doesNotMatch(html, /aria-label="关联当天订单"/);
+  assert.doesNotMatch(html, /aria-label="关联当天訂単"/);
 });
 
 test("defaults loader ignores late dates, auto-selects a single order and surfaces failures", async () => {

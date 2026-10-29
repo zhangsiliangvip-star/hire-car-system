@@ -217,7 +217,7 @@ export default function DriverReport() {
         const response = await fetch(`/api/driver/report-defaults?date=${encodeURIComponent(serviceDate)}`,
           { cache: "no-store", signal: controller.signal });
         if (response.status === 401) { location.replace("/driver/login"); return; }
-        if (!response.ok) throw new Error("无法读取当天订单和车库，请重试。");
+        if (!response.ok) throw new Error("无法读取当天訂単和车库，请重试。");
         const result = reportDefaultsSchema.parse(await response.json());
         if (result.serviceDate !== serviceDate) throw new Error("日报默认信息日期不匹配。");
         if (active && document.visibilityState === "visible") {
@@ -227,7 +227,7 @@ export default function DriverReport() {
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Driver report defaults load failed.", cause);
-        if (active) setDefaultsError("无法读取当天订单和车库，请点“刷新日报”重试。");
+        if (active) setDefaultsError("无法读取当天訂単和车库，请点“刷新日报”重试。");
       }
     }
     void loadDefaults();
@@ -351,24 +351,24 @@ export default function DriverReport() {
       "有未保存的日报信息，请点“出库打卡”保存。"}</p>}
     {busy ? <p className="driver-empty">正在读取日报…</p> : data && <>
       {!report && <div className="driver-card">
-        {!currentDefaults && !defaultsError && <p role="status">正在读取当天订单和车库…</p>}
+        {!currentDefaults && !defaultsError && <p role="status">正在读取当天訂単和车库…</p>}
         {defaultsError && <p className="driver-error" role="alert">{defaultsError}</p>}
-        {currentDefaults && (currentDefaults.orders.length ? <label className="driver-field">关联当天订单
-          <select aria-label="关联当天订单" value={assignment} disabled={saving} onChange={e => {
-            if (dirty && !window.confirm("更换订单会重新带入車両番号及车库地址，是否继续？")) return;
+        {currentDefaults && (currentDefaults.orders.length ? <label className="driver-field">关联当天訂単
+          <select aria-label="关联当天訂単" value={assignment} disabled={saving} onChange={e => {
+            if (dirty && !window.confirm("更换訂単会重新带入車両番号及车库地址，是否继续？")) return;
             setAssignment(e.target.value); setDirty(true);
           }}>
-            <option value="">请选择当天订单</option>
+            <option value="">请选择当天訂単</option>
             {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
               {order.time} · {order.pickup} → {order.destination} · {order.vehicleNumber || "未填車両番号"}
             </option>)}
-          </select></label> : <p className="driver-muted">当天没有已派给本人的订单，車両番号和车库地址请手动填写。</p>)}
-        {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一车辆所属会社的车库地址，请手动填写。</p>}
+          </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和车库地址请手动填写。</p>)}
+        {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的车库地址，请手动填写。</p>}
       </div>}
       <form ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
         aria-label="日报基本信息" onInput={() => setDirty(true)} onSubmit={e => { e.preventDefault(); if (report) void saveChanges(); }}>
-        {report && data.vehicleLinking && <label className="driver-report-order-link">关联当天订单
-          <select name="assignmentId" aria-label="日报关联订单" disabled={saving}
+        {report && data.vehicleLinking && <label className="driver-report-order-link">关联当天訂単
+          <select name="assignmentId" aria-label="日报关联訂単" disabled={saving}
             defaultValue={report.header?.assignmentId ?? ""} onChange={event => {
               const option = report.orderOptions?.find(item => item.assignmentId === event.target.value);
               const plate = headerForm.current?.elements.namedItem("vehicleNumber");
@@ -378,16 +378,16 @@ export default function DriverReport() {
               }
               setDirty(true);
             }}>
-            <option value="">未关联（保留手填车牌，不同步订单）</option>
+            <option value="">未关联（保留手填车牌，不同步訂単）</option>
             {report.header?.assignmentId && !report.orderOptions?.some(item => item.assignmentId === report.header?.assignmentId) &&
-              <option value={report.header.assignmentId}>原关联订单（历史派单）</option>}
+              <option value={report.header.assignmentId}>原关联訂単（历史派单）</option>}
             {report.orderOptions?.map(item => <option key={item.assignmentId} value={item.assignmentId}>
               {item.label} · {item.vehicleNumber || "未填写"}
             </option>)}
           </select>
           <span className="driver-muted">{report.header?.assignmentId
-            ? "車両番号与关联订单按服务日同步；修改并保存也会更新订单。"
-            : "尚未确认订单关联，保留原车牌；请人工选择后保存以开启同步。"}</span>
+            ? "車両番号与关联訂単按服务日同步；修改并保存也会更新訂単。"
+            : "尚未确认訂単关联，保留原车牌；请人工选择后保存以开启同步。"}</span>
           <input name="vehicleBaseline" type="hidden" defaultValue={report.header?.vehicleNumber ?? ""} />
         </label>}
         <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
@@ -421,7 +421,7 @@ export default function DriverReport() {
             <th scope="col">到着</th><th scope="col">出发</th></tr></thead>
           {!report && <LocationRows key={serviceDate} locationKey={assignment} depot={selectedOrder?.depot ?? null}
             disabled={saving || !currentDefaults || needsOrder} save={async p => {
-            if (!currentDefaults || needsOrder) { setError("请先读取当天订单并选择订单。"); return false; }
+            if (!currentDefaults || needsOrder) { setError("请先读取当天訂単并选择訂単。"); return false; }
             try { return await save("checkout", { ...p, header: readHeader() }); }
             catch (cause) { console.error("Invalid report header.", cause); setError("请检查日期、点呼时间、車両番号、運転手和客数。"); return false; }
           }} />}
@@ -459,6 +459,6 @@ export default function DriverReport() {
           {data.reports.map(r => <option key={r.id} value={r.id}>{r.serviceDate} {reportTime(r.departedAt).slice(11, 16)} {r.returnedAt ? "已归库" : "出库中"}</option>)}
         </select></label></details>}
     </>}
-    <p className="driver-muted">请在安全停车后操作。新日报按所选当天订单带入車両番号、本人姓名及车辆所属会社车库地址，均可手动修改；已保存日报不自动覆盖。不采集定位。</p>
+    <p className="driver-muted">请在安全停车后操作。新日报按所选当天訂単带入車両番号、本人姓名及車両所属会社车库地址，均可手动修改；已保存日报不自动覆盖。不采集定位。</p>
   </main>;
 }

@@ -49,7 +49,7 @@ export function buildDriverCalendar(entries: DriverCalendarEntry[], dates: strin
   const vehicles = new Map<string, DriverCalendarVehicle & { days: Map<string, DriverCalendarEntry[]> }>();
   for (const entry of entries) {
     if (!dateIndex.has(entry.date)) continue;
-    const key = entry.vehicleNumber.trim() || entry.vehicle.trim() || "未指定车辆";
+    const key = entry.vehicleNumber.trim() || entry.vehicle.trim() || "未指定車両";
     const row = vehicles.get(key) ?? { key, vehicle: entry.vehicle, vehicleNumber: entry.vehicleNumber,
       lanes: 1, segments: [], days: new Map() };
     if (!row.vehicle && entry.vehicle) row.vehicle = entry.vehicle;

@@ -75,7 +75,7 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     .note { border: 1px solid #bac3cd; padding: 8px; min-height: 50px; white-space: pre-wrap; overflow-wrap: anywhere; }
     footer { margin-top: 12px; font-size: 9px; color: #555; }
     </style></head><body><div class="sheet"><article class="content">
-    <header><h1>团务费用明细</h1><p class="name">${escapeHtml(data.name || "未填写订单名称")}</p>
+    <header><h1>团务费用明细</h1><p class="name">${escapeHtml(data.name || "未填写訂単名称")}</p>
     <div class="meta"><span>行程日期：${escapeHtml(data.period)}</span><span>金额单位：JPY ／ 燃油：L ／ 油价：JPY/L</span></div></header>
     <h2>每日司机与成本明细</h2>${dailyRows}
     <h2>整单费用汇总</h2>

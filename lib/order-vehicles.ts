@@ -38,7 +38,7 @@ export function getVehicleSegments(
     if (!date) return;
     const selected = getServiceVehicle(order, date);
     if (!selected.vehiclePlate && vehicle.plate) return;
-    if (!orderUsesVehicle({ ...selected, vehicle: selected.vehicle || "未安排车辆", regionId: order.regionId }, vehicle)) return;
+    if (!orderUsesVehicle({ ...selected, vehicle: selected.vehicle || "未安排車両", regionId: order.regionId }, vehicle)) return;
     const previous = segments[segments.length - 1];
     if (previous?.end === index) previous.end++;
     else segments.push({ start: index, end: index + 1 });
@@ -55,10 +55,10 @@ export function getCalendarVehicleRows(vehicles: Vehicle[], orders: Order[], dat
       ? row.plate === selected.vehiclePlate : !row.plate && row.name === selected.vehicle))) continue;
     rows.push({
       id: `calendar-only:${JSON.stringify([order.regionId, selected.vehicle, selected.vehiclePlate])}`,
-      regionId: order.regionId, name: selected.vehicle || "未安排车辆", plate: selected.vehiclePlate,
+      regionId: order.regionId, name: selected.vehicle || "未安排車両", plate: selected.vehiclePlate,
       calendarOnly: true, status: "停运中", calendarOrder: null,
       defaultParkingFee: 0, defaultInsuranceFee: 0, ownerCompany: "", seats: "", fuelType: "",
-      inspectionExpiry: "", liabilityExpiry: "", notes: "订单车牌未登记或未指定，请选择已登记車両番号",
+      inspectionExpiry: "", liabilityExpiry: "", notes: "訂単车牌未登记或未指定，请选择已登记車両番号",
     });
   }
   return rows;

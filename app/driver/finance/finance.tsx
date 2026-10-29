@@ -115,7 +115,7 @@ export default function DriverFinance() {
     pending.current = null;
   }
   function choose(id: string) {
-    if (id === selected || (orderDirty && !window.confirm("切换订单会放弃该订单尚未提交的明细，是否继续？"))) return;
+    if (id === selected || (orderDirty && !window.confirm("切换訂単会放弃该訂単尚未提交的明细，是否继续？"))) return;
     const item = data?.trips.find(item => item.assignmentId === id);
     setSelected(id); setExpenses(item?.claims.flatMap(claim => claim.expenses) || []);
     setHours(item ? String(item.claims.find(claim => claim.category === "overtime")?.overtimeHours ?? item.existingOvertimeHours) : "");
@@ -129,11 +129,11 @@ export default function DriverFinance() {
     if (!files?.length || lock.current || (!isFuel && !trip)) return;
     const selectedFiles = Array.from(files);
     const expense = expenses.find(item => item.id === id);
-    if (!isFuel && (!expense || !trip)) { setError("请先选择订单和费用明细。"); return; }
+    if (!isFuel && (!expense || !trip)) { setError("请先选择訂単和费用明细。"); return; }
     const receiptCount = isFuel ? fuelReceipts.length : expense?.receipts.length || 0;
     if (receiptCount + selectedFiles.length > 5) { setError("每条明细最多5张票据。"); return; }
     const pathPrefix = isFuel ? date : trip && expense ? `${trip.assignmentId}/${expense.type}` : "";
-    if (!pathPrefix) { setError("无法确定票据所属订单。"); return; }
+    if (!pathPrefix) { setError("无法确定票据所属訂単。"); return; }
     if (selectedFiles.some(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5242880)) {
       setError("票据请使用5MB以内的JPG、PNG或WebP照片。"); return;
     }
@@ -182,7 +182,7 @@ export default function DriverFinance() {
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = fuelSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("请选择当天关联订单，填写正整数燃油费并检查油票。"); return; }
+    if (!parsed.success) { setError("请选择当天关联訂単，填写正整数燃油费并检查油票。"); return; }
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -193,7 +193,7 @@ export default function DriverFinance() {
       if (!response.ok) throw new Error(result.error || "燃油费申报未确认。");
       const saved = fuelClaimSchema.parse(result.claim);
       setData(value => value ? { ...value, fuelClaims: [...value.fuelClaims.filter(item => item.date !== saved.date), saved] } : null);
-      pending.current = null; setNotice("燃油费已提交；后台确认后追加到关联订单当天燃油费，不加入司机立替和应发金额。");
+      pending.current = null; setNotice("燃油费已提交；后台确认后追加到关联訂単当天燃油费，不加入司机立替和应发金额。");
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver fuel submission failed.", cause);
@@ -244,7 +244,7 @@ export default function DriverFinance() {
       <button type="button" aria-pressed={view === "claims"} onClick={() => { setView("claims"); setReceipt(""); }}>立替申报</button>
       <button type="button" aria-pressed={view === "wages"} onClick={() => { setView("wages"); setReceipt(""); }}>月工资</button>
     </div>
-    <p className="driver-muted">本人有效行程可申报社报／旅报、超时和燃油费；历史订单可补录社报／旅报及超时。后台审核后入账。切后台会清除未提交草稿，请先提交。</p>
+    <p className="driver-muted">本人有效行程可申报社报／旅报、超时和燃油费；历史訂単可补录社报／旅报及超时。后台审核后入账。切后台会清除未提交草稿，请先提交。</p>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy}
       onChange={event => { if (event.target.value && canLeave()) {
         setLoading(true); setData(null); setSelected(""); setExpenses([]); setHours(""); setError(""); setNotice(""); setReceipt("");
@@ -277,14 +277,14 @@ export default function DriverFinance() {
         max={`${month}-${new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()}`} disabled={busy}
         onChange={event => changeDate(event.target.value)} /></label>
         <button className="driver-link" type="button" disabled={busy} onClick={() => changeDate(japanDate())}>当日</button></div>
-      <label className="driver-field">选择当天订单<select value={selected} disabled={busy} onChange={event => choose(event.target.value)}>
-        <option value="">请选择当天订单</option>{dayTrips.map(item =>
-          <option key={item.assignmentId} value={item.assignmentId}>{item.historical ? "历史订单 · " : ""}{item.pickup} → {item.destination}</option>)}
+      <label className="driver-field">选择当天訂単<select value={selected} disabled={busy} onChange={event => choose(event.target.value)}>
+        <option value="">请选择当天訂単</option>{dayTrips.map(item =>
+          <option key={item.assignmentId} value={item.assignmentId}>{item.historical ? "历史訂単 · " : ""}{item.pickup} → {item.destination}</option>)}
       </select></label>
       {!dayTrips.length && <p className="driver-empty">当天暂无本人可申报的行程。</p>}
       {trip && advanceSections.map(({ category, claim, readOnly }) =>
         <section className="driver-card" key={category} aria-label={financeCategoryLabels[category]}>
-        <h2>{financeCategoryLabels[category]}{trip.historical ? " · 历史订单" : ""}</h2>
+        <h2>{financeCategoryLabels[category]}{trip.historical ? " · 历史訂単" : ""}</h2>
         {claim && <p className="driver-muted">{labels[claim.status]} {claim.reviewNote}</p>}
         <fieldset disabled={busy || readOnly} className="finance-fields">
           <button className="driver-link" type="button" onClick={() => setExpenses(items => [...items,
@@ -314,7 +314,7 @@ export default function DriverFinance() {
         {!readOnly && <button className="driver-button" disabled={busy} value={category} onClick={handleAdvanceSubmit}>{busy ? "正在处理…" : `保存${financeCategoryLabels[category]}并提交`}</button>}
       </section>)}
       {trip && <section className="driver-card">
-        <h2>超时申报{trip.historical ? " · 历史订单" : ""}</h2>
+        <h2>超时申报{trip.historical ? " · 历史訂単" : ""}</h2>
         {overtimeClaim && <p className="driver-muted">{labels[overtimeClaim.status]} {overtimeClaim.reviewNote}</p>}
           <label className="driver-field">超时小时数<input type="number" min="0" max="999" step="0.01" inputMode="decimal"
             disabled={busy || overtimeReadOnly}
@@ -323,13 +323,13 @@ export default function DriverFinance() {
         {!overtimeReadOnly && <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超时并提交</button>}
       </section>}
       <section className="driver-card"><h2>当日燃油费</h2>
-        <p className="driver-muted">公司支付／油卡。每天统一申报一次，指定当天一张订单；审核后追加到该订单当天燃油费，不计司机立替及应发金额。请勿重复手工录入。</p>
+        <p className="driver-muted">公司支付／油卡。每天统一申报一次，指定当天一张訂単；审核后追加到该訂単当天燃油费，不计司机立替及应发金额。请勿重复手工录入。</p>
         {fuelClaim && <p className="driver-muted">{labels[fuelClaim.status]} {fuelClaim.reviewNote}</p>}
         <fieldset className="finance-fields" disabled={busy || fuelReadOnly || !fuelTrips.length}>
-          <label className="driver-field">燃油费关联订单<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
-            <option value="">请选择当天一张订单</option>
+          <label className="driver-field">燃油费关联訂単<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
+            <option value="">请选择当天一张訂単</option>
             {fuelClaim && !dayTrips.some(item => item.assignmentId === fuelClaim.assignmentId) &&
-              <option value={fuelClaim.assignmentId}>原关联订单（当前不可选）</option>}
+              <option value={fuelClaim.assignmentId}>原关联訂単（当前不可选）</option>}
             {fuelTrips.map(item => <option value={item.assignmentId} key={item.assignmentId}>{item.pickup} → {item.destination}</option>)}
           </select></label>
           <label className="driver-field">燃油费（JPY）<input type="number" min="1" max="99999999999999" step="1" inputMode="numeric"
@@ -349,7 +349,7 @@ export default function DriverFinance() {
         <div className="driver-row"><span>社报立替</span><strong>{yen(dayTotals.company)}</strong></div>
         <div className="driver-row"><span>旅报立替</span><strong>{yen(dayTotals.trip)}</strong></div>
         <div className="driver-row"><span>司机立替合计</span><strong>{yen(dayTotals.company + dayTotals.trip)}</strong></div>
-        <p className="driver-muted">所选日期全部订单，包含待审、已确认、退回及当前草稿，不代表已报销金额。</p>
+        <p className="driver-muted">所选日期全部訂単，包含待审、已确认、退回及当前草稿，不代表已报销金额。</p>
       </section>
       </>}
     </>}

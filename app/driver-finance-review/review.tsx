@@ -87,7 +87,7 @@ export default function Review() {
     const note = notes[row.claim.id] || "";
     if (decision === "rejected" && !note.trim()) { setError("退回时请填写原因。"); return; }
     if (!window.confirm(decision === "approved" ?
-      "确认将燃油费追加到指定订单当天的燃油费？公司支付／油卡，不加到司机立替和应发金额。请核对是否已手工录入。" : "确认退回燃油费？")) return;
+      "确认将燃油费追加到指定訂単当天的燃油费？公司支付／油卡，不加到司机立替和应发金额。请核对是否已手工录入。" : "确认退回燃油费？")) return;
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -135,7 +135,7 @@ export default function Review() {
       const totals = expenseTotals(row.claim.expenses);
       const key = `${row.claim.assignmentId}-${row.claim.category}`;
       return <section className="driver-card" key={key}>
-        <h2>{row.date} · {row.driverName}{row.claim.historical ? " · 历史订单" : ""}</h2><p>{row.pickup} → {row.destination}</p>
+        <h2>{row.date} · {row.driverName}{row.claim.historical ? " · 历史訂単" : ""}</h2><p>{row.pickup} → {row.destination}</p>
         <h3>{financeCategoryLabels[row.claim.category]}</h3>
         <p>{row.claim.category === "overtime" ? `超时 ${row.claim.overtimeHours} 小时` :
           `¥${(totals.company + totals.trip).toLocaleString()}`} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已入账" : "已退回"}</p>
@@ -154,9 +154,9 @@ export default function Review() {
     })}
     {fuelRows.map(row => <section className="driver-card" key={row.claim.id}>
       <h2>{row.claim.date} · {row.driverName} · 燃油费</h2>
-      <p>关联订单：{row.pickup} → {row.destination}</p>
-      <p>¥{row.claim.amount.toLocaleString()} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已计入订单燃油费" : "已退回"}</p>
-      <p className="driver-muted">每天一笔，全部关联指定订单当日燃油费；不计司机立替及应发金额。</p>
+      <p>关联訂単：{row.pickup} → {row.destination}</p>
+      <p>¥{row.claim.amount.toLocaleString()} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已计入訂単燃油费" : "已退回"}</p>
+      <p className="driver-muted">每天一笔，全部关联指定訂単当日燃油费；不计司机立替及应发金额。</p>
       {row.claim.receipts.map((path, index) => <button className="driver-link" key={path}
         onClick={() => void viewReceipt(path, "driver-fuel-receipts")}>油票 {index + 1}　</button>)}
       {row.claim.status === "pending" ? <>

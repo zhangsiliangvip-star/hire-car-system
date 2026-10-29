@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = fuelSubmissionSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "请检查日期、关联订单、燃油费和油票。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "请检查日期、关联訂単、燃油费和油票。" }, { status: 400 });
     const { date, assignmentId, expectedVersion, requestId, amount, receipts } = parsed.data;
     const { data, error } = await identity.supabase.rpc("submit_driver_daily_fuel", {
       target_date: date, expected_version: expectedVersion, target_request: requestId, amount, receipts,

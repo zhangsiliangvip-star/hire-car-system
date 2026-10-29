@@ -61,7 +61,7 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
     throw new Error("請求書当日车费必须是非负日元整数。");
   }
   if (days.length > 0 && days.reduce((sum, day) => sum + day.fare, 0) !== data.orderPrice) {
-    throw new Error("每日车费合计与订单价格不一致，请保存后重新导出。");
+    throw new Error("每日车费合计与訂単价格不一致，请保存后重新导出。");
   }
   const tax = Number(BigInt(total) * BigInt(10) / BigInt(110));
   const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;

@@ -31,7 +31,7 @@ export function getBalanceServiceMonth(
 ) {
   const offDates = new Set(order.offDates);
   const firstServiceDate = dateKeys.filter((date) => !offDates.has(date)).sort()[0];
-  if (!firstServiceDate) throw new Error("订单没有服务日，请检查用车日期和休运日。");
+  if (!firstServiceDate) throw new Error("訂単没有服务日，请检查用车日期和休运日。");
   return firstServiceDate.slice(0, 7);
 }
 
@@ -66,7 +66,7 @@ export function summarizeBalance(
     if (order.depositMethod === "口座入金") row.bankRequestAmount += order.requestAmount;
     else if (order.depositMethod === "现金入金") row.cashRequestAmount += order.requestAmount;
     else if (order.depositMethod === "") row.unassignedRequestAmount += order.requestAmount;
-    else throw new Error("订单入金方式无效，请检查订单资料。");
+    else throw new Error("訂単入金方式无效，请检查訂単资料。");
   }
   const expenses = manualExpenses.filter((row) => matches(row.companyName));
   for (const item of expenses) groupFor(item.companyName).expenseTotal += check(item.amount);

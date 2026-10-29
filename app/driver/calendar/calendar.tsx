@@ -106,7 +106,7 @@ export default function DriverCalendar() {
       <button type="button" className="driver-calendar-today" aria-pressed={month === today.slice(0, 7)}
         onClick={() => { scrolledMonth.current = ""; if (month === today.slice(0, 7)) setRevision(value => value + 1); else changeMonth(today.slice(0, 7)); }}>今天</button>
     </div>
-    <p className="driver-muted">只显示分配给你的订单及使用车辆；红色「休」为你提交的希望休。</p>
+    <p className="driver-muted">只显示分配给你的訂単及使用車両；红色「休」为你提交的希望休。</p>
     {error && <p className="driver-error" role="alert">{error}</p>}
     {!loaded ? (!error && <p className="driver-empty" role="status">正在读取日历…</p>) : <>
       <div className="driver-calendar-scroll" ref={scroller}>
@@ -132,7 +132,7 @@ export default function DriverCalendar() {
             {vehicle.segments.map(segment => <div key={`${segment.orderId}:${segment.start}`}
               className={`driver-calendar-order ${statusClasses[segment.status] ?? ""}`}
               style={{ gridColumn: `${segment.start + 2} / ${segment.end + 2}`, gridRow: segment.lane + 1 }}>
-              <strong>{segment.orderName || "订单内容未填写"}</strong>
+              <strong>{segment.orderName || "訂単内容未填写"}</strong>
               <span>{segment.time || "时间待定"}</span>
               {segment.summaries.some(Boolean) && <div className="driver-calendar-summaries"
                 style={{ gridTemplateColumns: `repeat(${segment.end - segment.start}, minmax(0, 1fr))` }}>
@@ -142,7 +142,7 @@ export default function DriverCalendar() {
           </div>)}
         </div>
       </div>
-      {!vehicles.length && <div className="driver-card driver-empty">本月暂无分配给你的订单。</div>}
+      {!vehicles.length && <div className="driver-card driver-empty">本月暂无分配给你的訂単。</div>}
     </>}
   </main>;
 }

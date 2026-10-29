@@ -8,7 +8,7 @@ export function summarizeRequestAmounts(
     if (row.depositMethod === "口座入金") totals.bank += row.requestAmount;
     else if (row.depositMethod === "现金入金") totals.cash += row.requestAmount;
     else if (row.depositMethod === "") totals.unassigned += row.requestAmount;
-    else throw new Error("订单入金方式无效，请检查订单资料。");
+    else throw new Error("訂単入金方式无效，请检查訂単资料。");
   }
   return totals;
 }

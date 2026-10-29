@@ -93,7 +93,7 @@ export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
       ${r.rests.length ? `<table class="rest-records"><thead><tr><th colspan="2">休息记录（另存的休息打卡）</th></tr><tr><th>开始</th><th>结束</th></tr></thead><tbody>${r.rests.map(rest =>
         `<tr><td>${time(rest.startedAt)}</td><td>${time(rest.endedAt)}</td></tr>`).join("")}</tbody></table>` : ""}
       ${inspectionForm(row.operationsManager)}
-      <footer>工时＝退勤点呼－出勤点呼；不扣除休息。公里表为累计读数。運行管理者取车辆所属会社资料；其他点检、确认及给油栏未采集，留空手填。○为原表印刷符号，不代表已通过。日报版本 ${r.version}。</footer>
+      <footer>工时＝退勤点呼－出勤点呼；不扣除休息。公里表为累计读数。運行管理者取車両所属会社资料；其他点检、确认及给油栏未采集，留空手填。○为原表印刷符号，不代表已通过。日报版本 ${r.version}。</footer>
       </article></section>`;
   }).join("");
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escape(title)}</title>

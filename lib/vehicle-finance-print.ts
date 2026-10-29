@@ -111,19 +111,19 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
   <header><h1>車両統計月度财务表</h1><div class="meta"><span>月份：${escapeHtml(data.month)}</span>
   <span>車両番号：${escapeHtml(data.vehicleNumber)}</span><span>分区：${escapeHtml(data.region)}</span><span>币种：JPY ／ 里程：km</span></div></header>
   <div class="summary"><div>请求金额合计<strong>${yen(sum("requestAmount"))}</strong></div>
-  <div>订单利润总和<strong>${yen(sum("profit"))}</strong></div>${netSummary}</div>
+  <div>訂単利润总和<strong>${yen(sum("profit"))}</strong></div>${netSummary}</div>
   <h2>每日运营明细</h2>
   <table><colgroup><col style="width:11%"><col style="width:18%"><col style="width:10%"><col style="width:9%">
   <col style="width:11%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:11%"></colgroup>
-  <thead><tr><th>服务日期</th><th>订单名称</th><th>車両番号</th><th>司机</th><th>请求金额</th><th>司机立替</th><th>会社支出</th><th>司机工资</th><th>订单利润</th></tr></thead>
+  <thead><tr><th>服务日期</th><th>訂単名称</th><th>車両番号</th><th>司机</th><th>请求金额</th><th>司机立替</th><th>会社支出</th><th>司机工资</th><th>訂単利润</th></tr></thead>
   <tbody>${data.rows.map((row) => `<tr><td>${escapeHtml(row.serviceDate)}</td><td>${escapeHtml(row.customer)}</td>
   <td>${escapeHtml(row.vehicleNumber)}</td><td>${escapeHtml(row.driver)}</td>${cell(row.requestAmount)}${cell(row.driverAdvances)}
   ${cell(row.companyExpenses)}${cell(row.driverWages)}${cell(row.profit)}</tr>`).join("")}</tbody>
   <tfoot><tr><td colspan="4">合计</td>${cell(sum("requestAmount"))}${cell(sum("driverAdvances"))}${cell(sum("companyExpenses"))}${cell(sum("driverWages"))}${cell(sum("profit"))}</tr></tfoot></table>
   ${monthlyHtml}
   <p class="notes">${data.monthly
-    ? "运营明细采用已保存的日财务记录；月度费用和里程采用当前页面填写内容，导出不会自动保存。扣除费用后利润＝订单利润总和－月度费用；每公里利润＝扣除费用后利润÷走行公里数。"
-    : "全部车辆模式仅汇总运营明细，不包含车辆月度固定费用、备品和里程。请筛选具体车辆查看完整月度费用及净利润。"}
+    ? "运营明细采用已保存的日财务记录；月度费用和里程采用当前页面填写内容，导出不会自动保存。扣除费用后利润＝訂単利润总和－月度费用；每公里利润＝扣除费用后利润÷走行公里数。"
+    : "全部車両模式仅汇总运营明细，不包含車両月度固定费用、备品和里程。请筛选具体車両查看完整月度费用及净利润。"}
   <br>司机立替与工资分别列示，财务口径与車両統計列表一致。内部资料，请妥善保管。</p>
   </article></div></body></html>`;
 }
@@ -143,7 +143,7 @@ export function buildVehicleSummaryPrintHtml(data: VehicleSummaryPrintData) {
   const number = (value: number) => value.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
   const cell = (value: number) => `<td class="number">${number(value)}</td>`;
   const totals = totalVehicleSummaries(data.rows);
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>全车辆月度统计表</title><style>
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>全車両月度统计表</title><style>
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; color: #172033; }
@@ -161,22 +161,22 @@ export function buildVehicleSummaryPrintHtml(data: VehicleSummaryPrintData) {
   small { display: block; color: #555; }
   .notes { margin-top: 14px; line-height: 1.8; }
   </style></head><body><div class="sheet"><article class="content">
-  <h1>全车辆月度统计表</h1><div class="meta"><span>服务月份：${escapeHtml(data.month)}</span>
-  <span>分区：${escapeHtml(data.region)}</span><span>车辆数：${data.rows.length}</span><span>单位：JPY</span></div>
+  <h1>全車両月度统计表</h1><div class="meta"><span>服务月份：${escapeHtml(data.month)}</span>
+  <span>分区：${escapeHtml(data.region)}</span><span>車両数：${data.rows.length}</span><span>单位：JPY</span></div>
   <div class="summary">利润汇总（已扣固定费用与备品）：<strong>¥${number(totals.profit)}</strong></div>
   <table><colgroup><col style="width:10%"><col style="width:18%"><col style="width:12%">
   <col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:13%"><col style="width:13%"></colgroup>
-  <thead><tr><th>服务月份</th><th>車両番号</th><th>请求总金额</th><th>司机立替</th><th>会社支付</th><th>司机工资</th><th>固定费用与备品</th><th>订单利润<br>（扣费后）</th></tr></thead>
+  <thead><tr><th>服务月份</th><th>車両番号</th><th>请求总金额</th><th>司机立替</th><th>会社支付</th><th>司机工资</th><th>固定费用与备品</th><th>訂単利润<br>（扣费后）</th></tr></thead>
   <tbody>${data.rows.map((row) => `<tr><td>${escapeHtml(row.month)}</td><td>${escapeHtml(row.vehicleNumber)}
   <small>${escapeHtml(data.regionNames[row.regionId || ""] || "未知地域")}</small></td>
   ${cell(row.requestAmount)}${cell(row.driverAdvances)}${cell(row.companyExpenses)}${cell(row.driverWages)}${cell(row.fixedExpenses)}${cell(row.profit)}</tr>`).join("")}</tbody>
   <tfoot><tr><td colspan="2">合计／利润汇总</td>${cell(totals.requestAmount)}${cell(totals.driverAdvances)}${cell(totals.companyExpenses)}${cell(totals.driverWages)}${cell(totals.fixedExpenses)}${cell(totals.profit)}</tr></tfoot></table>
-  <p class="notes">订单利润＝请求总金额－司机立替－会社支付－司机工资－固定费用与备品。<br>
-  月度费用优先采用所选月份已保存的记录；未登记时仅采用车辆资料的默认停车场费及保险费。无运营记录车辆仍列示固定成本；未匹配到车辆资料的历史记录单独标注，固定成本未知，暂记0。<br>
-  本表包含外注车辆，番号旁标注“外注”；未登记番号时明确提示。按车辆及分区归集，未保存的单车费用编辑不计入。内部财务资料，请妥善保管。</p>
+  <p class="notes">訂単利润＝请求总金额－司机立替－会社支付－司机工资－固定费用与备品。<br>
+  月度费用优先采用所选月份已保存的记录；未登记时仅采用車両资料的默认停车场费及保险费。无运营记录車両仍列示固定成本；未匹配到車両资料的历史记录单独标注，固定成本未知，暂记0。<br>
+  本表包含外注車両，番号旁标注“外注”；未登记番号时明确提示。按車両及分区归集，未保存的单车费用编辑不计入。内部财务资料，请妥善保管。</p>
   </article></div></body></html>`;
 }
 
 export async function printVehicleSummary(data: VehicleSummaryPrintData) {
-  await printA4Html(buildVehicleSummaryPrintHtml(data), "全车辆月度统计表打印");
+  await printA4Html(buildVehicleSummaryPrintHtml(data), "全車両月度统计表打印");
 }

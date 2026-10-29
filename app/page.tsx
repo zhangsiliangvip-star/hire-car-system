@@ -894,8 +894,8 @@ function FinanceSummaryPanel({
         </div>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        按每日财务明细日期按月汇总，包含取消订单及休运日；金额单位为日元（JPY）。
-        订单总利润 = 请求金额 - 会社总支出 - 司机总立替 - 司机总工资。
+        按每日财务明细日期按月汇总，包含取消訂単及休运日；金额单位为日元（JPY）。
+        訂単总利润 = 请求金额 - 会社总支出 - 司机总立替 - 司机总工资。
       </p>
       {children}
     </div>
@@ -1077,11 +1077,11 @@ export default function Home() {
     const version = getVersionOrders();
     const response = await fetch("/api/data", { cache: "no-store", signal });
     const payload = await readJsonSafely(response);
-    if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "无法刷新订单财务。"));
+    if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "无法刷新訂単财务。"));
     if (!payload || typeof payload !== "object" || !("orders" in payload) || !Array.isArray(payload.orders))
-      throw new Error("订单财务返回格式无效。");
+      throw new Error("訂単财务返回格式无效。");
     if (signal.aborted) return;
-    if (getVersionOrders() !== version) throw new Error("订单有新的本地修改，请刷新核对已批准金额。");
+    if (getVersionOrders() !== version) throw new Error("訂単有新的本地修改，请刷新核对已批准金额。");
     syncOrders((payload as DashboardData).orders, version);
   }, [getVersionOrders, syncOrders]);
   const {
@@ -1891,7 +1891,7 @@ export default function Home() {
       const orderTotals = orders.flatMap((order) => {
         if (getBalanceServiceMonth(order, getOrderDateKeys(order)) !== balanceMonth) return [];
         if (!Number.isSafeInteger(order.orderPrice) || order.orderPrice < 0) {
-          throw new Error(`订单「${order.customer}」价格须为非负日元整数。`);
+          throw new Error(`訂単「${order.customer}」价格须为非负日元整数。`);
         }
         return [{
           companyName: order.company || "",
@@ -1951,7 +1951,7 @@ export default function Home() {
   }
   async function exportOrderFinance() {
     if (sortedFinanceOrders.length === 0) {
-      alert("当前筛选范围暂无订单财务记录。");
+      alert("当前筛选范围暂无訂単财务记录。");
       return;
     }
     try {
@@ -2247,7 +2247,7 @@ export default function Home() {
         error: "",
       };
     } catch (error) {
-      return { rows: [], error: error instanceof Error ? error.message : "车辆月度汇总失败，请刷新后重试。" };
+      return { rows: [], error: error instanceof Error ? error.message : "車両月度汇总失败，请刷新后重试。" };
     }
   })();
   const vehicleSummaryTotals = totalVehicleSummaries(vehicleSummaryResult.rows);
@@ -2452,7 +2452,7 @@ export default function Home() {
         return;
       }
       if (vehicleSummaryResult.rows.length === 0) {
-        alert("当前分区暂无车辆或财务记录。");
+        alert("当前分区暂无車両或财务记录。");
         return;
       }
       try {
@@ -2463,16 +2463,16 @@ export default function Home() {
           regionNames: Object.fromEntries(regionNameById),
         });
       } catch (error) {
-        alert(error instanceof Error ? error.message : "车辆月度汇总导出失败，请重试。");
+        alert(error instanceof Error ? error.message : "車両月度汇总导出失败，请重试。");
       }
       return;
     }
     if (!selectedVehicleForFinance && filteredVehicleFinanceDetails.length === 0) {
-      alert("当前月份及分区暂无车辆财务记录。");
+      alert("当前月份及分区暂无車両财务记录。");
       return;
     }
     if (vehicleFinanceVehicleFilter && !selectedVehicleForFinance) {
-      alert("无法识别所选车辆，请重新选择車両番号。");
+      alert("无法识别所选車両，请重新选择車両番号。");
       return;
     }
     try {
@@ -2484,7 +2484,7 @@ export default function Home() {
         monthly: selectedVehicleForFinance ? vehicleMonthlyFinanceForm : null,
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "车辆财务表导出失败，请重试。");
+      alert(error instanceof Error ? error.message : "車両财务表导出失败，请重试。");
     }
   }
   const todayDateKey = toDateKey(new Date());
@@ -3015,8 +3015,8 @@ export default function Home() {
     if (!vehicle || getVehicleDisplayStatus(vehicle) !== "运营中") {
       alert(
         vehicle
-          ? `车辆「${vehicle.plate || vehicle.name}」当前不可用，不能新增予約。`
-          : "没有可用车辆，不能新增予約。",
+          ? `車両「${vehicle.plate || vehicle.name}」当前不可用，不能新增予約。`
+          : "没有可用車両，不能新增予約。",
       );
       return;
     }
@@ -3033,7 +3033,7 @@ export default function Home() {
     if (!requireSpecificRegionForNewData()) return;
     const vehicle = availableVehicleRecords[0];
     if (!vehicle) {
-      alert("没有可用车辆，不能批量新增预约。");
+      alert("没有可用車両，不能批量新增预约。");
       return;
     }
 
@@ -3062,7 +3062,7 @@ export default function Home() {
     }
     const batchVehicle = availableVehicleRecords.find((vehicle) => vehicle.id === batchOrderVehicle);
     if (!batchOrderDate || !batchVehicle) {
-      alert("请选择有效的日期和运营中的车辆。");
+      alert("请选择有效的日期和运营中的車両。");
       return;
     }
 
@@ -4019,7 +4019,7 @@ export default function Home() {
         ]),
       ].sort();
       if (dates.length === 0 || dates.length > 3660) {
-        alert("单笔订单财务明细最多支持 3660 个日历日。");
+        alert("单笔訂単财务明细最多支持 3660 个日历日。");
         return;
       }
       const orderForm = Object.fromEntries(
@@ -4205,19 +4205,19 @@ export default function Home() {
       !formVehicle &&
       orderFormVehicles.filter((vehicle) => vehicle.name === form.vehicle).length > 1
     ) {
-      alert(`车名「${form.vehicle}」有多台车辆，请选择具体的車両番号。`);
+      alert(`车名「${form.vehicle}」有多台車両，请选择具体的車両番号。`);
       return;
     }
     if (
       editingOrderId === null &&
       (!formVehicle || getVehicleDisplayStatus(formVehicle) !== "运营中")
     ) {
-      alert(`车辆「${form.vehicle}」当前不可用，不能新增予約。`);
+      alert(`車両「${form.vehicle}」当前不可用，不能新增予約。`);
       return;
     }
 
     if (!form.customer.trim()) {
-      alert("请填写订单名称。");
+      alert("请填写訂単名称。");
       return;
     }
 
@@ -4381,7 +4381,7 @@ export default function Home() {
     const targets = keys.map(key => ({ key, ...parseAccountingKey(key) }));
     if (targets.some(({ orderId, date }) => !allOrders.some(order => order.id === orderId &&
       getOrderDateKeys(order).includes(date)))) {
-      alert("订单或用车日期已变化，请关闭财务窗口后重新打开。");
+      alert("訂単或用车日期已变化，请关闭财务窗口后重新打开。");
       return;
     }
     if (targets.some(({ key, orderId, date }) => accountingForm[key]?.driverPaymentType !==
@@ -4499,7 +4499,7 @@ export default function Home() {
     setInvoiceStatusSavingIds(nextSavingIds);
     try {
       if (!(await waitForOrders())) {
-        alert("订单有未确认的保存，请先检查页面顶部的保存错误并重新载入核对。");
+        alert("訂単有未确认的保存，请先检查页面顶部的保存错误并重新载入核对。");
         return false;
       }
 
@@ -4544,7 +4544,7 @@ export default function Home() {
     if (!dialog) return;
     const order = orders.find((candidate) => candidate.id === dialog.orderId);
     if (!order) {
-      alert("订单已不存在，请刷新后重试。");
+      alert("訂単已不存在，请刷新后重试。");
       setInvoiceStatusDialog(null);
       return;
     }
@@ -4724,7 +4724,7 @@ export default function Home() {
             disabled={activeRegionId === ALL_REGIONS_ID || availableVehicleRecords.length === 0}
             className="rounded-lg bg-blue-600 px-5 py-1 font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            ＋ 新建订单
+            ＋ 新建訂単
           </button>
         </div>
       </header>
@@ -4744,10 +4744,10 @@ export default function Home() {
       )}
       {vehicleMonthlyFinanceMigrationPending && (
         <p role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          车辆月度费用功能尚未启用：请数据库管理员应用
+          車両月度费用功能尚未启用：请数据库管理员应用
           {" "}
           <code>supabase/migrations/20261018000000_vehicle_monthly_finance.sql</code>
-          {" "}后再录入月度费用或车辆固定月费；其余业务数据已正常载入。
+          {" "}后再录入月度费用或車両固定月费；其余业务数据已正常载入。
         </p>
       )}
       {balanceExpensesMigrationPending && (
@@ -5122,7 +5122,7 @@ export default function Home() {
                       </div>
                     ))}
                   </dl>
-                  <p className="mt-2 text-xs text-blue-800">按订单入金方式分类，不代表已实际收款。</p>
+                  <p className="mt-2 text-xs text-blue-800">按訂単入金方式分类，不代表已实际收款。</p>
                 </div>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4">
                   <p className="text-sm font-semibold text-emerald-800">利润总和</p>
@@ -5152,8 +5152,8 @@ export default function Home() {
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
-                      <th className="px-4 py-3 font-semibold">订单日期</th>
-                      <th className="px-4 py-3 font-semibold">订单名称</th>
+                      <th className="px-4 py-3 font-semibold">訂単日期</th>
+                      <th className="px-4 py-3 font-semibold">訂単名称</th>
                       <th className="px-4 py-3 font-semibold">来源</th>
                       <th className="px-4 py-3 font-semibold">司机</th>
                       <th className="px-4 py-3 font-semibold">車両番号</th>
@@ -5163,14 +5163,14 @@ export default function Home() {
                       <th className="px-4 py-3 text-right font-semibold">司机总立替</th>
                       <th className="px-4 py-3 text-right font-semibold">会社总支出</th>
                       <th className="px-4 py-3 text-right font-semibold">司机总工资</th>
-                      <th className="px-4 py-3 text-right font-semibold">订单总利润</th>
+                      <th className="px-4 py-3 text-right font-semibold">訂単总利润</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedFinanceOrders.length === 0 ? (
                       <tr>
                         <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
-                          该月份暂无订单财务记录
+                          该月份暂无訂単财务记录
                         </td>
                       </tr>
                     ) : (
@@ -5355,7 +5355,7 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">服务日期</th>
-                      <th className="px-4 py-3 font-semibold">订单名称</th>
+                      <th className="px-4 py-3 font-semibold">訂単名称</th>
                       <th className="px-4 py-3 font-semibold">車輌番号</th>
                       <th className="px-4 py-3 font-semibold">司机姓名</th>
                       <th className="px-4 py-3 font-semibold">所属会社</th>
@@ -5394,7 +5394,7 @@ export default function Home() {
                             onClick={() => {
                               const order = orders.find((item) => item.id === row.orderId);
                               if (!order) {
-                                alert("未找到对应订单，请刷新后重试。");
+                                alert("未找到对应訂単，请刷新后重试。");
                                 return;
                               }
                               openAccounting(order);
@@ -5589,7 +5589,7 @@ export default function Home() {
                   onClick={exportVehicleFinance}
                   className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
                 >
-                  导出车辆财务表（A4）
+                  导出車両财务表（A4）
                 </button>
               }
               trailingHeaderActions={
@@ -5800,14 +5800,14 @@ export default function Home() {
                   </>
                 ) : (
                   <p className="text-sm text-gray-600">
-                    请先在右上角选择車両番号，再录入该车辆的月度费用和公里数。
+                    请先在右上角选择車両番号，再录入该車両的月度费用和公里数。
                   </p>
                 )}
               </section>
               {selectedVehicleForFinance && (
                 <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                   {[
-                    ["订单利润总和", formatYen(vehicleOrderProfit)],
+                    ["訂単利润总和", formatYen(vehicleOrderProfit)],
                     ["各种费用支出", formatYen(vehicleMonthlyExpenses)],
                     ["扣除费用后利润", formatYen(vehicleNetProfit)],
                     [
@@ -5835,7 +5835,7 @@ export default function Home() {
               {!vehicleFinanceVehicleFilter ? (
                 <div>
                   <p className="mb-3 text-sm text-gray-600">
-                    每车一行，包含外注车辆（标注“外注”，未登记番号时明确提示）。订单利润已扣除固定费用与备品。月度费用使用已保存记录；未登记月份使用默认停车场费及保险费。无运营记录的车辆也计入固定成本。
+                    每车一行，包含外注車両（标注“外注”，未登记番号时明确提示）。訂単利润已扣除固定费用与备品。月度费用使用已保存记录；未登记月份使用默认停车场费及保险费。无运营记录的車両也计入固定成本。
                   </p>
                   {vehicleSummaryResult.error ? (
                     <p role="alert" className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{vehicleSummaryResult.error}</p>
@@ -5857,12 +5857,12 @@ export default function Home() {
                             <th className="px-4 py-3 text-right font-semibold">会社支付</th>
                             <th className="px-4 py-3 text-right font-semibold">司机工资</th>
                             <th className="px-4 py-3 text-right font-semibold">固定费用与备品</th>
-                            <th className="px-4 py-3 text-right font-semibold">订单利润（扣费后）</th>
+                            <th className="px-4 py-3 text-right font-semibold">訂単利润（扣费后）</th>
                           </tr>
                         </thead>
                         <tbody>
                           {vehicleSummaryResult.rows.length === 0 ? (
-                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">暂无车辆或财务记录</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">暂无車両或财务记录</td></tr>
                           ) : vehicleSummaryResult.rows.map((row) => (
                             <tr key={row.key} className="border-t hover:bg-gray-50">
                               <td className="px-4 py-3">{row.month}</td>
@@ -5906,20 +5906,20 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">服务日期</th>
-                      <th className="px-4 py-3 font-semibold">订单名称</th>
+                      <th className="px-4 py-3 font-semibold">訂単名称</th>
                       <th className="px-4 py-3 font-semibold">運転士</th>
                       <th className="px-4 py-3 text-right font-semibold">请求金额</th>
                       <th className="px-4 py-3 text-right font-semibold">司机总立替</th>
                       <th className="px-4 py-3 text-right font-semibold">会社总支出</th>
                       <th className="px-4 py-3 text-right font-semibold">司机总工资</th>
-                      <th className="px-4 py-3 text-right font-semibold">订单总利润</th>
+                      <th className="px-4 py-3 text-right font-semibold">訂単总利润</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredVehicleFinanceDetails.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                          暂无车辆财务记录
+                          暂无車両财务记录
                         </td>
                       </tr>
                     ) : (
@@ -5990,10 +5990,10 @@ export default function Home() {
                 </div>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                当月利润＝请求总金额＋手动输入的其他收入－下方手动输入的支出总和。不自动扣除车辆费用、司机工资、立替或其他运营支出。
-                整单请求金额（订单价格及全日期的ETC旅报、司机立替旅报、会社立替旅报、超时费）按首个服务日所在月份计入，不按天分摊。
-                首个服务日排除休运日；请求按订单所属会社归集，其他收入和支出按手动项目所属会社及录入月份归集。
-                口座入金、现金入金按订单入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列。
+                当月利润＝请求总金额＋手动输入的其他收入－下方手动输入的支出总和。不自动扣除車両费用、司机工资、立替或其他运营支出。
+                整单请求金额（訂単价格及全日期的ETC旅报、司机立替旅报、会社立替旅报、超时费）按首个服务日所在月份计入，不按天分摊。
+                首个服务日排除休运日；请求按訂単所属会社归集，其他收入和支出按手动项目所属会社及录入月份归集。
+                口座入金、现金入金按訂単入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列。
               </p>
               {balanceResult.summary ? (
               <>
@@ -6040,7 +6040,7 @@ export default function Home() {
                     ))}
                   </dl>
                   <p className="mt-2 text-xs text-emerald-800">
-                    外注司机出金对账明细，仅供核对，不重复计入收支平衡；月份沿用订单首个服务月。
+                    外注司机出金对账明细，仅供核对，不重复计入收支平衡；月份沿用訂単首个服务月。
                   </p>
                 </section>
                 <section className="rounded-lg border border-violet-200 bg-violet-50 px-5 py-4 shadow-sm">
@@ -6441,7 +6441,7 @@ export default function Home() {
 
       <div className="calendar-vehicle-filters flex flex-wrap items-center gap-1 border-b bg-white px-3 py-0.5">
         {([
-          ["all", "全体车辆"],
+          ["all", "全体車両"],
           ["alphard", "Alphard"],
           ["hiace", "Hiace"],
           ["tesla", "Tesla"],
@@ -6774,8 +6774,8 @@ export default function Home() {
                     draggable={!vehicleRecord.calendarOnly}
                     role="button"
                     tabIndex={-1}
-                    title="拖动调整车辆顺序"
-                    aria-label={`拖动调整车辆顺序 ${vehicleRecord.plate || vehicle}`}
+                    title="拖动调整車両顺序"
+                    aria-label={`拖动调整車両顺序 ${vehicleRecord.plate || vehicle}`}
                     onDragStart={(event) => {
                       if (vehicleRecord.calendarOnly) { event.preventDefault(); return; }
                       event.dataTransfer.effectAllowed = "move";
@@ -7246,7 +7246,7 @@ export default function Home() {
                   </span>
                   <button
                     type="button"
-                    aria-label="筛选订单来源"
+                    aria-label="筛选訂単来源"
                     onClick={() => setSourceSelectionOpen("order-filter")}
                     title={orderSourceFilter || undefined}
                     className="rounded border bg-white px-3 py-2 text-sm"
@@ -7401,7 +7401,7 @@ export default function Home() {
                       <th className="px-2 py-3 font-semibold">配車時間</th>
                       <th className="px-2 py-3 font-semibold">手配状態</th>
                       <th className="px-2 py-3 font-semibold">予約情報</th>
-                      <th className="px-2 py-3 font-semibold">订单状态</th>
+                      <th className="px-2 py-3 font-semibold">訂単状态</th>
                       <th className="px-2 py-3 font-semibold">車両</th>
                       <th className="px-2 py-3 font-semibold">運転士</th>
                       <th className="px-2 py-3 font-semibold">来源</th>
@@ -7606,11 +7606,11 @@ export default function Home() {
                         <span className="block text-sm font-medium">
                           {invoiceStatusDialog.origin === "reservation" && invoiceStatusDialogOrder.importBatchId
                             ? `当前导入批次（${invoiceStatusDialog.month} ${invoiceStatusDialogSingleTargets.length} 笔）`
-                            : "仅此订单"}
+                            : "仅此訂単"}
                         </span>
                         {invoiceStatusDialog.origin === "reservation" && invoiceStatusDialogOrder.importBatchId && (
                           <span className="mt-1 block text-xs text-gray-500">
-                            列表中合并显示的同批次订单会一起变更。
+                            列表中合并显示的同批次訂単会一起变更。
                           </span>
                         )}
                       </span>
@@ -7629,13 +7629,13 @@ export default function Home() {
                       />
                       <span>
                         <span className="block text-sm font-medium">
-                          {invoiceStatusDialog.month} 同来源订单（{invoiceStatusDialogSourceTargets.length} 笔）
+                          {invoiceStatusDialog.month} 同来源訂単（{invoiceStatusDialogSourceTargets.length} 笔）
                         </span>
                         <span className="mt-1 block text-xs">
                           {invoiceStatusDialogOrder.orderSource
                             ? `来源：${invoiceStatusDialogOrder.orderSource}`
-                            : "该订单未填写来源，无法批量变更。"}
-                          {" · "}仅包含该月份内、同地域且来源完全一致的订单。
+                            : "该訂単未填写来源，无法批量变更。"}
+                          {" · "}仅包含该月份内、同地域且来源完全一致的訂単。
                         </span>
                       </span>
                     </label>
@@ -7643,12 +7643,12 @@ export default function Home() {
                 </fieldset>
 
                 <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600" role="status">
-                  将变更 {invoiceStatusDialogChangedCount} 笔订单为「{
+                  将变更 {invoiceStatusDialogChangedCount} 笔訂単为「{
                     invoiceStatusDialog.status === "paid" ? "入金済み"
                       : invoiceStatusDialog.status === "unpaid" ? "未入金" : invoiceStatusDialog.status
                   }」。
                   {invoiceStatusDialog.kind === "deposit" && invoiceStatusDialog.status === "paid" && (
-                    <span className="mt-1 block text-xs">新标记为已入金的订单将记录今天（{todayDateKey}）为入金日；已有入金日保留。</span>
+                    <span className="mt-1 block text-xs">新标记为已入金的訂単将记录今天（{todayDateKey}）为入金日；已有入金日保留。</span>
                   )}
                 </p>
                 <div className="mt-5 flex justify-end gap-2">
@@ -8132,7 +8132,7 @@ export default function Home() {
               </button>
             </div>
             <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              系统会从每条信息中识别“配車時間、上车地点、下车地点”；以下状态、司机、来源和所属公司将应用于本批所有订单。
+              系统会从每条信息中识别“配車時間、上车地点、下车地点”；以下状态、司机、来源和所属公司将应用于本批所有訂単。
             </p>
             <div className="space-y-4">
               <label className="block text-sm font-medium">
@@ -8242,7 +8242,7 @@ export default function Home() {
                 onClick={importBatchOrders}
                 className="rounded bg-blue-600 px-5 py-2 font-bold text-white hover:bg-blue-700"
               >
-                生成订单
+                生成訂単
               </button>
             </div>
           </div>
@@ -8257,7 +8257,7 @@ export default function Home() {
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 className="text-xl font-bold">
-                {editingOrderId === null ? "新建订单" : "编辑予約"}
+                {editingOrderId === null ? "新建訂単" : "編集訂単"}
                 {editingOrderId !== null && <LastOperation record={orders.find((order) => order.id === editingOrderId)} />}
               </h2>
 
@@ -8271,9 +8271,9 @@ export default function Home() {
             </div>
 
             <div className="space-y-4">
-              {/* 订单名称 */}
+              {/* 訂単名称 */}
               <label className="block text-sm font-medium">
-                订单名称
+                訂単名称
                 <input
                   type="text"
                   required
@@ -8466,7 +8466,7 @@ export default function Home() {
                 }
               />
               {form.endDate !== form.date && <p className="text-xs text-gray-600">
-                上方为订单默认车辆，仅影响未单独换车的日期；某一天换车请在下方对应日期选择車両番号。
+                上方为訂単默认車両，仅影响未单独换车的日期；某一天换车请在下方对应日期选择車両番号。
               </p>}
 
               {/* 運転士 */}
@@ -8784,7 +8784,7 @@ export default function Home() {
                 onClick={() => setPendingOrderConflicts([])} className="text-2xl text-gray-500">×</button>
             </div>
             <p className="mt-3 text-sm text-gray-700">
-              以下予約在相同日期与本予約使用同一车辆或同一司机，且时间重复或相近（2小时内）：
+              以下予約在相同日期与本予約使用同一車両或同一司机，且时间重复或相近（2小时内）：
             </p>
             <ul className="mt-2 space-y-2 text-sm text-gray-700">
               {pendingOrderConflicts.map(({ order, vehicles, drivers }) => (
@@ -8793,7 +8793,7 @@ export default function Home() {
                   {order.endDate && order.endDate !== order.date ? ` ～ ${order.endDate}` : ""}
                   {" "}{order.time || "未填写时间"} · {order.customer || "未填写客户"}
                   <div className="text-xs font-bold text-red-600">
-                    {vehicles.length > 0 && `车辆重复：${vehicles.join("、")}`}
+                    {vehicles.length > 0 && `車両重复：${vehicles.join("、")}`}
                     {vehicles.length > 0 && drivers.length > 0 && "　"}
                     {drivers.length > 0 && `司机重复：${drivers.join("、")}`}
                   </div>
@@ -9489,7 +9489,7 @@ export default function Home() {
                 order.id === driverSelectionOrder.id ? { id: order.id, ...updateReservationDriver(order, name) } : order));
               void finishDialogSave([waitForOrders()], () => {});
             } else {
-              alert("订单已不存在，请刷新后重试。");
+              alert("訂単已不存在，请刷新后重试。");
             }
           }}
         />
@@ -9565,7 +9565,7 @@ export default function Home() {
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="accounting-preview-title" className="text-xl font-bold">
-                订单财务统计
+                訂単财务统计
               </h2>
               <button
                 type="button"
@@ -9579,7 +9579,7 @@ export default function Home() {
                   const company = companyRecords.find((item) =>
                     item.regionId === accountingPreviewOrder.regionId && item.name === companyName);
                   if (!source || !company) {
-                    alert("请先为订单设置同分区的来源和所属会社。");
+                    alert("请先为訂単设置同分区的来源和所属会社。");
                     return;
                   }
                   if (!company.bankAccount || !/^T[0-9]{13}$/.test(company.taxRegistrationNumber) || !company.phone || !company.rollCallAddress) {
@@ -9588,7 +9588,7 @@ export default function Home() {
                   }
                   const price = primaryAccountingOrderPrice;
                   if (!Number.isSafeInteger(price) || price < 0) {
-                    alert("請求書订单价格必须为非负日元整数。");
+                    alert("請求書訂単价格必须为非负日元整数。");
                     return;
                   }
                   const today = new Date();
@@ -9719,17 +9719,17 @@ export default function Home() {
                 <p className="font-semibold text-indigo-900">
                   {accountingBatchOrders[0]?.importBatchId
                     ? `导入批次：合计${accountingBatchOrders.length}单`
-                    : `同日批量订单：共 ${accountingBatchOrders.length} 单（同一天、同一车辆的单日订单）`}
+                    : `同日批量訂単：共 ${accountingBatchOrders.length} 单（同一天、同一車両的单日訂単）`}
                 </p>
                 <p className="mt-1 text-xs text-indigo-800">
-                  批量统一设置：在这里选择一次，本批全部订单同步；下方各订单仍可单独修改，只影响该订单。
+                  批量统一设置：在这里选择一次，本批全部訂単同步；下方各訂単仍可单独修改，只影响该訂単。
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {([
                     ["driver", "司机（全部统一）", accountingBatchDriverOptions, accountingBatchCommon.driver, "未安排司机"],
-                    ["orderSource", "订单来源（全部统一）", accountingSourceOptions, accountingBatchCommon.orderSource, "未填写"],
-                    ["company", "订单所属（全部统一）", accountingCompanyOptions, accountingBatchCommon.company, "未设置"],
-                    ["status", "订单状态（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "请选择订单状态"],
+                    ["orderSource", "訂単来源（全部统一）", accountingSourceOptions, accountingBatchCommon.orderSource, "未填写"],
+                    ["company", "訂単所属（全部统一）", accountingCompanyOptions, accountingBatchCommon.company, "未设置"],
+                    ["status", "訂単状态（全部统一）", accountingBatchStatusOptions, accountingBatchCommon.status, "请选择訂単状态"],
                   ] as const).map(([field, label, options, common, emptyLabel]) => (
                     <label key={field} className="block min-w-0 font-medium text-indigo-900">
                       {label}
@@ -9780,13 +9780,13 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="mt-2 text-xs text-indigo-800">
-                  核算状态、請求書、入金和备注仅保存到当前点击的订单；請求書和费用表导出也仅针对当前订单。
+                  核算状态、請求書、入金和备注仅保存到当前点击的訂単；請求書和费用表导出也仅针对当前訂単。
                 </p>
               </div>
             )}
             <div className="mt-5 flex flex-wrap gap-4">
               <div className="w-full max-w-sm text-sm font-semibold">
-                订单价格（每日当日车费合计，JPY）
+                訂単价格（每日当日车费合计，JPY）
                 <output
                   aria-live="polite"
                   className="mt-1 block w-full rounded border bg-gray-100 p-2 text-gray-800"
@@ -9796,7 +9796,7 @@ export default function Home() {
               </div>
               {isAccountingBatch && (
                 <div className="w-full max-w-sm text-sm font-semibold">
-                  本批订单价格合计（JPY）
+                  本批訂単价格合计（JPY）
                   <output
                     aria-live="polite"
                     className="mt-1 block w-full rounded border bg-gray-100 p-2 text-gray-800"
@@ -9843,12 +9843,12 @@ export default function Home() {
                         )}
                         {isAccountingBatch && financeOrder.id === accountingPreviewOrder.id && (
                           <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">
-                            当前订单
+                            当前訂単
                           </span>
                         )}
                         {isOutsideOrderDates && (
                           <span className="ml-2 rounded bg-amber-100 px-2 py-1 text-xs text-amber-800">
-                            订单日期外
+                            訂単日期外
                           </span>
                         )}
                         {isOffDate && (
@@ -9879,7 +9879,7 @@ export default function Home() {
                       {isAccountingBatch && (
                         <div className="md:col-span-2 grid gap-3 sm:grid-cols-2">
                           <label className="block text-sm font-medium">
-                            订单来源
+                            訂単来源
                             <button
                               type="button"
                               onClick={() => setSourceSelectionOpen(`accounting-order:${financeOrder.id}`)}
@@ -9892,7 +9892,7 @@ export default function Home() {
                             </button>
                           </label>
                           <label className="block text-sm font-medium">
-                            订单所属
+                            訂単所属
                             <select
                               className="mt-1 w-full rounded border p-2"
                               value={financeOrderMeta.company}
@@ -10328,7 +10328,7 @@ export default function Home() {
                   { label: "司机总立替", amount: accountingTotals.driverAdvances },
                   { label: "会社总支出", amount: accountingTotals.companyExpenses },
                   { label: "司机总工资", amount: accountingTotals.driverWages },
-                  { label: "订单总利润", amount: accountingTotals.profit },
+                  { label: "訂単总利润", amount: accountingTotals.profit },
                 ].map((item) => (
                   <div key={item.label} className="rounded border bg-gray-50 p-3">
                     <p className="text-xs text-gray-500">{item.label}</p>
@@ -10337,10 +10337,10 @@ export default function Home() {
                 ))}
               </div>
               <p className="mt-3 text-xs text-gray-500">
-                请求金额 = 订单价格 + ETC（旅报）+ 司机立替（旅报）+ 会社立替（旅报）+ 超时请求；
+                请求金额 = 訂単价格 + ETC（旅报）+ 司机立替（旅报）+ 会社立替（旅报）+ 超时请求；
                 比例工资 =（请求金额 - 司机总立替 - 会社总支出）× 50% / 60% / 70%；
                 司机总工资 = 超时工资 + 固定工资或比例工资 + 奖励工资；
-                订单总利润 = 请求金额 - 会社总支出 - 司机总立替 - 司机总工资。
+                訂単总利润 = 请求金额 - 会社总支出 - 司机总立替 - 司机总工资。
               </p>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -10432,7 +10432,7 @@ export default function Home() {
                 rows={3}
                 maxLength={5000}
                 className="mt-1 w-full rounded border p-3 font-normal"
-                placeholder="填写整笔订单的财务备注"
+                placeholder="填写整笔訂単的财务备注"
                 value={accountingFinanceNote}
                 onChange={(event) => setAccountingFinanceNote(event.target.value)}
               />
@@ -10478,7 +10478,7 @@ export default function Home() {
               </button>
             </div>
             <label className="mb-4 block text-sm">服务日
-              <select aria-label="车辆信息服务日" className="ml-2 rounded border p-2"
+              <select aria-label="車両信息服务日" className="ml-2 rounded border p-2"
                 value={selectedOrderServiceDate} onChange={event => setOrderDetailsDate(event.target.value)}>
                 {getOrderDateKeys(selectedOrderDetails).map(date => <option key={date} value={date}>
                   {date} · {getServiceVehicle(selectedOrderDetails, date).vehiclePlate || "未填写"}

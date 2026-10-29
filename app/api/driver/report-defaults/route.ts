@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const { data, error } = await identity.supabase.rpc("driver_report_defaults", { target_date: date.data });
     if (error) {
       console.error("Driver report defaults rejected.", { code: error.code });
-      return jsonResponse({ error: "无法读取当天订单和车库，请重试。" }, { status: 503 });
+      return jsonResponse({ error: "无法读取当天訂単和车库，请重试。" }, { status: 503 });
     }
     return jsonResponse(reportDefaultsSchema.parse(data));
   } catch (error) {

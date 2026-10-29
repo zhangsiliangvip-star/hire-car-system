@@ -221,7 +221,7 @@ test("drawer shows dates, drivers, details, amounts, overtime and compact photos
   // Render the actual drawer in a fresh React hook scope with empty notes.
   cursor = 6;
   const html = renderToStaticMarkup(React.createElement(drawer, drawerProps));
-  for (const text of ["订单财务审核", "2026-10-25", "2026-10-26", "Test driver", "Parking", "1,000 JPY", "2,000 JPY",
+  for (const text of ["訂単财务审核", "2026-10-25", "2026-10-26", "Test driver", "Parking", "1,000 JPY", "2,000 JPY",
     "1.5 小时", "批准入账", "驳回移除", "保留记录", "Review error"]) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /Other driver|Other order/);
   assert.equal((html.match(/>批准入账<\/button>/g) ?? []).length, 3);

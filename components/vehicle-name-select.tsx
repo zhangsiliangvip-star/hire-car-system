@@ -70,7 +70,7 @@ export function VehicleNameSelect({
   }
 
   function deleteOption(name: string) {
-    if (!window.confirm(`从本浏览器的车名列表删除「${name}」？已有车辆和订单不会改变。`)) return;
+    if (!window.confirm(`从本浏览器的车名列表删除「${name}」？已有車両和訂単不会改变。`)) return;
     if (saveOptions(settings.options.filter((option) => option !== name)) && value === name) {
       onDeleteSelected();
     }
@@ -121,7 +121,7 @@ export function VehicleNameSelect({
       {settings.error && <p role="alert" className="mt-2 text-sm text-rose-700">{settings.error}</p>}
       {isManaging && (
         <div id="vehicle-name-options-manager" className="mt-2 rounded border bg-gray-50 p-3">
-          <p className="mb-2 text-xs text-gray-600">仅影响本浏览器的下拉选项，不删除车辆或订单。</p>
+          <p className="mb-2 text-xs text-gray-600">仅影响本浏览器的下拉选项，不删除車両或訂単。</p>
           {settings.options.length === 0 && <p className="text-sm text-gray-600">已无预设车名，仍可手动输入。</p>}
           <ul className="space-y-2">
             {settings.options.map((name) => (

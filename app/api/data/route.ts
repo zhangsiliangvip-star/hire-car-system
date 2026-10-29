@@ -1010,7 +1010,7 @@ export async function POST(request: Request) {
         parsed.data.collection === "balanceExpenseItems" ||
         parsed.data.collection === "driverWageItems")
     ) {
-      return jsonResponse({ error: "仅管理员可以管理车辆统计、收支平衡及司机工资手动项目。" }, { status: 403 });
+      return jsonResponse({ error: "仅管理员可以管理車両统计、收支平衡及司机工资手动项目。" }, { status: 403 });
     }
     if (parsed.data.deleteIds.length > 0) {
       const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);
@@ -1040,7 +1040,7 @@ export async function POST(request: Request) {
     console.error("Failed to persist dashboard data.", error);
     if (typeof error === "object" && error !== null && "code" in error && error.code === "PDR01") {
       return jsonResponse(
-        { error: "订单已关联司机派单或执行历史，不能永久删除；请改为取消订单。历史记录和小票会保留。" },
+        { error: "訂単已关联司机派单或执行历史，不能永久删除；请改为取消訂単。历史记录和小票会保留。" },
         { status: 409 },
       );
     }
@@ -1051,7 +1051,7 @@ export async function POST(request: Request) {
       /import_batch_(id|index)/.test(error.message)
     ) {
       return jsonResponse(
-        { error: "数据库尚未添加导入批次字段，请先执行 20261102000000_order_import_batches.sql 迁移后再保存订单。" },
+        { error: "数据库尚未添加导入批次字段，请先执行 20261102000000_order_import_batches.sql 迁移后再保存訂単。" },
         { status: 500 },
       );
     }

@@ -90,7 +90,7 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
     if (rows.some(row => notes[orderReviewKey(row)]?.trim()) && !window.confirm("关闭会放弃尚未提交的审核备注，是否继续？")) return;
     close();
   }
-  return <dialog ref={dialog} className={styles.dialog} aria-label="订单财务审核"
+  return <dialog ref={dialog} className={styles.dialog} aria-label="訂単财务审核"
     onCancel={event => { event.preventDefault(); dismiss(); }}
     onKeyDown={event => { if (event.key === "Escape") { event.preventDefault(); dismiss(); } }}
     onClick={event => { if (event.target === event.currentTarget) dismiss(); }}>
@@ -99,11 +99,11 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
         <h2 className="min-w-0 break-words font-semibold">{name} · 司机申报审核</h2>
         <button type="button" disabled={busy} onClick={dismiss} className="rounded border px-3 py-1">关闭</button>
       </div>
-      <p className="mb-3 text-xs text-gray-600">仅审核待审核申报。批准才入账；驳回相当于从订单待审核区删除，不计入金额，但保留记录并允许司机重报。已批准申报不能在此撤销。</p>
+      <p className="mb-3 text-xs text-gray-600">仅审核待审核申报。批准才入账；驳回相当于从訂単待审核区删除，不计入金额，但保留记录并允许司机重报。已批准申报不能在此撤销。</p>
       {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mb-3 text-sm text-emerald-800">{notice}</p>}
-      {blocked && <p role="alert" className="mb-3 text-sm text-red-700">订单有未完成保存或保存错误，请先处理后再审核。</p>}
-      {!rows.length && <p className="py-4 text-sm text-gray-500">本订单本月没有待审核申报。</p>}
+      {blocked && <p role="alert" className="mb-3 text-sm text-red-700">訂単有未完成保存或保存错误，请先处理后再审核。</p>}
+      {!rows.length && <p className="py-4 text-sm text-gray-500">本訂単本月没有待审核申报。</p>}
       <div className="space-y-3">{rows.map(row => {
         const key = orderReviewKey(row);
         const amount = row.kind === "fuel" ? row.claim.amount :
@@ -119,7 +119,7 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
             </div>)}
           {row.kind === "finance" && row.claim.category === "overtime" &&
             <p className="mt-1 text-xs text-gray-600">批准后替换该日超时小时数，按后台单价重算金额。</p>}
-          {row.kind === "fuel" && <p className="mt-1 text-xs text-gray-600">批准后追加到该订单当天燃油费，不计司机立替或应发工资。</p>}
+          {row.kind === "fuel" && <p className="mt-1 text-xs text-gray-600">批准后追加到该訂単当天燃油费，不计司机立替或应发工资。</p>}
           {(row.kind === "fuel" || row.claim.category !== "overtime") && <PendingPhotos key={`${key}-${row.claim.version}`} row={row} />}
           <label className="mt-3 block text-xs">审核备注（驳回必填）
             <input aria-label={`${row.date} ${label(row)}审核备注`} maxLength={500} disabled={busy || blocked}
@@ -164,7 +164,7 @@ export function OrderFinanceReviewProvider({ month, enabled, blocked, onApproved
           { cache: "no-store", signal: request.signal });
         const result = await response.json();
         if (!active || request.signal.aborted) return;
-        if (!response.ok) throw new Error(result.error || "无法读取订单待审核申报。");
+        if (!response.ok) throw new Error(result.error || "无法读取訂単待审核申报。");
         setData(orderReviewDataSchema.parse(result));
       } catch (cause) {
         if (!active || request.signal.aborted) return;

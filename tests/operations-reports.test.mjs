@@ -192,7 +192,7 @@ test("operation list includes required columns, first/last stops, open reports a
     assert.ok(html.includes(value), value);
   assert.doesNotMatch(html, /\d{2}\/\d{2} \d{2}:\d{2}/);
   assert.doesNotMatch(html, />2026-10-/);
-  assert.doesNotMatch(html, /订单名称/);
+  assert.doesNotMatch(html, /訂単名称/);
   const buttons = elements(tree).filter(e => e.type === "button");
   await buttons.find(b => b.props.children === "删除").props.onClick();
   await new Promise(resolve => setImmediate(resolve));

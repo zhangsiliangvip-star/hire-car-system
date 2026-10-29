@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       return jsonResponse({ error: "请求内容不是有效的 JSON。" }, { status: 400 });
     }
     const parsed = schema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "订单或会社编号格式不正确。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "訂単或会社编号格式不正确。" }, { status: 400 });
     const { data, error } = await supabase.rpc("allocate_invoice_number", {
       p_order_id: parsed.data.orderId,
       p_company_id: parsed.data.companyId,
