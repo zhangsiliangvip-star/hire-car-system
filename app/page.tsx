@@ -1413,7 +1413,6 @@ export default function Home() {
   const [vehicleNameMode, setVehicleNameMode] = useState("");
   const [form, setForm] = useState<OrderDraft>(() => createEmptyDraft());
   const [offDateInput, setOffDateInput] = useState("");
-  const [customDriverMode, setCustomDriverMode] = useState(false);
   const [driverSelectionTarget, setDriverSelectionTarget] = useState<string | null>(null);
   const [sourceSelectionOpen, setSourceSelectionOpen] = useState<
     "form" | "batch" | "accounting-batch" | "order-filter" | "finance-filter" | "calendar-filter" | `accounting-order:${string}` | null
@@ -2494,13 +2493,11 @@ export default function Home() {
   }
   const todayDateKey = toDateKey(new Date());
   const driverSelectionOrder = driverSelectionTarget &&
-    !["form", "batch", "accounting-batch", "driver-finance-filter"].includes(driverSelectionTarget) &&
+    !["batch", "accounting-batch", "driver-finance-filter"].includes(driverSelectionTarget) &&
     !driverSelectionTarget.startsWith("accounting-finance:")
     ? orders.find((order) => order.id === driverSelectionTarget)
     : undefined;
-  const driverSelectionRegionId = driverSelectionTarget === "form"
-    ? form.regionId || getRegionForNewRecords()
-    : driverSelectionTarget === "batch"
+  const driverSelectionRegionId = driverSelectionTarget === "batch"
       ? getRegionForNewRecords()
       : driverSelectionTarget === "accounting-batch" ||
           driverSelectionTarget?.startsWith("accounting-finance:")
@@ -2524,7 +2521,6 @@ export default function Home() {
         }))]
     : driverSelectionTarget?.startsWith("accounting-finance:")
       ? [parseAccountingKey(driverSelectionTarget.slice("accounting-finance:".length)).date]
-    : driverSelectionTarget === "form" ? getOrderDateKeys(form).filter(date => !form.offDates.includes(date))
     : driverSelectionOrder ? getOrderDateKeys(driverSelectionOrder).filter(date => !driverSelectionOrder.offDates.includes(date)) : [];
   const isUpcomingOrder = (order: Order) => order.date > todayDateKey;
 
@@ -3029,7 +3025,6 @@ export default function Home() {
     setEditingOrderId(null);
     setForm(createEmptyDraft(vehicle.name, date, vehicle.plate));
     setOffDateInput("");
-    setCustomDriverMode(false);
     setCustomCompanyMode(false);
     setShowForm(true);
   }
@@ -4003,11 +3998,6 @@ export default function Home() {
     });
     setOffDateInput("");
 
-    setCustomDriverMode(
-      Boolean(order.driver) &&
-        !driverRecords.some((driver) => driver.name === order.driver),
-    );
-
     setCustomCompanyMode(
       Boolean(order.company) &&
         !companies.includes(order.company),
@@ -4191,7 +4181,6 @@ export default function Home() {
     setEditingOrderId(null);
     setPendingOrderConflicts([]);
     setOffDateInput("");
-    setCustomDriverMode(false);
     setCustomCompanyMode(false);
   }
 
@@ -8487,38 +8476,12 @@ export default function Home() {
                 }
               />
               {form.endDate !== form.date && <p className="text-xs text-gray-600">
-                上方为訂単默认車両，仅影响未单独换車的日期；某一天换車請在下方对应日期選択車両番号。
+                上方为訂単默认車両番号。
               </p>}
-
-              {/* 運転士 */}
-              <div className="block text-sm font-medium">
-                運転士
-                <button type="button" aria-haspopup="dialog"
-                  onClick={() => setDriverSelectionTarget("form")}
-                  className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50">
-                  {getOrderDriverLabel(form)} · 点击選任
-                </button>
-                <p className="mt-1 text-xs text-gray-600">選任后统一应用到所有用車日；可在下方逐日调整運転士。</p>
-              </div>
-
-              {customDriverMode && (
-                <label className="block text-sm font-medium">
-                  新運転士
-                  <input
-                    type="text"
-                    className="mt-1 w-full rounded border p-2"
-                    value={form.driver}
-                    onChange={(e) =>
-                      setForm((current) => updateReservationDriver(current, e.target.value))
-                    }
-                    placeholder="請输入運転士"
-                  />
-                </label>
-              )}
 
               <fieldset className="space-y-3 rounded border border-blue-200 bg-blue-50/40 p-3">
                 <legend className="px-1 text-sm font-semibold">每日行程与車費</legend>
-                <p className="text-xs text-gray-600">運転士工資与外注運転士費用二选一。外注運転士費用、出金方式、状態和备注由上方外注運転士字段录入；下方立替費用区关联显示，不会重复计入。会社立替費用独立記録。</p>
+                <p className="text-xs text-gray-600">請在各用車日選択当日運転士并设置費用类型；運転士工資与外注運転士費用二选一。会社立替費用独立記録。</p>
                 {getOrderDateKeys(form).map((date) => {
                   const finance = getReservationFinance(form)[date] || emptyOrderFinance;
                   return (
@@ -8526,19 +8489,6 @@ export default function Home() {
                     <p className="text-sm font-semibold">
                       {date}{form.offDates.includes(date) ? "（休運）" : ""}
                     </p>
-                    <OrderVehiclePlateSelect financeMode
-                      vehicles={orderFormVehicles}
-                      vehicleName={getFinanceDayOrder({ ...form, id: editingOrderId || "draft" }, finance).vehicle}
-                      vehiclePlate={getFinanceDayOrder({ ...form, id: editingOrderId || "draft" }, finance).vehiclePlate}
-                      getStatus={getVehicleDisplayStatus}
-                      onSelect={vehicle => setForm(current => {
-                        const next = updateReservationFinance(current, date, {
-                          vehicle: vehicle.name, vehiclePlate: vehicle.plate, vehicleOverride: Boolean(vehicle.name),
-                        });
-                        return (current.endDate || current.date) === current.date
-                          ? { ...next, ...getServiceVehicle(next, date) } : next;
-                      })}
-                    />
                     <label className="block text-sm font-medium">
                       行程簡概
                       <textarea
@@ -9498,9 +9448,7 @@ export default function Home() {
         <DriverSelectionDialog
           drivers={driverSelectionCandidates}
           serviceDates={driverSelectionDates}
-          selected={driverSelectionTarget === "form"
-            ? form.driver
-            : driverSelectionTarget === "batch"
+          selected={driverSelectionTarget === "batch"
               ? batchOrderDriver
               : driverSelectionTarget === "accounting-batch"
                 ? accountingBatchCommon.driver || ""
@@ -9513,11 +9461,8 @@ export default function Home() {
           emptyLabel={driverSelectionTarget === "driver-finance-filter" ? "全部運転士" : "未安排運転士"}
           showServiceDays={driverSelectionTarget !== "driver-finance-filter"}
           onClose={() => setDriverSelectionTarget(null)}
-          onSelect={(name, manual) => {
-            if (driverSelectionTarget === "form") {
-              setCustomDriverMode(manual);
-              setForm((current) => updateReservationDriver(current, name));
-            } else if (driverSelectionTarget === "batch") {
+          onSelect={(name) => {
+            if (driverSelectionTarget === "batch") {
               setBatchOrderDriver(name);
             } else if (driverSelectionTarget === "accounting-batch") {
               applyAccountingBatchValue("driver", name);

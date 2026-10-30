@@ -2047,7 +2047,7 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   assert.ok(source.includes('editingOrderId === null ? getRegionForNewRecords() : form.regionId'));
   assert.ok(source.includes("vehicle.regionId === orderFormRegionId"));
   assert.ok(source.indexOf("<OrderVehiclePlateSelect") > source.indexOf("value={form.vehicle}"));
-  assert.ok(source.includes("vehicle: vehicle.name, vehiclePlate: vehicle.plate"));
+  assert.ok(source.includes("setForm((current) => changeOrderVehicle(current, vehicle"));
   assert.ok(source.includes("{getOrderVehicleNumber({ ...accountingPreviewOrder, financeByDate: primaryAccountingForm })}"));
   assert.ok(source.includes("vehicle.regionId === accountingPreviewOrder.regionId"));
   assert.ok(!source.includes("finance-vehicles-"));
@@ -2359,20 +2359,24 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   const statusField = source.indexOf("{/* 予約状態 */}", sourceField);
   const vehicleField = source.indexOf("{/* 車両 */}", statusField);
   const plateField = source.indexOf("<OrderVehiclePlateSelect", vehicleField);
-  const driverField = source.indexOf("{/* 運転士 */}", plateField);
   const startDate = source.indexOf("{/* 开始日期 */}");
   const endDate = source.indexOf("{/* 終了日期 */}", startDate);
   const offDate = source.indexOf('htmlFor="order-off-date"', endDate);
   const customerField = source.indexOf("{/* 訂単名称 */}");
-  const departureTime = source.indexOf("value={form.time}", driverField);
+  const departureTime = source.indexOf("value={form.time}", plateField);
   assert.ok(customerField < startDate && startDate < endDate && endDate < offDate &&
     offDate < sourceField && sourceField < statusField && statusField < vehicleField &&
-    vehicleField < plateField && plateField < driverField && driverField < first &&
+    vehicleField < plateField && plateField < first &&
     last < departureTime && departureTime < source.indexOf("{/* 上車地点 */}", departureTime));
   assert.equal((source.match(/htmlFor="order-off-date"/g) || []).length, 1);
   assert.ok(last < source.indexOf("{/* 上車地点 */}", last));
   assert.doesNotMatch(source, /每日運転士費用快捷输入/);
+  assert.doesNotMatch(source, /setDriverSelectionTarget\("form"\)|選任后统一应用到所有用車日/);
   const markup = source.slice(first, last);
+  assert.doesNotMatch(markup, /OrderVehiclePlateSelect/,
+    "daily itinerary uses the order-level vehicle selector");
+  assert.match(markup, /FinanceDriverSelect/,
+    "daily driver selection remains available");
   const context = {
     ...payment, ...load("lib\\order-drivers.ts"), require: nodeRequire, exports: {},
     FinanceDriverSelect: "driver-select", OrderVehiclePlateSelect: "vehicle-select",
