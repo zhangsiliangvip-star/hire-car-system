@@ -18,6 +18,8 @@ function load(relative, mocks = {}, globals = {}) {
   vm.runInNewContext(output, { module: compiled, exports: compiled.exports,
     require: name => Object.hasOwn(mocks, name) ? mocks[name] :
       name === "@/app/driver/navigation" ? load("app/driver/navigation.tsx", mocks, globals) :
+      name === "@/lib/driver-selection" ? load("lib/driver-selection.ts", mocks, globals) :
+      name === "@/lib/order-drivers" ? load("lib/order-drivers.ts", mocks, globals) :
       name.endsWith(".css") ? {} : require(name),
     Request, Response, Headers, URL, Date, Intl, AbortController, process, console: { error() {} }, ...globals,
   });
@@ -215,7 +217,8 @@ test("initial shift read restores month and late submit cannot restore private d
   stop();
 });
 
-function renderDialog({ days = [], fetch: fetchMock, serviceDates = data.dates } = {}) {
+function renderDialog({ days = [], fetch: fetchMock, serviceDates = data.dates,
+  drivers = [{ id, name: "Test Driver", reading: "test driver", serviceDays: 2 }] } = {}) {
   const states = ["", "", { key: JSON.stringify([...serviceDates].sort()), days }, "", 0];
   const effects = [], buttons = [];
   let cursor = 0, selected = "";
@@ -233,7 +236,7 @@ function renderDialog({ days = [], fetch: fetchMock, serviceDates = data.dates }
   function render() {
     cursor = 0; buttons.length = 0;
     return renderToStaticMarkup(React.createElement(DriverSelectionDialog, {
-      drivers: [{ id, name: "Test Driver", serviceDays: 2 }], serviceDates, selected: "",
+      drivers, serviceDates, selected: "",
       onSelect: name => { selected = name; }, onClose() {},
     }));
   }
@@ -247,6 +250,14 @@ test("driver cards show red rest in bottom-right by driver ID but remain selecta
   assert.equal(h.selected(), "Test Driver");
   assert.equal(renderDialog({ days: [{ driverId: "c6000000-0000-4000-8000-000000000002", date: data.dates[0] }] })
     .html.includes(">休</span>"), false);
+});
+test("driver selection dialog displays drivers by recorded romanized reading", () => {
+  const h = renderDialog({ drivers: [
+    { id: "b", name: "田中", reading: "tanaka", serviceDays: 20 },
+    { id: "a", name: "佐藤", reading: "sato", serviceDays: 1 },
+  ] });
+  assert.ok(h.html.indexOf("佐藤") < h.html.indexOf("田中"));
+  assert.ok(h.html.indexOf("sato") < h.html.indexOf("tanaka"));
 });
 test("rest hints fetch all actual service dates, never notes; failures explicitly warn", async () => {
   const calls = [];

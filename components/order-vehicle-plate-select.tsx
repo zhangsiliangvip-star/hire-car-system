@@ -1,7 +1,7 @@
 "use client";
 
 import type { Vehicle, VehicleDisplayStatus } from "@/lib/domain";
-import { resolveOrderVehicle } from "@/lib/vehicle-order";
+import { compareCalendarVehicles, resolveOrderVehicle } from "@/lib/vehicle-order";
 
 export function OrderVehiclePlateSelect({
   vehicles,
@@ -26,6 +26,11 @@ export function OrderVehiclePlateSelect({
       })
     : undefined;
   const sameNameCount = vehicles.filter((vehicle) => vehicle.name === vehicleName).length;
+  const sortedVehicles = vehicles.slice().sort((first, second) =>
+    compareCalendarVehicles(
+      { ...first, outOfService: getStatus(first) !== "运营中" },
+      { ...second, outOfService: getStatus(second) !== "运营中" },
+    ));
 
   return (
     <div>
@@ -52,7 +57,7 @@ export function OrderVehiclePlateSelect({
               : selected ? "当前車両未登记番号"
               : vehicleName ? "当前車両未登记或未指定番号" : financeMode ? "使用訂単默认車両" : "請選択車両番号"}
           </option>
-          {vehicles.filter((vehicle) => vehicle.plate).map((vehicle) => {
+          {sortedVehicles.filter((vehicle) => vehicle.plate).map((vehicle) => {
             const unavailable = !financeMode && getStatus(vehicle) !== "运营中";
             return (
               <option key={vehicle.id} value={vehicle.id} disabled={unavailable}>

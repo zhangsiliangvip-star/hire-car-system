@@ -95,6 +95,7 @@ export type Driver = AuditedRecord & {
   id: string;
   regionId?: string;
   name: string;
+  reading: string;
   phone: string;
   wechat: string;
   whatsapp: string;

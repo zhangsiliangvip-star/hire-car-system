@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { shiftStatusSchema } from "@/lib/driver/shifts";
+import { sortDriversByReading } from "@/lib/driver-selection";
 
 type Props = {
-  drivers: { id: string; name: string; serviceDays: number }[];
+  drivers: { id: string; name: string; reading?: string; serviceDays: number }[];
   selected: string;
   onSelect: (name: string, manual: boolean) => void;
   onClose: () => void;
@@ -58,7 +59,10 @@ export function DriverSelectionDialog({
     dialogRef.current?.querySelector<HTMLInputElement>("input")?.focus();
     return () => { if (previous instanceof HTMLElement) previous.focus(); };
   }, []);
-  const matches = drivers.filter((driver) => driver.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const searchTerm = search.trim().toLocaleLowerCase();
+  const matches = sortDriversByReading(drivers.filter((driver) =>
+    driver.name.toLocaleLowerCase().includes(searchTerm) ||
+    driver.reading?.toLocaleLowerCase().includes(searchTerm)));
   return (
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
@@ -89,7 +93,7 @@ export function DriverSelectionDialog({
         </div>
         {showServiceDays && (
           <>
-            <p className="mb-4 text-sm text-gray-500">最近30天服务日数由高到低排列，常出勤運転士在左上角；同一天多单计1天，同日数按姓名排序。</p>
+            <p className="mb-4 text-sm text-gray-500">按姓名读音罗马字A-Z排列；未填写读音时按姓名排序。最近30天服务日数仅供参考，同一天多单计1天。</p>
             <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务記録中的運転士；排除休运日、取消訂単及未来日期，不作为考勤证明。</p>
           </>
         )}
@@ -108,6 +112,7 @@ export function DriverSelectionDialog({
               onClick={() => onSelect(driver.name, false)}
               className={`relative min-h-20 break-words rounded-lg border p-3 pr-9 text-left hover:border-blue-500 hover:bg-blue-50 ${selected === driver.name ? "border-blue-600 bg-blue-50" : "border-gray-200"}`}>
               <span className="block font-semibold">{driver.name}</span>
+              {driver.reading && <span className="mt-1 block text-xs text-gray-500">{driver.reading}</span>}
               {showServiceDays && (
                 <span className="mt-1 block text-xs text-gray-500">最近30天 · {driver.serviceDays}天</span>
               )}

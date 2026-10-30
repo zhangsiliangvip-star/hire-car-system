@@ -14,7 +14,7 @@ const expectedColumns = {
   "vehicle-finance": 8,
   balance: 8,
   "balance-items": 4,
-  drivers: 9,
+  drivers: 10,
   vehicles: 10,
   sources: 7,
   companies: 10,

@@ -774,9 +774,11 @@ function updateReservationDriver(draft: OrderDraft, name: string): OrderDraft {
 
 function updateReservationDailyDriver(draft: OrderDraft, date: string, name: string): OrderDraft {
   const finance = getReservationFinance(draft)[date] || emptyOrderFinance;
-  return updateReservationFinance(draft, date, finance.driverPaymentType === "company_advance"
-    ? withCompanyAdvanceDriver(finance, name)
-    : { driver: name });
+  return updateReservationFinance(draft, date, setReservationDriverPayment(
+    { ...finance, driver: name },
+    name ? "wage" : "company_advance",
+    name,
+  ));
 }
 
 function hasDailyFares(financeByDate: Order["financeByDate"]) {
@@ -1379,6 +1381,7 @@ export default function Home() {
   const [editingDriverName, setEditingDriverName] = useState<string | null>(null);
   const [driverForm, setDriverForm] = useState<DriverDraft>({
     name: "",
+    reading: "",
     phone: "",
     wechat: "",
     whatsapp: "",
@@ -1694,6 +1697,7 @@ export default function Home() {
     ...unregisteredDriverNames.map((name, index) => ({
       id: `unregistered-driver-${index}`,
       name,
+      reading: "",
       phone: "",
       wechat: "",
       whatsapp: "",
@@ -3110,6 +3114,7 @@ export default function Home() {
     setEditingDriverName(null);
     setDriverForm({
       name: "",
+      reading: "",
       phone: "",
       wechat: "",
       whatsapp: "",
@@ -3124,6 +3129,7 @@ export default function Home() {
     setEditingDriverName(driver.name);
     setDriverForm({
       name: driver.name,
+      reading: driver.reading || "",
       phone: driver.phone,
       wechat: driver.wechat,
       whatsapp: driver.whatsapp,
@@ -3142,6 +3148,7 @@ export default function Home() {
     if (!driverRegionId) return;
     const savedDriver: DriverDraft = {
       name: driverForm.name.trim(),
+      reading: driverForm.reading.trim(),
       phone: driverForm.phone.trim(),
       wechat: driverForm.wechat.trim(),
       whatsapp: driverForm.whatsapp.trim(),
@@ -3807,8 +3814,8 @@ export default function Home() {
 
     if (batchAddType === "drivers") {
       const records = lines.map((line) => {
-        const [name, phone = "", wechat = "", whatsapp = "", licenseExpiry = "", personalSlogan = ""] = splitColumns(line);
-        return { name, phone, wechat, whatsapp, licenseExpiry, personalSlogan };
+        const [name, phone = "", wechat = "", whatsapp = "", licenseExpiry = "", personalSlogan = "", reading = ""] = splitColumns(line);
+        return { name, phone, wechat, whatsapp, licenseExpiry, personalSlogan, reading };
       });
       const names = records.map((record) => record.name);
       if (records.some((record) => !record.name)) {
@@ -4279,11 +4286,18 @@ export default function Home() {
   }
 
   function requestOrderDeletion(order: Order) {
-    requestDelete(`确定要删除予約「${order.customer || order.id}」吗？`, () => {
-      setOrders((currentOrders) =>
-        currentOrders.filter((currentOrder) => currentOrder.id !== order.id),
-      );
-    });
+    requestDelete(
+      `确定永久删除予約「${order.customer || order.id}」吗？此操作会一并清除财务、派单、执行記録及相关小票，且无法恢复。`,
+      async () => {
+        setOrders((currentOrders) =>
+          currentOrders.filter((currentOrder) => currentOrder.id !== order.id),
+        );
+        if (!(await waitForOrders())) {
+          throw new Error("訂単删除未获服务器确认。請检查保存错误并重新载入核对数据。");
+        }
+        closeForm();
+      },
+    );
   }
 
   function deleteOrder() {
@@ -4369,7 +4383,7 @@ export default function Home() {
     : [];
   function updateAccountingFinance(key: string, patch: Partial<OrderFinance>) {
     if (patch.driver !== undefined) {
-      void saveAccountingDrivers([key], patch.driver);
+      void saveAccountingDrivers([key], patch.driver, true);
       return;
     }
     setAccountingForm((current) => ({
@@ -4377,7 +4391,7 @@ export default function Home() {
       [key]: { ...(current[key] || emptyOrderFinance), ...patch },
     }));
   }
-  async function saveAccountingDrivers(keys: string[], name: string) {
+  async function saveAccountingDrivers(keys: string[], name: string, syncPaymentType = false) {
     if (dialogSavingRef.current) return;
     const targets = keys.map(key => ({ key, ...parseAccountingKey(key) }));
     if (targets.some(({ orderId, date }) => !allOrders.some(order => order.id === orderId &&
@@ -4408,18 +4422,22 @@ export default function Home() {
       for (const { date } of days) {
         const finance = financeByDate[date] || { ...emptyOrderFinance,
           driver: order.driver, vehicle: order.vehicle, vehiclePlate: order.vehiclePlate };
-        financeByDate[date] = finance.driverPaymentType === "company_advance"
-          ? withCompanyAdvanceDriver(finance, name)
-          : { ...finance, driver: name };
+        financeByDate[date] = syncPaymentType
+          ? setReservationDriverPayment({ ...finance, driver: name }, name ? "wage" : "company_advance", name)
+          : finance.driverPaymentType === "company_advance"
+            ? withCompanyAdvanceDriver(finance, name)
+            : { ...finance, driver: name };
       }
       return { ...order, financeByDate };
     }));
     await finishDialogSave([waitForOrders()], () => {
       setAccountingForm(current => Object.fromEntries(Object.entries(current).map(([key, finance]) => {
         if (!keys.includes(key)) return [key, finance];
-        return [key, finance.driverPaymentType === "company_advance"
-          ? withCompanyAdvanceDriver(finance, name)
-          : { ...finance, driver: name }];
+        return [key, syncPaymentType
+          ? setReservationDriverPayment({ ...finance, driver: name }, name ? "wage" : "company_advance", name)
+          : finance.driverPaymentType === "company_advance"
+            ? withCompanyAdvanceDriver(finance, name)
+            : { ...finance, driver: name }];
       })));
     });
   }
@@ -7724,15 +7742,16 @@ export default function Home() {
               <div className="overflow-x-auto border bg-white">
                 <table className="management-table w-full min-w-[1800px] table-fixed text-center text-sm" data-table="drivers">
                   <colgroup>
-                    <col style={{ width: "7%" }} /><col style={{ width: "15%" }} />
-                    <col style={{ width: "9%" }} /><col style={{ width: "9%" }} />
-                    <col style={{ width: "9%" }} /><col style={{ width: "8%" }} />
-                    <col style={{ width: "18%" }} /><col style={{ width: "19%" }} />
-                    <col style={{ width: "6%" }} />
+                    <col style={{ width: "7%" }} /><col style={{ width: "12%" }} />
+                    <col style={{ width: "12%" }} /><col style={{ width: "8%" }} />
+                    <col style={{ width: "8%" }} /><col style={{ width: "8%" }} />
+                    <col style={{ width: "8%" }} /><col style={{ width: "17%" }} />
+                    <col style={{ width: "14%" }} /><col style={{ width: "6%" }} />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">運転士</th>
+                      <th className="px-4 py-3 font-semibold">姓名读音（罗马字）</th>
                       <th className="px-4 py-3 font-semibold">个人标语</th>
                       <th className="px-4 py-3 font-semibold">携帯番号</th>
                       <th className="px-4 py-3 font-semibold">微信号</th>
@@ -7747,6 +7766,7 @@ export default function Home() {
                     {driverRows.map((driver) => (
                       <tr key={driver.id} className="border-t">
                         <td className={`whitespace-nowrap px-4 py-3 font-medium ${isDriverLicenseExpired(driver) ? "text-red-600" : ""}`}>{driver.name}</td>
+                        <td className="whitespace-nowrap px-4 py-3">{driver.reading || "-"}</td>
                         <td className="min-w-52 px-4 py-2">
                           <input
                             type="text"
@@ -8866,6 +8886,17 @@ export default function Home() {
                 />
               </label>
               <label className="block text-sm font-medium">
+                姓名读音（罗马字，用于A-Z排序）
+                <input
+                  type="text"
+                  maxLength={200}
+                  className="mt-1 w-full rounded border p-2"
+                  value={driverForm.reading}
+                  onChange={(event) => setDriverForm({ ...driverForm, reading: event.target.value })}
+                  placeholder="例如：TANAKA TARO"
+                />
+              </label>
+              <label className="block text-sm font-medium">
                 个人标语（留空時手机端显示“姓名，你好”）
                 <input
                   type="text"
@@ -9545,7 +9576,7 @@ export default function Home() {
               value={batchInput}
               onChange={(event) => setBatchInput(event.target.value)}
               placeholder={batchAddType === "drivers"
-                ? "姓名,携帯番号（可选）,微信号（可选）,WhatsApp（可选）,免許有効期限（可选）,个人标语（可选）"
+                ? "姓名,携帯番号（可选）,微信号（可选）,WhatsApp（可选）,免許有効期限（可选）,个人标语（可选）,姓名读音罗马字（可选）"
                 : batchAddType === "vehicles"
                   ? "車名,車両番号,座位数,燃油类型,車検有効期限,自賠責有効期限,備考,車両所属（可选）"
                   : batchAddType === "sources"

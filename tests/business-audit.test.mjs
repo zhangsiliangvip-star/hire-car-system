@@ -23,6 +23,7 @@ function load(relative, mocks = {}, globals = {}) {
     require: (name) => Object.hasOwn(mocks, name) ? mocks[name] :
       name === "@/lib/reservation-driver-payment" ? load("lib\\reservation-driver-payment.ts") :
       name === "@/lib/order-drivers" ? load("lib\\order-drivers.ts") :
+      name === "@/lib/driver-selection" ? load("lib\\driver-selection.ts") :
       name === "@/lib/order-vehicles" ? load("lib\\order-vehicles.ts") :
       name === "@/lib/vehicle-order" ? load("lib\\vehicle-order.ts") :
       name === "@/lib/driver/shifts" ? load("lib\\driver\\shifts.ts") : nodeRequire(name),
@@ -160,6 +161,19 @@ test("company advance external names appear in order labels but stay excluded fr
   assert.doesNotMatch(source, /form\[key\] = \{ \.\.\.finance, driver: defaultDriver \}/);
 });
 
+test("driver reading sorts assignment options by romanized A-Z order", () => {
+  const { sortDriversByReading } = load("lib\\driver-selection.ts");
+  const drivers = [
+    { id: "c", name: "佐藤", reading: "sato" },
+    { id: "a", name: "田中", reading: "Tanaka" },
+    { id: "b", name: "鈴木", reading: "suzuki" },
+    { id: "d", name: "Adams", reading: "" },
+  ];
+  assert.deepEqual(plain(sortDriversByReading(drivers).map((driver) => driver.id)), ["d", "c", "b", "a"]);
+  assert.deepEqual(drivers.map((driver) => driver.id), ["c", "a", "b", "d"],
+    "sorting does not mutate the source list");
+});
+
 test("outsourced driver labels have a distinct badge while staff driver labels remain unbadged", () => {
   const { OrderDriverLabels } = load("components\\driver-name-label.tsx");
   const order = { date: "2026-10-27", endDate: "2026-10-27", offDates: [], driver: "",
@@ -281,6 +295,45 @@ test("accounting driver autosave submits only persisted finances, preserves unsa
     await context.saveAccountingDrivers([key], "Blocked");
     assert.equal(writes, 1);
     assert.match(alerts.at(-1), /費用类型尚未保存/);
+  }
+});
+
+test("daily driver selection synchronizes expense type to wage or outsourced", async () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /function updateReservationDailyDriver\(draft: OrderDraft, date: string, name: string\): OrderDraft \{[\s\S]*?name \? "wage" : "company_advance"/);
+  const start = source.indexOf("  async function saveAccountingDrivers(");
+  const body = source.slice(start, source.indexOf("  const accountingMixedValue", start));
+  const key = `${id}|2026-10-27`;
+  for (const [name, type, driver] of [
+    ["Selected Driver", "wage", "Selected Driver"],
+    ["", "company_advance", ""],
+  ]) {
+    const finance = { driver: "Previous Driver", driverPaymentType: "wage",
+      driverWageMode: "fixed", driverWage: 500, driverBonusWage: 0,
+      driverOvertimeHours: 0, driverOvertimeRate: 0, driverOvertimeFee: 0,
+      externalDriverFee: 0 };
+    let records = [{ id, date: "2026-10-27", endDate: "2026-10-27", offDates: [],
+      driver: "Default", financeByDate: { "2026-10-27": finance } }];
+    let draft = { [key]: { ...finance } };
+    const context = {
+      ...load("lib\\order-drivers.ts"), ...load("lib\\reservation-driver-payment.ts"),
+      dialogSavingRef: { current: false }, allOrders: records, accountingForm: draft,
+      parseAccountingKey: () => ({ orderId: id, date: "2026-10-27" }),
+      getOrderDateKeys: () => ["2026-10-27"],
+      getReservationFinance: order => ({ ...order.financeByDate }), emptyOrderFinance: {},
+      alert: message => assert.fail(message), setOrders: update => { records = update(records); },
+      setAccountingForm: update => { draft = update(draft); },
+      waitForOrders: async () => true,
+      finishDialogSave: async (saves, done) => { if ((await Promise.all(saves)).every(Boolean)) done(); },
+    };
+    vm.createContext(context);
+    vm.runInContext(ts.transpileModule(body, {
+      compilerOptions: { target: ts.ScriptTarget.ES2020 },
+    }).outputText, context);
+    await context.saveAccountingDrivers([key], name, true);
+    assert.equal(records[0].financeByDate["2026-10-27"].driverPaymentType, type);
+    assert.equal(records[0].financeByDate["2026-10-27"].driver, driver);
+    assert.equal(draft[key].driverPaymentType, type);
   }
 });
 
@@ -462,6 +515,7 @@ test("orders API validates and round-trips persistent batch metadata", async () 
     "@/lib/api-response": { jsonResponse: (data, init) => ({ data, status: init?.status ?? 200 }) },
     "@/lib/supabase/pagination": { readAllPages: async (fetch) => fetch(0, 999) },
     "@/lib/delete-password": {},
+    "@/lib/supabase/admin": { createAdminClient: () => { throw new Error("Not used by this test"); } },
     "@/lib/company-seal": { isCompanySealDataUrl: () => true, MAX_SEAL_DATA_LENGTH: 350000 },
     "@/lib/audit": audit,
   });
@@ -537,6 +591,70 @@ test("orders API validates and round-trips persistent batch metadata", async () 
   const missingMigration = await post(order);
   assert.equal(missingMigration.status, 500);
   assert.match(missingMigration.data.error, /20261102000000_order_import_batches.sql/);
+});
+
+test("order deletion clears related rows and removes associated receipt files", async () => {
+  const deletions = [];
+  const removals = [];
+  const route = load("app\\api\\data\\route.ts", {
+    "@/lib/supabase/authorization": {
+      getAuthenticatedProfile: async () => ({
+        profile: { role: "user", regionId: region },
+        supabase: {
+          rpc: async (name, args) => {
+            deletions.push({ name, args });
+            return { data: [
+              { bucket: "driver-finance-receipts", path: "driver/assignment/receipt.jpg" },
+              { bucket: "driver-finance-receipts", path: "driver/assignment/receipt.jpg" },
+              { bucket: "driver-fuel-receipts", path: "driver/assignment/fuel.jpg" },
+            ], error: null };
+          },
+        },
+      }),
+    },
+    "@/lib/api-response": { jsonResponse: (data, init) => ({ data, status: init?.status ?? 200 }) },
+    "@/lib/delete-password": { verifyDeletePassword: () => ({ configured: true, valid: true }) },
+    "@/lib/supabase/admin": {
+      createAdminClient: () => ({
+        storage: { from: (bucket) => ({ remove: async (paths) => {
+          removals.push({ bucket, paths });
+          return { error: null };
+        } }) },
+      }),
+    },
+    "@/lib/supabase/pagination": {},
+    "@/lib/company-seal": { isCompanySealDataUrl: () => true, MAX_SEAL_DATA_LENGTH: 350000 },
+    "@/lib/audit": audit,
+  });
+  const response = await route.POST({ json: async () => ({
+    collection: "orders", upsert: [], deleteIds: [id], deletePassword: "confirmed",
+  }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual(plain(deletions), [{
+    name: "delete_orders_with_related_data",
+    args: { target_order_ids: [id] },
+  }]);
+  assert.deepEqual(plain(removals), [
+    { bucket: "driver-finance-receipts", paths: ["driver/assignment/receipt.jpg"] },
+    { bucket: "driver-fuel-receipts", paths: ["driver/assignment/fuel.jpg"] },
+  ]);
+});
+
+test("order deletion migration removes dispatch history and linked reports before deleting orders", () => {
+  const migration = fs.readFileSync(path.join(root, "supabase", "migrations",
+    "20261118000000_order_cascade_delete.sql"), "utf8");
+  assert.match(migration, /drop trigger if exists retain_driver_order_history on public\.orders/);
+  for (const table of [
+    "driver_report_events", "driver_daily_reports", "driver_daily_fuel_events",
+    "driver_daily_fuel", "driver_finance_events", "driver_finance_claims",
+    "driver_assignment_events", "driver_assignments", "driver_historical_finance_links",
+  ]) {
+    assert.ok(migration.indexOf(`delete from public.${table}`) < migration.indexOf("delete from public.orders"),
+      `${table} is cleared before the order`);
+  }
+  assert.match(migration, /driver-finance-receipts/);
+  assert.match(migration, /driver-fuel-receipts/);
+  assert.match(migration, /grant execute on function public\.delete_orders_with_related_data\(uuid\[\]\) to authenticated/);
 });
 
 test("vehicle statistics filter displays plates instead of vehicle names", () => {
@@ -774,7 +892,7 @@ test("single-record save dialogs close on confirmation, retain failures and avoi
   const helper = source.slice(helperStart, source.indexOf("  const [accountError", helperStart));
   for (const [kind, start, end, initial, recordKey, formKey, idKey, nameKey, savedName] of [
     ["Driver", "function saveDriver()", "function deleteDriver(", {
-      name: "Driver", phone: "", wechat: "", whatsapp: "", licenseExpiry: "", personalSlogan: "",
+      name: "Driver", reading: "", phone: "", wechat: "", whatsapp: "", licenseExpiry: "", personalSlogan: "",
     }, "driverRecords", "driverForm", "editingDriverId", "editingDriverName", "Driver"],
     ["Source", "function saveSource()", "function updateSourceColor(", {
       companyName: "Source", shortName: "", contactName: "", contactInfo: "", address: "", color: "",
@@ -1865,8 +1983,8 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
     "@/lib/vehicle-order": load("lib\\vehicle-order.ts"),
   });
   const vehicles = [
-    { id: "a", name: "Alphard 01", plate: "品川 100", status: "运营中" },
-    { id: "b", name: "Hiace 01", plate: "品川 200", status: "运营中" },
+    { id: "b", name: "Hiace 01", plate: "品川 200", status: "运营中", calendarOrder: 1 },
+    { id: "a", name: "Alphard 01", plate: "品川 100", status: "运营中", calendarOrder: 0 },
     { id: "c", name: "外注其他", plate: "", status: "运营中" },
     { id: "d", name: "Tesla 01", plate: "品川 300", status: "停运中" },
   ];
@@ -1892,6 +2010,8 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   }
   let view = render("Alphard 01", vehicles, false, "品川 100");
   assert.equal(view.select.props.value, "a");
+  assert.deepEqual(view.options.filter((option) => option.props.value !== "")
+    .map((option) => option.props.value), ["a", "b", "d"]);
   assert.equal(renderToStaticMarkup(view.options.find((option) => option.props.value === "a")),
     '<option value="a">品川 100</option>');
   view.select.props.onChange({ target: { value: "b" } });
@@ -1907,7 +2027,7 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   view.select.props.onChange({ target: { value: "d" } });
   view.select.props.onChange({ target: { value: "invalid" } });
   assert.equal(changes.length, 1);
-  const shared = [...vehicles, { ...vehicles[0], id: "duplicate", plate: "品川 400" }];
+  const shared = [...vehicles, { ...vehicles[1], id: "duplicate", plate: "品川 400" }];
   view = render("Alphard 01", shared);
   assert.equal(view.select.props.value, "");
   assert.ok(view.html.includes("請選択具体的車両番号"));
@@ -2316,11 +2436,12 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   input("2026-10-27 運転士費用类型").props.onChange({ target: { value: "company_advance" } });
   assert.equal(context.form.financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注司机：Daily C");
   driver(1).props.onChange("Daily D");
-  assert.equal(driver(1).props.value, "");
-  assert.equal(context.form.financeByDate["2026-10-27"].companyAdvancePaymentNote, "外注司机：Daily D");
-  assert.equal(context.form.financeByDate["2026-10-27"].driver, "");
+  assert.equal(driver(1).props.value, "Daily D");
+  assert.equal(context.form.financeByDate["2026-10-27"].driverPaymentType, "wage");
+  assert.equal(context.form.financeByDate["2026-10-27"].driver, "Daily D");
   driver(1).props.onChange("");
-  assert.equal(driver(1).props.value, "", "external name remains outside the daily driver assignment");
+  assert.equal(driver(1).props.value, "", "clearing the daily driver defaults to outsourced payment");
+  assert.equal(context.form.financeByDate["2026-10-27"].driverPaymentType, "company_advance");
   context.form = context.updateReservationDriver(context.form, "All Days");
   assert.equal(driver(0).props.value, "All Days");
   assert.equal(driver(1).props.value, "");
@@ -3190,6 +3311,7 @@ test("business POST returns trusted metadata and rejects client-supplied audit f
     },
     "@/lib/api-response": { jsonResponse: (data, init) => ({ data, status: init?.status ?? 200 }) },
     "@/lib/supabase/pagination": {},
+    "@/lib/supabase/admin": { createAdminClient: () => { throw new Error("Not used by this test"); } },
     "@/lib/delete-password": { verifyDeletePassword: () => ({ configured: true, valid: true }) },
     "@/lib/company-seal": { isCompanySealDataUrl: () => true, MAX_SEAL_DATA_LENGTH: 350000 },
     "@/lib/audit": audit,

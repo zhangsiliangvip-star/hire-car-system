@@ -1,6 +1,21 @@
 import type { Driver, Order } from "@/lib/domain";
 import { getServiceDriver } from "@/lib/order-drivers";
 
+const driverReadingCollator = new Intl.Collator("en", {
+  usage: "sort",
+  sensitivity: "base",
+  numeric: true,
+});
+
+export function sortDriversByReading<T extends Pick<Driver, "id" | "name"> & { reading?: string | null }>(
+  drivers: T[],
+) {
+  return drivers.slice().sort((first, second) =>
+    driverReadingCollator.compare(first.reading?.trim() || first.name, second.reading?.trim() || second.name) ||
+    driverReadingCollator.compare(first.name, second.name) ||
+    first.id.localeCompare(second.id));
+}
+
 export function rankDriversByRecentService(
   drivers: Driver[],
   orders: Order[],

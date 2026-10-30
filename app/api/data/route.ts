@@ -20,6 +20,7 @@ import { verifyDeletePassword } from "@/lib/delete-password";
 import { isCompanySealDataUrl, MAX_SEAL_DATA_LENGTH } from "@/lib/company-seal";
 import { toLastOperation, type LastOperation } from "@/lib/audit";
 import { hasValidDriverPayment } from "@/lib/reservation-driver-payment";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const idSchema = z.string().uuid();
 const dateSchema = z.iso.date();
@@ -118,6 +119,7 @@ const driverSchema = z.object({
   id: idSchema,
   regionId: idSchema,
   name: z.string().min(1).max(200),
+  reading: z.string().max(200).default(""),
   phone: z.string().max(100),
   wechat: z.string().max(200),
   whatsapp: z.string().max(200),
@@ -435,6 +437,7 @@ function toDriver(row: Database["public"]["Tables"]["drivers"]["Row"]): Driver {
     id: row.id,
     regionId: row.region_id,
     name: row.name,
+    reading: row.reading ?? "",
     phone: row.phone,
     wechat: row.wechat,
     whatsapp: row.whatsapp,
@@ -588,6 +591,7 @@ function toDriverRow(driver: Driver): Database["public"]["Tables"]["drivers"]["I
     id: driver.id,
     region_id: driver.regionId ?? "",
     name: driver.name,
+    reading: driver.reading,
     phone: driver.phone,
     wechat: driver.wechat,
     whatsapp: driver.whatsapp,
@@ -695,6 +699,12 @@ function toCompanyRow(
 
 type SavedOperation = { id: string; lastOperation: LastOperation | null };
 type SavedOperationRow = { id: string; last_operation: unknown };
+const orderReceiptCleanupSchema = z.array(z.object({
+  bucket: z.enum(["driver-finance-receipts", "driver-fuel-receipts"]),
+  path: z.string().min(1),
+}).strict());
+
+class OrderReceiptCleanupError extends Error {}
 
 function toSavedOperations(rows: SavedOperationRow[] | null): SavedOperation[] {
   return (rows ?? []).map((row) => ({
@@ -716,8 +726,22 @@ async function applyMutation(
       saved = toSavedOperations(data);
     }
     if (mutation.deleteIds.length) {
-      const { error } = await supabase.from("orders").delete().in("id", mutation.deleteIds);
+      const admin = createAdminClient();
+      const { data, error } = await supabase.rpc("delete_orders_with_related_data", {
+        target_order_ids: mutation.deleteIds,
+      });
       if (error) throw error;
+      const receipts = orderReceiptCleanupSchema.parse(data);
+      for (const bucket of ["driver-finance-receipts", "driver-fuel-receipts"] as const) {
+        const paths = [...new Set(receipts.filter((receipt) => receipt.bucket === bucket).map((receipt) => receipt.path))];
+        if (!paths.length) continue;
+        const { error: storageError } = await admin.storage.from(bucket).remove(paths);
+        if (storageError) {
+          throw new OrderReceiptCleanupError(
+            `訂単已删除，但关联小票文件清理失败（${bucket}）。請联系管理员检查存储清理。`,
+          );
+        }
+      }
     }
   } else if (mutation.collection === "drivers") {
     if (mutation.upsert.length) {
@@ -1038,6 +1062,20 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: true, saved });
   } catch (error) {
     console.error("Failed to persist dashboard data.", error);
+    if (error instanceof OrderReceiptCleanupError) {
+      return jsonResponse({ error: error.message }, { status: 500 });
+    }
+    if (
+      typeof error === "object" && error !== null &&
+      "code" in error && error.code === "PGRST202" &&
+      "message" in error && typeof error.message === "string" &&
+      error.message.includes("delete_orders_with_related_data")
+    ) {
+      return jsonResponse(
+        { error: "数据库尚未应用订单关联数据删除迁移，请先执行 20261118000000_order_cascade_delete.sql。" },
+        { status: 503 },
+      );
+    }
     if (typeof error === "object" && error !== null && "code" in error && error.code === "PDR01") {
       return jsonResponse(
         { error: "訂単已关联運転士派单或执行历史，不能永久删除；請改为取消訂単。历史記録和小票会保留。" },

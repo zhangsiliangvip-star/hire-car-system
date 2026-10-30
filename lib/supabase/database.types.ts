@@ -67,6 +67,7 @@ export type Database = {
         id: string;
         region_id: string;
         name: string;
+        reading: string;
         phone: string;
         wechat: string;
         whatsapp: string;
@@ -180,6 +181,10 @@ export type Database = {
       allocate_invoice_number: {
         Args: { p_order_id: string; p_company_id: string };
         Returns: string;
+      };
+      delete_orders_with_related_data: {
+        Args: { target_order_ids: string[] };
+        Returns: Json;
       };
       is_admin: {
         Args: Record<string, never>;
