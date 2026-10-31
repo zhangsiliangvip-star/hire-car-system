@@ -44,25 +44,25 @@ export function buildDriverWagePrintHtml(data: DriverWagePrintData) {
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { padding: 0; margin: 0; background: white; color: #172033; }
-  body { font: 10px Arial, "Microsoft YaHei", sans-serif; }
+  body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
   .sheet { width: 190mm; height: 276mm; overflow: hidden; }
   .content.fit-page-width { width: 190mm; transform-origin: top left; }
   h1 { margin: 0 0 14px; font-size: 24px; text-align: center; letter-spacing: 4px; }
   header { border-bottom: 2px solid #263b53; padding-bottom: 12px; }
-  .meta { display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 12px; overflow-wrap: anywhere; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 13px; overflow-wrap: anywhere; }
   .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
   .summary div { border: 1px solid #bac3cd; padding: 10px; }
   .summary strong { display: block; margin-top: 6px; font-size: 19px; }
-  h2 { font-size: 12px; margin: 14px 0 6px; }
+  h2 { font-size: 14px; margin: 14px 0 6px; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td { border: 1px solid #bac3cd; padding: 6px 3px; overflow-wrap: anywhere; }
-  th { background: #edf1f5; font-size: 9px; text-align: center; }
+  th { background: #edf1f5; font-size: 12px; text-align: center; }
   td { text-align: center; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
-  small { display: block; color: #555; margin-top: 3px; }
+  small { display: block; color: #555; margin-top: 3px; font-size: 12px; }
   tfoot { font-weight: bold; background: #f4f6f8; }
   .notes { margin-top: 16px; border: 1px solid #bac3cd; padding: 10px; line-height: 1.8; }
-  footer { font-size: 9px; color: #555; margin-top: 14px; }
+  footer { font-size: 12px; color: #555; margin-top: 14px; }
   </style></head><body><div class="sheet"><article class="content fit-page-width">
   <header><h1>運転士月度工資表</h1><div class="meta">
   <span>運転士：<strong>${escapeHtml(data.driver)}</strong></span><span>工資月份：${escapeHtml(data.month)}</span>
@@ -130,12 +130,12 @@ export function buildCompanyWagePrintHtml(data: CompanyWagePrintData) {
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; color: #172033; background: white; }
-  body { font: 10px Arial, "Microsoft YaHei", sans-serif; }
+  body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
   .sheet { width: 190mm; height: 276mm; overflow: hidden; }
   .content.fit-page-width { width: 190mm; transform-origin: top left; }
   h1 { margin: 0 0 15px; font-size: 23px; text-align: center; letter-spacing: 2px; }
   header { border-bottom: 2px solid #263b53; padding-bottom: 12px; }
-  .meta { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 12px; overflow-wrap: anywhere; }
+  .meta { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13px; overflow-wrap: anywhere; }
   .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
   .summary div { border: 1px solid #bac3cd; padding: 12px; }
   .summary strong { display: block; font-size: 19px; margin-top: 6px; }
@@ -143,7 +143,7 @@ export function buildCompanyWagePrintHtml(data: CompanyWagePrintData) {
   th, td { border: 1px solid #bac3cd; padding: 7px 3px; overflow-wrap: anywhere; text-align: center; }
   th, tfoot { background: #edf1f5; font-weight: bold; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
-  small { display: block; margin-top: 3px; color: #555; }
+  small { display: block; margin-top: 3px; color: #555; font-size: 12px; }
   .notes { border: 1px solid #bac3cd; padding: 10px; margin-top: 18px; line-height: 1.8; }
   </style></head><body><div class="sheet"><article class="content fit-page-width">
   <header><h1>所属会社全员工資総表</h1><div class="meta">

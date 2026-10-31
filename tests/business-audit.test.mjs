@@ -1246,6 +1246,7 @@ test("A4 report exports omit signature fields and preserve report content", () =
     assert.ok(html.includes(`<h1>${title}</h1>`), title);
     assert.ok(html.includes(metadata), title);
     assert.match(html, /<table/);
+    assert.match(html, /body\s*\{\s*font:\s*12px/, `${title} readable base font`);
   }
   assert.equal(reports.slice(0, 2).reduce((total, [html]) =>
     total + (html.match(/class="content fit-page-width"/g)?.length ?? 0), 0), 2);
@@ -2598,6 +2599,7 @@ test("balance payment reconciliation filters methods without changing expenses o
   assert.doesNotMatch(balanceHtml, /fit-page-width/);
   assert.ok(balanceHtml.includes("¥2,000") && balanceHtml.includes("¥8,000"));
   const html = buildCompanyAdvancePrintHtml(data);
+  assert.match(html, /body \{ font: 12px/);
   assert.match(html, /size: A4 portrait/);
   assert.match(html, /class="content fit-page-width"/);
   assert.match(html, /\.content\.fit-page-width\s*\{[^}]*width:\s*190mm/);
@@ -3043,6 +3045,8 @@ test("invoice always keeps order line and prints exactly the nonzero trip charge
     const data = { ...base };
     fees.forEach((fee, index) => { data[fee] = mask & (1 << index) ? 110 * (index + 1) : 0; });
     const html = buildInvoicePrintHtml(data);
+    assert.match(html, /body \{ font: 12px/);
+    assert.match(html, /\.document-meta \{[^}]*font-size: 12px/);
     const body = html.match(/<tbody>([\s\S]*?)<\/tbody>/)[1];
     const hasTripReport = fees.some((fee) => data[fee] > 0);
     assert.equal((body.match(/<tr[ >]/g) ?? []).length, 1 + (hasTripReport ? 1 : 0));

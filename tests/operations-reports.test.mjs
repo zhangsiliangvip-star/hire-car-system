@@ -330,6 +330,8 @@ test("PDF and monthly print contain one complete escaped sheet per report in ser
   assert.doesNotMatch(html, /\d{2}\/\d{2} \d{2}:\d{2}/);
   assert.match(html, /26小時30分/); assert.match(html, /休息記録/);
   assert.match(html, /80\.0 km/); assert.match(html, /&lt;img/); assert.doesNotMatch(html, /<img src=x/);
+  assert.match(html, /body\{font:12px/);
+  assert.match(html, /\.inspection\{font-size:12px\}/);
   assert.match(html, /break-after:page/);
   assert.throws(() => printing.buildOperationsPrintHtml([], "empty"), /没有可打印/);
   if (process.env.OPERATIONS_PRINT_FIXTURE) writeFileSync(process.env.OPERATIONS_PRINT_FIXTURE, html);

@@ -90,7 +90,7 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   .sheet { width: 190mm; height: 276mm; overflow: hidden; }
   .content { width: 190mm; transform-origin: top left; padding: 8mm 4mm; }
   h1 { text-align: center; font-size: 30px; letter-spacing: 12px; margin: 0 0 24px; }
-  .document-meta { text-align: right; font-size: 10px; margin-bottom: 20px; overflow-wrap: anywhere; }
+  .document-meta { text-align: right; font-size: 12px; margin-bottom: 20px; overflow-wrap: anywhere; }
   .parties { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; }
   .recipient { font-size: 20px; border-bottom: 1px solid #273d53; padding-bottom: 8px; }
   .lines { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; }
@@ -108,11 +108,11 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   tr.day td { padding: 8px; white-space: pre-wrap; }
   .day-date { display: inline-block; min-width: 5.5em; margin-right: 8px; font-weight: bold; }
   .subject { margin: 0 0 10px; }
-  .breakdown { display: block; margin-top: 4px; font-size: 10px; color: #4a5a6a; }
+  .breakdown { display: block; margin-top: 4px; font-size: 12px; color: #4a5a6a; }
   .tax { margin-left: auto; width: 60%; margin-top: 14px; }
   .tax td { padding: 8px; }
   .bank { border: 1px solid #aeb9c3; padding: 14px; margin-top: 24px; }
-  footer { margin-top: 18px; font-size: 10px; line-height: 1.8; }
+  footer { margin-top: 18px; font-size: 12px; line-height: 1.8; }
   </style></head><body><div class="sheet"><article class="content">
   <h1>請求書</h1><div class="document-meta">請求書番号：${escapeHtml(data.number)}<br>発行日：${escapeHtml(data.issuedDate)}</div>
   <div class="parties"><div><div class="recipient">${escapeHtml(data.recipient)} 御中</div>

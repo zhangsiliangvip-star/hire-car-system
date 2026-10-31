@@ -31,7 +31,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; color: #172033; }
-  body { font: 11px Arial, "Microsoft YaHei", sans-serif; }
+  body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
   .sheet { width: 190mm; height: 276mm; overflow: hidden; }
   .content { width: 190mm; transform-origin: top left; }
   h1 { font-size: 24px; text-align: center; margin: 0 0 14px; }
@@ -40,11 +40,11 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
   .summary div { border: 1px solid #bac3cd; padding: 12px; }
   .summary strong { display: block; font-size: 18px; margin-top: 8px; overflow-wrap: anywhere; }
-  .request-breakdown { margin-top: 8px; font-size: 10px; line-height: 1.7; }
+  .request-breakdown { margin-top: 8px; font-size: 12px; line-height: 1.7; }
   h2 { font-size: 14px; margin: 16px 0 8px; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td { border: 1px solid #bac3cd; padding: 7px 8px; overflow-wrap: anywhere; text-align: left; }
-  .company-summary { font-size: 11px; }
+  .company-summary { font-size: 12px; }
   .company-summary th, .company-summary td { padding: 7px 3px; }
   th, tfoot { background: #edf1f5; font-weight: bold; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
@@ -105,7 +105,7 @@ export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; color: #172033; background: white; }
-  body { font: 11px Arial, "Microsoft YaHei", sans-serif; }
+  body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
   .sheet { width: 190mm; height: 276mm; overflow: hidden; }
   .content.fit-page-width { width: 190mm; transform-origin: top left; }
   h1 { text-align: center; font-size: 24px; margin: 0 0 14px; }

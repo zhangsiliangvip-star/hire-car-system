@@ -98,7 +98,7 @@ export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
   }).join("");
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escape(title)}</title>
     <style>@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}
-    body{font:11px "Yu Mincho","MS Mincho","Noto Serif CJK JP","SimSun",serif}.sheet{width:190mm;height:276mm;overflow:hidden;break-after:page;page-break-after:always}
+    body{font:12px "Yu Mincho","MS Mincho","Noto Serif CJK JP","SimSun",serif}.sheet{width:190mm;height:276mm;overflow:hidden;break-after:page;page-break-after:always}
     .sheet:last-child{break-after:auto;page-break-after:auto}.content{width:190mm;transform-origin:top left}
     table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{border:1px solid #222;padding:3px 4px;overflow-wrap:anywhere;text-align:center;vertical-align:middle;font-weight:normal}
     .report-title{font-size:23px;font-weight:bold;height:10mm;letter-spacing:3px}
@@ -106,13 +106,13 @@ export function buildOperationsPrintHtml(rows: OperationRow[], title: string) {
     .journey th,.journey td{padding:2px 4px;line-height:1.35;min-height:4.5mm}
     .journey .place{text-align:left;white-space:pre-wrap}.odometer,.planned{font-variant-numeric:tabular-nums}
     .stop-entry{break-inside:avoid}.totals td,.totals th{height:7mm}.rest-records th,.rest-records td{padding:2px}
-    .paper-lower{margin-top:2mm}.alcohol{font-size:10px}.alcohol tr{height:6mm}
+    .paper-lower{margin-top:2mm}.alcohol{font-size:12px}.alcohol tr{height:6mm}
     .remarks{text-align:left}.remarks span{display:inline-block;margin-left:12px}.manager-sign{height:8mm}.fuel-blank{text-align:right;vertical-align:bottom}
     .inspection-heading th{height:6mm;letter-spacing:1px}.inspection-columns{display:grid;grid-template-columns:1fr 1fr}
-    .inspection{font-size:10.5px}.inspection tr{height:5.6mm}.inspection th,.inspection td{padding:1px 3px;line-height:1.15}
+    .inspection{font-size:12px}.inspection tr{height:5.6mm}.inspection th,.inspection td{padding:1px 3px;line-height:1.15}
     .right-inspection{margin-left:-1px;width:calc(100% + 1px)}.vertical{writing-mode:vertical-rl;letter-spacing:2px}
     .circle{font-size:15px;line-height:1}.alcohol-device{text-align:left}.inspection-heading,.alcohol,.report-header,.journey,.totals,.rest-records{margin-bottom:-1px}
-    footer{margin-top:2mm;font:9px Arial,sans-serif;line-height:1.3}</style></head><body>${pages}</body></html>`;
+    footer{margin-top:2mm;font:11px Arial,sans-serif;line-height:1.3}</style></head><body>${pages}</body></html>`;
 }
 
 export async function printOperationsReports(rows: OperationRow[], title: string, signal: AbortSignal) {

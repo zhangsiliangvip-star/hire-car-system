@@ -55,25 +55,25 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     @page { size: A4 portrait; margin: 10mm; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; color: #172033; background: white; }
-    body { font: 10px Arial, "Microsoft YaHei", sans-serif; }
+    body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
     .sheet { width: 190mm; height: 276mm; overflow: hidden; }
     .content { width: 190mm; transform-origin: top left; }
     header { border-bottom: 2px solid #263b53; padding-bottom: 12px; }
     h1 { margin: 0 0 10px; font-size: 23px; letter-spacing: 3px; }
     .meta { display: flex; gap: 20px; flex-wrap: wrap; }
-    .name { font-size: 13px; font-weight: bold; overflow-wrap: anywhere; }
-    h2 { margin: 16px 0 6px; font-size: 12px; }
+    .name { font-size: 14px; font-weight: bold; overflow-wrap: anywhere; }
+    h2 { margin: 16px 0 6px; font-size: 14px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     td { border: 1px solid #bac3cd; padding: 4px; overflow-wrap: anywhere; width: 16.666%; }
     td strong { display: block; text-align: right; font-variant-numeric: tabular-nums; margin-top: 3px; }
     .day { margin-top: 8px; break-inside: avoid; }
     .day-heading { display: flex; flex-wrap: wrap; gap: 6px 18px; background: #edf1f5; border: 1px solid #bac3cd; border-bottom: 0; padding: 5px; overflow-wrap: anywhere; }
-    small { display: block; color: #555; }
+    small { display: block; color: #555; font-size: 12px; }
     .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
     .card { border: 1px solid #bac3cd; padding: 9px; }
-    .card strong { display: block; font-size: 16px; margin-top: 5px; }
+    .card strong { display: block; font-size: 18px; margin-top: 5px; }
     .note { border: 1px solid #bac3cd; padding: 8px; min-height: 50px; white-space: pre-wrap; overflow-wrap: anywhere; }
-    footer { margin-top: 12px; font-size: 9px; color: #555; }
+    footer { margin-top: 12px; font-size: 12px; color: #555; }
     </style></head><body><div class="sheet"><article class="content">
     <header><h1>团务費用明細</h1><p class="name">${escapeHtml(data.name || "未填写訂単名称")}</p>
     <div class="meta"><span>行程日期：${escapeHtml(data.period)}</span><span>金額单位：JPY ／ 燃油：L ／ 油价：JPY/L</span></div></header>

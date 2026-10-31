@@ -90,7 +90,7 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; color: #172033; }
-  body { font: 10px Arial, "Microsoft YaHei", sans-serif; }
+  body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
   .sheet { width: 190mm; height: 276mm; overflow: hidden; }
   .content { width: 190mm; transform-origin: top left; }
   h1 { margin: 0 0 14px; font-size: 23px; text-align: center; letter-spacing: 2px; }
@@ -98,12 +98,12 @@ export function buildVehicleFinancePrintHtml(data: VehicleFinancePrintData) {
   .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12px; overflow-wrap: anywhere; }
   .summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
   .summary div { flex: 1 1 120px; border: 1px solid #bac3cd; padding: 9px; }
-  .summary strong { display: block; font-size: 16px; margin-top: 6px; }
-  h2 { font-size: 12px; margin: 14px 0 6px; }
+  .summary strong { display: block; font-size: 18px; margin-top: 6px; }
+  h2 { font-size: 14px; margin: 14px 0 6px; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td { border: 1px solid #bac3cd; padding: 6px 3px; overflow-wrap: anywhere; }
   th, tfoot { background: #edf1f5; font-weight: bold; }
-  th { font-size: 9px; }
+  th { font-size: 12px; }
   td { text-align: center; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
   .supplies, .notes { margin-top: 10px; line-height: 1.8; overflow-wrap: anywhere; }
@@ -147,18 +147,18 @@ export function buildVehicleSummaryPrintHtml(data: VehicleSummaryPrintData) {
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; color: #172033; }
-  body { font: 10px Arial, "Microsoft YaHei", sans-serif; }
+  body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
   .sheet { width: 190mm; height: 276mm; overflow: hidden; }
   .content { width: 190mm; transform-origin: top left; }
   h1 { font-size: 23px; text-align: center; margin: 0 0 14px; }
   .meta { display: flex; gap: 18px; flex-wrap: wrap; border-bottom: 2px solid #263b53; padding-bottom: 12px; }
-  .summary { margin: 14px 0; padding: 12px; border: 1px solid #bac3cd; font-size: 13px; }
-  .summary strong { font-size: 21px; }
+  .summary { margin: 14px 0; padding: 12px; border: 1px solid #bac3cd; font-size: 14px; }
+  .summary strong { font-size: 22px; }
   table { width: 100%; table-layout: fixed; border-collapse: collapse; }
   th, td { padding: 7px 3px; border: 1px solid #bac3cd; overflow-wrap: anywhere; text-align: center; }
   th, tfoot { background: #edf1f5; font-weight: bold; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
-  small { display: block; color: #555; }
+  small { display: block; color: #555; font-size: 12px; }
   .notes { margin-top: 14px; line-height: 1.8; }
   </style></head><body><div class="sheet"><article class="content">
   <h1>全車両月度统计表</h1><div class="meta"><span>服务月份：${escapeHtml(data.month)}</span>

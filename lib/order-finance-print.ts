@@ -43,16 +43,16 @@ export function buildOrderFinancePrintHtml(data: OrderFinancePrintData) {
   @page { size: A4 portrait; margin: 10mm; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; color: #172033; }
-  body { font: 9px Arial, "Microsoft YaHei", sans-serif; }
+  body { font: 12px Arial, "Microsoft YaHei", sans-serif; }
   .sheet { width: 190mm; min-height: 276mm; height: auto; overflow: visible; }
   .content.expand-pages { width: 190mm; transform-origin: top left; }
   h1 { font-size: 23px; text-align: center; margin: 0 0 14px; }
   header { border-bottom: 2px solid #263b53; padding-bottom: 12px; }
-  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 11px; overflow-wrap: anywhere; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 12px; overflow-wrap: anywhere; }
   .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
   .summary div { border: 1px solid #bac3cd; padding: 10px; }
-  .summary strong { display: block; font-size: 18px; margin-top: 6px; }
-  .request-breakdown { margin-top: 8px; font-size: 10px; line-height: 1.7; }
+  .summary strong { display: block; font-size: 20px; margin-top: 6px; }
+  .request-breakdown { margin-top: 8px; font-size: 12px; line-height: 1.7; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td { border: 1px solid #bac3cd; padding: 6px 3px; overflow-wrap: anywhere; }
   th, tfoot { background: #edf1f5; font-weight: bold; }
