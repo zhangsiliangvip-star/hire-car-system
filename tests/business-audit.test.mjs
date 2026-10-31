@@ -2864,12 +2864,13 @@ test("reservation table omits order status and preserves request status controls
   const table = source.slice(start, source.indexOf("</table>", start));
   const headers = [...table.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1]);
   assert.deepEqual(headers, [
-    "用車日期", "予約情報", "配車時間", "来源",
-    "車両", "運転士", "請求書状態", "操作",
+    "用車日期", "予約情報", "来源", "車両",
+    "運転士", "請求書状態", "操作",
   ]);
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
-  assert.deepEqual(columnWidths, [16, 18, 8, 9, 10, 12, 12, 15]);
+  assert.deepEqual(columnWidths, [16, 18, 11, 12, 15, 14, 14]);
   assert.equal(columnWidths.reduce((sum, width) => sum + width, 0), 100);
+  assert.doesNotMatch(table, /配車時間|order\.time/);
   assert.doesNotMatch(table, /訂単状態|order\.status/);
   assert.match(table, /点击選択請求書状態和变更范围/);
   assert.match(table, /onClick=\{\(\) => openOrderStatusDialog\(order, "invoice", "reservation"\)\}/);

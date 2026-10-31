@@ -7534,18 +7534,16 @@ export default function Home() {
                   <colgroup>
                     <col className="w-[16%]" />
                     <col className="w-[18%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[10%]" />
-                    <col className="w-[12%]" />
+                    <col className="w-[11%]" />
                     <col className="w-[12%]" />
                     <col className="w-[15%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[14%]" />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-2 py-3 font-semibold">用車日期</th>
                       <th className="px-2 py-3 font-semibold">予約情報</th>
-                      <th className="px-2 py-3 font-semibold">配車時間</th>
                       <th className="px-2 py-3 font-semibold">来源</th>
                       <th className="px-2 py-3 font-semibold">車両</th>
                       <th className="px-2 py-3 font-semibold">運転士</th>
@@ -7579,7 +7577,6 @@ export default function Home() {
                               </span>
                             )}
                           </td>
-                          <td className="whitespace-nowrap px-2 py-3">{order.time}</td>
                           <td className="break-words px-2 py-3">{order.orderSource || "未填写"}</td>
                           <td className="break-words px-2 py-3">
                             <button
