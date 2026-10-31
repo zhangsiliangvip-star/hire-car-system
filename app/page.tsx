@@ -5218,8 +5218,8 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              <div className="overflow-x-auto border bg-white">
-                <table className="management-table w-full min-w-[1700px] table-fixed text-center text-sm" data-table="order-finance">
+              <div className="order-finance-table-region border bg-white">
+                <table className="management-table order-finance-management-table w-full min-w-[1700px] table-fixed text-center text-sm" data-table="order-finance">
                   <colgroup>
                     <col style={{ width: "8%" }} /><col style={{ width: "14%" }} />
                     <col style={{ width: "11%" }} /><col style={{ width: "7%" }} />
@@ -5256,10 +5256,10 @@ export default function Home() {
                         const totals = getOrderFinanceForOrder(order);
                         return (
                           <tr key={order.id} className="border-t hover:bg-gray-50">
-                          <td className="whitespace-nowrap px-4 py-3">
+                          <td data-label="訂単日期" className="whitespace-nowrap px-4 py-3">
                             {formatOrderDate(order.date)}
                           </td>
-                          <td className="px-4 py-3">
+                          <td data-label="訂単名称" className="px-4 py-3">
                             <button
                               type="button"
                               onClick={() => openAccounting(order)}
@@ -5270,15 +5270,15 @@ export default function Home() {
                             </button>
                             <OrderFinanceReviewButton orderId={order.id} name={order.customer || "未填写"} />
                           </td>
-                          <td className="px-4 py-3">{order.orderSource || "未填写"}</td>
-                          <td className="px-4 py-3">
+                          <td data-label="来源" className="px-4 py-3">{order.orderSource || "未填写"}</td>
+                          <td data-label="運転士" className="px-4 py-3">
                             <button type="button" onClick={() => setDriverSelectionTarget(order.id)}
                               className="font-medium text-blue-700 hover:underline">
                               <OrderDriverLabels order={order} />
                             </button>
                           </td>
-                          <td className="px-4 py-3">{getOrderVehicleNumber(order, financeMonth)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
+                          <td data-label="車両番号" className="px-4 py-3">{getOrderVehicleNumber(order, financeMonth)}</td>
+                          <td data-label="請求書状態" className="whitespace-nowrap px-4 py-3 text-right font-semibold">
                             <button
                               type="button"
                               aria-label={`${order.customer} 請求書状態：${order.invoiceStatus}，点击更改`}
@@ -5290,7 +5290,7 @@ export default function Home() {
                               {invoiceStatusSavingIds.has(order.id) ? "保存中…" : order.invoiceStatus}
                             </button>
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
+                          <td data-label="入金状態" className="whitespace-nowrap px-4 py-3 text-right font-semibold">
                             <button
                               type="button"
                               aria-label={`${order.customer} 入金状態：${order.depositDate ? "入金済み" : "未入金"}，点击更改`}
@@ -5302,11 +5302,11 @@ export default function Home() {
                               {invoiceStatusSavingIds.has(order.id) ? "保存中…" : order.depositDate ? "入金済み" : "未入金"}
                             </button>
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.requestAmount)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.driverAdvances)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.companyExpenses)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.driverWages)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(totals.profit)}</td>
+                          <td data-label="請求金額" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.requestAmount)}</td>
+                          <td data-label="運転士総立替" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.driverAdvances)}</td>
+                          <td data-label="会社総支出" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.companyExpenses)}</td>
+                          <td data-label="運転士総工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.driverWages)}</td>
+                          <td data-label="訂単総利润" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(totals.profit)}</td>
                           </tr>
                         );
                       })
@@ -5419,16 +5419,15 @@ export default function Home() {
                   <span className="text-lg font-bold tabular-nums text-blue-950">{formatYen(driverFinanceTotalAdvances + driverFinanceTotalWage)}</span>
                 </div>
               </div>
-              <div className="overflow-x-auto border bg-white">
-                <table className="management-table w-full min-w-[1900px] table-fixed text-center text-xs" data-table="driver-finance">
+              <div className="driver-finance-table-region overflow-x-auto border bg-white">
+                <table className="management-table driver-finance-management-table w-full min-w-[1900px] table-fixed text-center text-xs" data-table="driver-finance">
                   <colgroup>
-                    <col style={{ width: "7%" }} /><col style={{ width: "12%" }} />
+                    <col style={{ width: "8%" }} /><col style={{ width: "14%" }} />
+                    <col style={{ width: "9%" }} /><col style={{ width: "7%" }} />
                     <col style={{ width: "8%" }} /><col style={{ width: "6%" }} />
-                    <col style={{ width: "9%" }} /><col style={{ width: "6%" }} />
-                    <col style={{ width: "6.5%" }} /><col style={{ width: "5%" }} />
-                    <col style={{ width: "6.5%" }} /><col style={{ width: "6.5%" }} />
+                    <col style={{ width: "8%" }} /><col style={{ width: "8%" }} />
+                    <col style={{ width: "9%" }} /><col style={{ width: "9%" }} />
                     <col style={{ width: "7%" }} /><col style={{ width: "7%" }} />
-                    <col style={{ width: "6.5%" }} /><col style={{ width: "7%" }} />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
@@ -5436,8 +5435,6 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">訂単名称</th>
                       <th className="px-4 py-3 font-semibold">車輌番号</th>
                       <th className="px-4 py-3 font-semibold">運転士姓名</th>
-                      <th className="px-4 py-3 font-semibold">所属会社</th>
-                      <th className="px-4 py-3 font-semibold">核算担当</th>
                       <th className="px-4 py-3 text-right font-semibold">運転士立替</th>
                       <th className="px-4 py-3 text-right font-semibold">超時時間</th>
                       <th className="px-4 py-3 text-right font-semibold">超時工資</th>
@@ -5451,7 +5448,7 @@ export default function Home() {
                   <tbody>
                     {filteredDriverFinanceDetails.length === 0 ? (
                       <tr>
-                        <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
                           暂无運転士工資記録
                         </td>
                       </tr>
@@ -5459,12 +5456,13 @@ export default function Home() {
                       filteredDriverFinanceDetails.map((row) => (
                       <tr key={row.id} className="border-t hover:bg-gray-50">
                         <td
+                          data-label="服务日期"
                           className="whitespace-nowrap px-4 py-3 font-medium"
                           style={row.isRedDay ? { color: "#dc2626" } : undefined}
                         >
                           {formatOrderDate(row.serviceDate)}
                         </td>
-                        <td className="px-4 py-3 font-medium">
+                        <td data-label="訂単名称" className="px-4 py-3 font-medium">
                           <button
                             type="button"
                             aria-haspopup="dialog"
@@ -5481,18 +5479,16 @@ export default function Home() {
                             {row.customer}
                           </button>
                         </td>
-                        <td className="px-4 py-3">{row.vehicleNumber || "—"}</td>
-                        <td className="px-4 py-3">{row.driver}</td>
-                        <td className="px-4 py-3">{row.company || "未设置"}</td>
-                        <td className="px-4 py-3">{row.accountingAssignee || "—"}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.driverAdvances)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{row.overtimeHours.toLocaleString("ja-JP")} h</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.overtimeFee)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.bonusWage)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.percentageWage)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.fixedWage)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(row.totalWage)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-blue-800">{formatYen(row.driverAdvances + row.totalWage)}</td>
+                        <td data-label="車輌番号" className="px-4 py-3">{row.vehicleNumber || "—"}</td>
+                        <td data-label="運転士姓名" className="px-4 py-3">{row.driver}</td>
+                        <td data-label="運転士立替" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.driverAdvances)}</td>
+                        <td data-label="超時時間" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{row.overtimeHours.toLocaleString("ja-JP")} h</td>
+                        <td data-label="超時工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.overtimeFee)}</td>
+                        <td data-label="奖励工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.bonusWage)}</td>
+                        <td data-label="運転士比例工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.percentageWage)}</td>
+                        <td data-label="運転士固定工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.fixedWage)}</td>
+                        <td data-label="工資総额" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(row.totalWage)}</td>
+                        <td data-label="支付総额" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-blue-800">{formatYen(row.driverAdvances + row.totalWage)}</td>
                       </tr>
                       ))
                     )}
@@ -7797,13 +7793,13 @@ export default function Home() {
                 </button>}
                 {driverGlobalSloganError && <p role="alert" className="w-full text-sm text-red-700">{driverGlobalSloganError}</p>}
               </div>
-              <DriverLoginProvider>
               <div
                 className="driver-table-region border bg-white"
                 role="region"
                 aria-label="運転士列表"
               >
-                <table className="management-table driver-management-table w-full table-fixed text-center text-sm" data-table="drivers">
+                <DriverLoginProvider>
+                <table className="management-table driver-management-table w-full min-w-[1800px] table-fixed text-center text-sm" data-table="drivers">
                   <colgroup>
                     <col style={{ width: "7%" }} /><col style={{ width: "12%" }} />
                     <col style={{ width: "12%" }} /><col style={{ width: "8%" }} />
@@ -7857,7 +7853,7 @@ export default function Home() {
                         <td data-label="WhatsApp" className="px-4 py-3">{driver.whatsapp || "-"}</td>
                         <td data-label="免許有効期限" className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
                         {driver.id.startsWith("unregistered-driver-")
-                          ? <td data-label="登录信息" colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士記録</td>
+                          ? <td colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士記録</td>
                           : <DriverLoginFields driverId={driver.id} name={driver.name} regionId={driver.regionId} />}
                         <td data-label="操作" className="px-4 py-3">
                           <div className="flex gap-3">
@@ -7881,8 +7877,8 @@ export default function Home() {
                     ))}
                   </tbody>
                 </table>
+                </DriverLoginProvider>
               </div>
-              </DriverLoginProvider>
             </div>
           )}
 

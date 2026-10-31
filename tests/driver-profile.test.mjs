@@ -177,7 +177,11 @@ test("driver list exposes email and write-only password fields; inputs clear on 
   assert.match(source, /grid-cols-\[minmax\(0,1fr\)_3rem_5rem\]/);
   assert.equal((source.match(/className="h-10 /g) || []).length, 4);
   const page = readFileSync(fileURLToPath(new URL("../app/page.tsx", import.meta.url)), "utf8");
-  assert.match(page, /登录邮箱<\/th>/); assert.match(page, /登录密码<\/th>/);
+  const driverTable = page.slice(page.indexOf('data-table="drivers"'), page.indexOf("</table>", page.indexOf('data-table="drivers"')));
+  const loginManagement = page.slice(page.indexOf('{activeView === "login"'), page.indexOf('{activeView === "orderFinance"'));
+  assert.match(driverTable, /登录邮箱<\/th>/); assert.match(driverTable, /登录密码<\/th>/);
+  assert.match(driverTable, /<DriverLoginFields driverId=\{driver\.id\}/);
+  assert.doesNotMatch(loginManagement, /DriverLoginFields|driver-login-accounts/);
   assert.match(source, /manageableRegionId === regionId/);
   assert.match(page, /regionId=\{driver\.regionId\}/);
   const profileSource = readFileSync(fileURLToPath(new URL("../app/driver/profile/page.tsx", import.meta.url)), "utf8");
