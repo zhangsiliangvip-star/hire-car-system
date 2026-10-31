@@ -58,8 +58,10 @@ test("driver edit and delete controls use distinct semantic action styles", () =
   const driverViewStart = page.indexOf('{activeView === "drivers"');
   const driverViewEnd = page.indexOf('{activeView === "vehicles"', driverViewStart);
   const driverView = page.slice(driverViewStart, driverViewEnd);
-  assert.match(driverView, /openEditDriver\(driver\)[\s\S]*?className="table-action-button table-action-button--edit"/);
-  assert.match(driverView, /deleteDriver\(driver\)[\s\S]*?className="table-action-button table-action-button--delete"/);
+  assert.match(driverView, /openEditDriver\(driver\)[\s\S]*?className="table-action-button table-action-button--edit driver-action-button"/);
+  assert.match(driverView, /deleteDriver\(driver\)[\s\S]*?className="table-action-button table-action-button--delete driver-action-button"/);
+  assert.match(css, /\.driver-action-buttons\s*\{[^}]*display: grid !important;[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
+  assert.match(css, /\.driver-action-button\s*\{[^}]*width: 100%;[^}]*min-width: 0;[^}]*white-space: normal;/);
 });
 
 test("edit, delete and PDF export actions use scoped semantic button styles", () => {

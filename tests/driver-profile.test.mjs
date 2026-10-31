@@ -182,6 +182,8 @@ test("driver mobile settings expose email and write-only password fields; inputs
   const loginManagement = page.slice(page.indexOf('{activeView === "login"'), page.indexOf('{activeView === "orderFinance"'));
   assert.doesNotMatch(driverTable, /登录邮箱<\/th>|登录密码<\/th>/);
   assert.match(driverTable, /<DriverMobileDialog/);
+  assert.match(driverTable, /className="driver-action-buttons"/);
+  assert.equal((driverTable.match(/className="driver-action-slot"/g) || []).length, 3);
   assert.doesNotMatch(driverTable, /个人标语<\/th>|登录邮箱<\/th>|登录密码<\/th>/);
   assert.ok(driverTable.indexOf("openEditDriver(driver)") < driverTable.indexOf("<DriverMobileDialog"));
   assert.ok(driverTable.indexOf("<DriverMobileDialog") < driverTable.indexOf("deleteDriver(driver)"));
@@ -191,7 +193,7 @@ test("driver mobile settings expose email and write-only password fields; inputs
   assert.match(mobileDialog, /<DriverLoginFields driverId=\{driverId\}/);
   assert.match(mobileDialog, /const isLoggedIn = account\?\.status === "active"/);
   assert.match(mobileDialog, /isLoggedIn \? "手机端已登录" : "手机端"/);
-  assert.match(mobileDialog, /className=\{`table-action-button driver-mobile-launch-button\$\{isLoggedIn \? " is-active" : ""\}`\}/);
+  assert.match(mobileDialog, /className=\{`table-action-button driver-mobile-launch-button driver-action-button\$\{isLoggedIn \? " is-active" : ""\}`\}/);
   assert.match(mobileDialog, /className="driver-mobile-dialog__driver-name"/);
   const styles = readFileSync(fileURLToPath(new URL("../app/globals.css", import.meta.url)), "utf8");
   assert.match(styles, /\.driver-mobile-launch-button\.is-active\s*\{[^}]*background: #dcfce7;[^}]*color: #15803d;/);

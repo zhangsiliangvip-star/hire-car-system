@@ -243,6 +243,29 @@ body {
   background: #bbf7d0;
 }
 
+.driver-action-buttons {
+  display: grid !important;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.driver-action-slot {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+}
+
+.driver-action-button {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.2rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .driver-mobile-close-button {
   flex-shrink: 0;
   border: 1px solid #cbd5e1;
@@ -598,6 +621,23 @@ body {
 
   .driver-management-table td[data-label="操作"] > div {
     justify-content: flex-start;
+  }
+
+  .driver-management-table td[data-label="操作"] .driver-action-buttons {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  .driver-management-table td[data-label="操作"] .driver-action-slot {
+    width: 100%;
+  }
+
+  .driver-management-table td[data-label="操作"] .driver-action-button {
+    min-height: 2.5rem;
+    font-size: 0.7rem;
+    line-height: 1.15;
   }
 
   .driver-mobile-dialog-backdrop {

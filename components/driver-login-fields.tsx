@@ -134,7 +134,7 @@ export function DriverMobileDialog({ driverId, name, regionId, slogan, onSloganC
       type="button"
       disabled={disabled}
       onClick={() => setOpen(true)}
-      className={`table-action-button driver-mobile-launch-button${isLoggedIn ? " is-active" : ""}`}
+      className={`table-action-button driver-mobile-launch-button driver-action-button${isLoggedIn ? " is-active" : ""}`}
       aria-label={`${name}手机端设置`}
       title={disabled ? "請先编辑保存为正式運転士記錄" : undefined}
     >

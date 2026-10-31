@@ -7827,14 +7827,17 @@ export default function Home() {
                         <td data-label="WhatsApp" className="px-4 py-3">{driver.whatsapp || "-"}</td>
                         <td data-label="免許有効期限" className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
                         <td data-label="操作" className="px-4 py-3">
-                          <div className="flex gap-3">
+                          <div className="driver-action-buttons">
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => openEditDriver(driver)}
-                              className="table-action-button table-action-button--edit"
+                              className="table-action-button table-action-button--edit driver-action-button"
                             >
                               编辑
                             </button>
+                            </div>
+                            <div className="driver-action-slot">
                             <DriverMobileDialog
                               driverId={driver.id}
                               name={driver.name}
@@ -7854,13 +7857,16 @@ export default function Home() {
                                 ));
                               }}
                             />
+                            </div>
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => deleteDriver(driver)}
-                              className="table-action-button table-action-button--delete"
+                              className="table-action-button table-action-button--delete driver-action-button"
                             >
                               删除
                             </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
