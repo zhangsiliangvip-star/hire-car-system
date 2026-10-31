@@ -249,7 +249,8 @@ export function OrderFinanceReviewButton({ orderId, name }: { orderId: string; n
   const context = useContext(Context);
   if (!context?.data?.enabled) return null;
   const count = context.data.rows.filter(row => row.orderId === orderId).length;
-  return <button type="button" disabled={context.busy || context.blocked || !count} aria-haspopup="dialog"
-    className={`mt-1 block text-left text-xs ${count ? "font-semibold text-amber-700 hover:underline" : "text-gray-400"} disabled:cursor-default`}
-    onClick={() => context.open(orderId, name)}>{count ? `運転士申報待审核 ${count} 项` : "无待审核申報"}</button>;
+  if (!count) return null;
+  return <button type="button" disabled={context.busy || context.blocked} aria-haspopup="dialog"
+    className="mt-1 block text-left text-xs font-semibold text-amber-700 hover:underline disabled:cursor-default"
+    onClick={() => context.open(orderId, name)}>運転士申報待审核 {count} 项</button>;
 }

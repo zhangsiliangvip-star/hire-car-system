@@ -45,6 +45,14 @@ test("management views allocate every column explicitly without changing table d
   assert.deepEqual(found.sort(), Object.keys(expectedColumns).sort());
 });
 
+test("vehicle summary displays the vehicle number without a region subtitle", () => {
+  const tableStart = page.indexOf('data-table="vehicle-summary"');
+  const tableEnd = page.indexOf("</table>", tableStart);
+  const table = page.slice(page.lastIndexOf("<table", tableStart), tableEnd);
+  assert.match(table, /<td className="px-4 py-3 font-medium">\s*\{row\.vehicleNumber\}\s*<\/td>/);
+  assert.doesNotMatch(table, /regionNameById\.get\(row\.regionId/);
+});
+
 test("management cells and controls center and wrap without affecting other tables", () => {
   assert.doesNotMatch(css, /\.dashboard table td button\s*\{/);
   assert.doesNotMatch(css, /\.dashboard button:not\(:disabled\):active/);

@@ -5946,7 +5946,6 @@ export default function Home() {
                               <td className="px-4 py-3">{row.month}</td>
                               <td className="px-4 py-3 font-medium">
                                 {row.vehicleNumber}
-                                <span className="block text-xs text-gray-500">{regionNameById.get(row.regionId || "") || "未知地域"}</span>
                               </td>
                               <td className="px-4 py-3 text-right tabular-nums">{formatYen(row.requestAmount)}</td>
                               <td className="px-4 py-3 text-right tabular-nums">{formatYen(row.driverAdvances)}</td>
