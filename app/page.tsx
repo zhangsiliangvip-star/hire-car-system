@@ -7858,10 +7858,10 @@ export default function Home() {
                 <DriverLoginProvider>
                 <table className="management-table driver-management-table w-full min-w-[1800px] table-fixed text-center text-sm" data-table="drivers">
                   <colgroup>
-                    <col style={{ width: "12%" }} /><col style={{ width: "18%" }} />
-                    <col style={{ width: "13%" }} /><col style={{ width: "13%" }} />
-                    <col style={{ width: "13%" }} /><col style={{ width: "14%" }} />
-                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "12%" }} /><col style={{ width: "12%" }} />
+                    <col style={{ width: "12%" }} /><col style={{ width: "14%" }} />
+                    <col style={{ width: "14%" }} /><col style={{ width: "17%" }} />
+                    <col style={{ width: "19%" }} />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>

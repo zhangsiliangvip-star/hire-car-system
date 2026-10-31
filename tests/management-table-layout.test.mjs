@@ -36,6 +36,7 @@ test("management views allocate every column explicitly without changing table d
           .map((match) => Number(match[1] ?? match[2]));
         assert.equal(columns.length, expectedColumns[name], name);
         assert.ok(Math.abs(columns.reduce((sum, width) => sum + width, 0) - 100) < 0.001, name);
+        if (name === "drivers") assert.deepEqual(columns, [12, 12, 12, 14, 14, 17, 19]);
         assert.match(markup, /<tbody>/);
       }
     }
