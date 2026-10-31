@@ -105,6 +105,30 @@ const LOGIN_ACCOUNT_POSITIONS = ["役员", "操作", "会计"] as const;
 
 const fuelTypes = ["レギュラー", "ディーゼル"];
 
+function SidebarIcon({ name }: { name: string }) {
+  const icons: Record<string, ReactNode> = {
+    calendar: <><rect x="3" y="4.5" width="18" height="17" rx="2" /><path d="M7.5 2.5v4M16.5 2.5v4M3 9.5h18M7.5 13h.01M12 13h.01M16.5 13h.01M7.5 17h.01M12 17h.01" /></>,
+    orders: <><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></>,
+    operations: <><path d="M3 19.5h18M5 16V9l7-5 7 5v7" /><path d="M9 19.5v-6h6v6M12 4v4" /></>,
+    driver: <><circle cx="12" cy="7" r="3.25" /><path d="M5 21v-2a7 7 0 0 1 14 0v2z" /></>,
+    vehicle: <><path d="m5 11 1.5-5h11L19 11M3.5 11h17v8h-17zM6.5 19v2M17.5 19v2" /><path d="M7 15h.01M17 15h.01" /></>,
+    source: <><path d="M7 17 17 7M8 7h9v9" /><circle cx="6" cy="18" r="2" /></>,
+    company: <><path d="M4 21V5l8-3 8 3v16M2 21h20" /><path d="M8 8h1M15 8h1M8 12h1M15 12h1M10 21v-4h4v4" /></>,
+    finance: <><path d="M5 7h14M5 12h14M5 17h14" /><path d="m9 4-2 16M17 4l-2 16" /></>,
+    salary: <><path d="M12 3v18M17 7.5c0-1.7-1.9-3-4.5-3S8 5.7 8 7.5s1.9 3 4.5 3 4.5 1.3 4.5 3-1.9 3-4.5 3S8 15.7 8 14" /></>,
+    vehicleFinance: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
+    balance: <><path d="M12 3v18M5 7h14M6 7l-4 7h8L6 7ZM18 7l-4 7h8l-4-7ZM8 21h8" /></>,
+    login: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M10 8h7M10 12h7M10 16h4M6.5 8h.01M6.5 12h.01M6.5 16h.01" /></>,
+    audit: <><path d="M8 4h11v17H5V7zM8 4v4H5M9 12h6M9 16h6" /><path d="m15 3 3 3" /></>,
+  };
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+      {icons[name]}
+    </svg>
+  );
+}
+
 function preventNumberInputWheelChange(event: WheelEvent) {
   const input = event.target;
   if (
@@ -1760,8 +1784,12 @@ export default function Home() {
   const orderFormVehicles = allVehicleRecords
     .filter((vehicle) => Boolean(orderFormRegionId) && vehicle.regionId === orderFormRegionId)
     .slice().sort(compareVehicles);
-  const orderFormVehicleStatusByName = new Map(
-    orderFormVehicles.map((vehicle) => [vehicle.name, getVehicleDisplayStatus(vehicle)]),
+  const orderFormVehicleAvailableByName = new Map(
+    [...new Set(orderFormVehicles.map((vehicle) => vehicle.name))].map((name) => [
+      name,
+      orderFormVehicles.some((vehicle) =>
+        vehicle.name === name && getVehicleDisplayStatus(vehicle) === "运营中"),
+    ]),
   );
   const orderFormAvailableVehicles = orderFormVehicles
     .filter((vehicle) => getVehicleDisplayStatus(vehicle) === "运营中")
@@ -4781,50 +4809,92 @@ export default function Home() {
       )}
 
       <div className="dashboard-layout flex min-h-[calc(100vh-76px)] flex-col lg:flex-row">
-        <aside className="dashboard-sidebar w-full min-w-0 shrink-0 border-b bg-white p-3 lg:w-[180px] lg:border-b-0 lg:border-r">
-          <p className="mb-3 px-3 text-xs font-semibold text-gray-500">工作台</p>
-          <nav aria-label="主菜单" className="flex gap-2 overflow-x-auto lg:flex-col">
+        <aside className="dashboard-sidebar w-full min-w-0 shrink-0 border-b bg-white p-3 lg:w-[220px] lg:border-b-0 lg:border-r lg:border-slate-200 lg:p-4">
+          <p className="mb-3 flex items-center gap-2 px-3 text-xs font-semibold tracking-wide text-slate-500">
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            工作台
+            <span className="ml-auto hidden text-[9px] font-medium tracking-[0.18em] text-slate-300 lg:inline">MENU</span>
+          </p>
+          <nav aria-label="主菜单" className="flex gap-2 overflow-x-auto lg:flex-col lg:gap-4">
             {[
-              { id: "calendar", label: "カレンダー", icon: "▦" },
-              { id: "orders", label: "予約管理", icon: "≡" },
-              { id: "operations", label: "運行管理", icon: "▤" },
-              { id: "drivers", label: "運転士", icon: "♙" },
-              { id: "vehicles", label: "車両", icon: "▰" },
-              { id: "sources", label: "来源", icon: "↗" },
-              { id: "companies", label: "所属会社", icon: "▣" },
-              { id: "orderFinance", label: "経理統計", icon: "¥" },
-              { id: "driverFinance", label: "給料統計", icon: "¥" },
-              ...(canViewVehicleAndBalanceReports
-                ? [
-                    { id: "vehicleFinance" as const, label: "車両統計", icon: "¥" },
-                    { id: "balance" as const, label: "收支平衡", icon: "¥" },
-                  ]
-                : []),
+              {
+                label: "業務",
+                surface: "bg-sky-50/80 ring-sky-100",
+                heading: "text-sky-700",
+                items: [
+                  { id: "calendar", label: "カレンダー", icon: "calendar" },
+                  { id: "orders", label: "予約管理", icon: "orders" },
+                  { id: "operations", label: "運行管理", icon: "operations" },
+                ],
+              },
+              {
+                label: "管理",
+                surface: "bg-emerald-50/70 ring-emerald-100",
+                heading: "text-emerald-700",
+                items: [
+                  { id: "drivers", label: "運転士", icon: "driver" },
+                  { id: "vehicles", label: "車両", icon: "vehicle" },
+                  { id: "sources", label: "来源", icon: "source" },
+                  { id: "companies", label: "所属会社", icon: "company" },
+                ],
+              },
+              {
+                label: "財務・統計",
+                surface: "bg-amber-50/70 ring-amber-100",
+                heading: "text-amber-700",
+                items: [
+                  { id: "orderFinance", label: "経理統計", icon: "finance" },
+                  { id: "driverFinance", label: "給料統計", icon: "salary" },
+                  ...(canViewVehicleAndBalanceReports
+                    ? [
+                        { id: "vehicleFinance" as const, label: "車両統計", icon: "vehicleFinance" },
+                        { id: "balance" as const, label: "收支平衡", icon: "balance" },
+                      ]
+                    : []),
+                ],
+              },
               ...(currentProfile.role === "admin"
-                ? [
-                    { id: "login" as const, label: "ログイン管理", icon: "♙" },
-                    { id: "audit" as const, label: "操作記録", icon: "≡" },
-                  ]
+                ? [{
+                    label: "システム",
+                  surface: "bg-violet-50/70 ring-violet-100",
+                  heading: "text-violet-700",
+                    items: [
+                      { id: "login" as const, label: "ログイン管理", icon: "login" },
+                      { id: "audit" as const, label: "操作記録", icon: "audit" },
+                    ],
+                  }]
                 : []),
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  if (item.id === "orders" && activeView !== "orders") {
-                    setOrderMonth(getCurrentMonthKey());
-                    setOrderDateFilter("");
-                    setOrderSourceFilter("");
-                    setOrderCompanyFilter("");
-                  }
-                  setActiveView(item.id as ActiveView);
-                }}
-                aria-current={activeView === item.id ? "page" : undefined}
-                className={`flex shrink-0 items-center gap-3 rounded px-3 py-2.5 text-left text-sm font-medium transition-colors ${activeView === item.id ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"}`}
-              >
-                <span aria-hidden="true" className="w-5 text-center text-base">{item.icon}</span>
-                {item.label}
-              </button>
+            ].map((group) => (
+              <div key={group.label} className={`flex shrink-0 items-center gap-1 rounded-xl p-1.5 ring-1 ring-inset ${group.surface} border-r border-slate-200 pr-2 last:border-r-0 last:pr-0 lg:w-full lg:flex-col lg:items-stretch lg:gap-1 lg:border-r-0 lg:border-b-0 lg:p-2 lg:last:pb-2`}>
+                <p className={`hidden px-3 pb-1 text-[10px] font-semibold tracking-widest lg:block ${group.heading}`}>
+                  {group.label}
+                </p>
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.id === "orders" && activeView !== "orders") {
+                        setOrderMonth(getCurrentMonthKey());
+                        setOrderDateFilter("");
+                        setOrderSourceFilter("");
+                        setOrderCompanyFilter("");
+                      }
+                      setActiveView(item.id as ActiveView);
+                    }}
+                    aria-current={activeView === item.id ? "page" : undefined}
+                    className={`group flex min-h-11 w-full shrink-0 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${activeView === item.id ? "bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-[0_6px_16px_rgba(15,23,42,0.16)]" : "text-slate-600 hover:translate-x-0.5 hover:bg-slate-100 hover:text-slate-950"}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${activeView === item.id ? "bg-white/10 text-blue-100" : "text-slate-400 group-hover:text-slate-700"}`}
+                    >
+                      <SidebarIcon name={item.icon} />
+                    </span>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
         </aside>
@@ -8458,9 +8528,9 @@ export default function Home() {
                     <option
                       key={vehicle}
                       value={vehicle}
-                      disabled={orderFormVehicleStatusByName.get(vehicle) !== "运营中"}
+                      disabled={!orderFormVehicleAvailableByName.get(vehicle)}
                     >
-                      {vehicle}{orderFormVehicleStatusByName.get(vehicle) !== "运营中" ? "（不可用于新予約）" : ""}
+                      {vehicle}{!orderFormVehicleAvailableByName.get(vehicle) ? "（不可用于新予約）" : ""}
                     </option>
                   ))}
                 </select>

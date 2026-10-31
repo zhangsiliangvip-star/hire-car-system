@@ -57,7 +57,7 @@ export function OrderVehiclePlateSelect({
               : selected ? "当前車両未登记番号"
               : vehicleName ? "当前車両未登记或未指定番号" : financeMode ? "使用訂単默认車両" : "請選択車両番号"}
           </option>
-          {sortedVehicles.filter((vehicle) => vehicle.plate).map((vehicle) => {
+          {sortedVehicles.filter((vehicle) => vehicle.plate && vehicle.name === vehicleName).map((vehicle) => {
             const unavailable = !financeMode && getStatus(vehicle) !== "运营中";
             return (
               <option key={vehicle.id} value={vehicle.id} disabled={unavailable}>

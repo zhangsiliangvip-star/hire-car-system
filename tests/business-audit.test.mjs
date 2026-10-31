@@ -2011,13 +2011,15 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   let view = render("Alphard 01", vehicles, false, "品川 100");
   assert.equal(view.select.props.value, "a");
   assert.deepEqual(view.options.filter((option) => option.props.value !== "")
-    .map((option) => option.props.value), ["a", "b", "d"]);
+    .map((option) => option.props.value), ["a"]);
   assert.equal(renderToStaticMarkup(view.options.find((option) => option.props.value === "a")),
     '<option value="a">品川 100</option>');
   view.select.props.onChange({ target: { value: "b" } });
   assert.deepEqual(changes, [{ name: "Hiace 01", plate: "品川 200" }]);
   assert.equal(render("Hiace 01", vehicles, false, "品川 200").select.props.value, "b");
   assert.equal(render("Hiace 01").select.props.value, "", "a model alone must not select a plate");
+  assert.deepEqual(render("Hiace 01").options.filter((option) => option.props.value !== "")
+    .map((option) => option.props.value), ["b"], "only plates for the selected vehicle are listed");
   assert.equal(render("外注其他").select.props.value, "");
   assert.ok(render("外注其他").html.includes("当前車両未登记或未指定番号"));
   assert.ok(render("Deleted").html.includes("当前車両未登记或未指定番号"));
@@ -2031,6 +2033,8 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   view = render("Alphard 01", shared);
   assert.equal(view.select.props.value, "");
   assert.ok(view.html.includes("請選択具体的車両番号"));
+  assert.deepEqual(view.options.filter((option) => option.props.value !== "")
+    .map((option) => option.props.value), ["a", "duplicate"]);
   assert.equal(render("Alphard 01", shared, false, "品川 400").select.props.value, "duplicate");
   view.select.props.onChange({ target: { value: "duplicate" } });
   assert.deepEqual(changes.at(-1), { name: "Alphard 01", plate: "品川 400" });
@@ -2046,6 +2050,7 @@ test("reservation plate selector links vehicles by plate, retains unavailable se
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.ok(source.includes('editingOrderId === null ? getRegionForNewRecords() : form.regionId'));
   assert.ok(source.includes("vehicle.regionId === orderFormRegionId"));
+  assert.match(source, /orderFormVehicles\.some\(\(vehicle\) =>\s*vehicle\.name === name && getVehicleDisplayStatus\(vehicle\) === "运营中"\)/);
   assert.ok(source.indexOf("<OrderVehiclePlateSelect") > source.indexOf("value={form.vehicle}"));
   assert.ok(source.includes("setForm((current) => changeOrderVehicle(current, vehicle"));
   assert.ok(source.includes("{getOrderVehicleNumber({ ...accountingPreviewOrder, financeByDate: primaryAccountingForm })}"));
