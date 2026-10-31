@@ -5,6 +5,23 @@ function compareImportOrder(first: Order, second: Order) {
     first.id.localeCompare(second.id);
 }
 
+export function groupOrdersByImportBatch(orders: readonly Order[]) {
+  const groups = new Map<string, Order[]>();
+  for (const order of orders) {
+    const key = order.importBatchId
+      ? `${order.regionId || ""}:${order.importBatchId}`
+      : `order:${order.id}`;
+    const group = groups.get(key);
+    if (group) group.push(order);
+    else groups.set(key, [order]);
+  }
+  return [...groups.values()]
+    .map((group) => group.sort(compareImportOrder))
+    .sort((first, second) =>
+      `${first[0].date} ${first[0].time}`.localeCompare(`${second[0].date} ${second[0].time}`),
+    );
+}
+
 export function groupReservationOrders(orders: readonly Order[]) {
   const rows: { order: Order; count: number }[] = [];
   const batches = new Map<string, { order: Order; count: number }>();

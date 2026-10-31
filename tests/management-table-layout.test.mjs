@@ -8,7 +8,7 @@ const css = fs.readFileSync(new URL("../app/globals.css", import.meta.url), "utf
 const ast = ts.createSourceFile("page.tsx", page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const expectedColumns = {
   accounts: 8,
-  "order-finance": 12,
+  "order-finance": 7,
   "driver-finance": 12,
   "vehicle-summary": 8,
   "vehicle-finance": 8,
@@ -115,18 +115,27 @@ test("driver and company lists fit the viewport and use cards on mobile", () => 
   assert.match(css, /\.company-management-table td::before\s*\{\s*content: attr\(data-label\);/);
 });
 
-test("order finance rows stay in a compact table without horizontal scrolling", () => {
+test("order finance statistics display one summarized row per import group without driver or vehicle details", () => {
   const tableStart = page.lastIndexOf("<table", page.indexOf('data-table="order-finance"'));
   const table = page.slice(tableStart, page.indexOf("</table>", tableStart));
   assert.match(table, /order-finance-management-table/);
-  for (const label of ["訂単日期", "訂単名称", "来源", "運転士", "車両番号", "請求書状態",
-    "入金状態", "請求金額", "運転士総立替", "会社総支出", "運転士総工資", "訂単総利润"]) {
+  for (const label of ["訂単日期", "团／訂単名称", "来源", "請求書状態",
+    "入金状態", "請求金額", "訂単総利润"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table,\s*\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.6875rem;/);
-  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\),\s*\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.0625rem 0\.08rem;[^}]*line-height: 12\.1px;/);
+  assert.doesNotMatch(table, /data-label="運転士"|data-label="車両番号"/);
+  assert.doesNotMatch(table, /運転士総立替|会社総支出|運転士総工資/);
+  assert.match(page, /groupOrdersByImportBatch\(sortedFinanceOrders\)/);
+  assert.match(page, /groupOrdersByImportBatch\(monthlyFinanceOrders\)[\s\S]*?group\.some\(matchesFinanceFilters\)/);
+  assert.match(page, /group\.totals\.requestAmount/);
+  assert.match(page, /group\.orders\.length > 1/);
+  assert.match(page, /isBatch \? "finance-batch" : "finance"/);
+  assert.match(page, /invoiceStatusDialog\.origin === "finance-batch"/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.8125rem;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.45rem 0\.3rem;[^}]*line-height: 1\.4;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.0625rem 0\.08rem;[^}]*line-height: 12\.1px;/);
   assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*font-size: 0\.75rem;/);
-  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table td :is\(button\),\s*\.dashboard \.management-table\.driver-finance-management-table td :is\(button\)\s*\{[^}]*line-height: 12\.1px;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table td :is\(button\)\s*\{[^}]*line-height: 12\.1px;/);
   assert.doesNotMatch(css, /\.order-finance-management-table thead\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });

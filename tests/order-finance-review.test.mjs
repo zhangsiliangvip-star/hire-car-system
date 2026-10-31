@@ -290,7 +290,7 @@ test("pending receipt thumbnails use private buckets, open large previews and su
 
 test("order finance list wires review with save protection and explicit server-only totals synchronization", () => {
   const source = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(source, /<OrderFinanceReviewButton orderId=\{order\.id\} name=\{order\.customer/);
+  assert.match(source, /<OrderFinanceReviewButton orderId=\{member\.id\} name=\{member\.customer/);
   assert.match(source, /blocked=\{pendingSaveCount > 0 \|\| Boolean\(persistenceError\)\}/);
   assert.match(source, /onApproved=\{refreshApprovedOrderFinance\}/);
   assert.match(source, /syncOrders\(\(payload as DashboardData\)\.orders, version\)/);

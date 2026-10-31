@@ -6,15 +6,11 @@ type OrderFinancePrintRow = {
   date: string;
   customer: string;
   source: string;
-  driver: string;
-  vehicleNumber: string;
   invoiceStatus: string;
   paid: boolean;
+  depositStatus?: string;
   depositMethod: Order["depositMethod"];
   requestAmount: number;
-  driverAdvances: number;
-  companyExpenses: number;
-  driverWages: number;
   profit: number;
 };
 
@@ -26,6 +22,8 @@ type OrderFinancePrintData = {
   depositStatus: string;
   invoiceStatus: string;
   rows: OrderFinancePrintRow[];
+  orderCount?: number;
+  requestAmounts?: ReturnType<typeof summarizeRequestAmounts>;
 };
 
 function escapeHtml(value: string) {
@@ -35,9 +33,9 @@ function escapeHtml(value: string) {
 }
 
 export function buildOrderFinancePrintHtml(data: OrderFinancePrintData) {
-  const requestAmounts = summarizeRequestAmounts(data.rows);
+  const requestAmounts = data.requestAmounts ?? summarizeRequestAmounts(data.rows);
   const number = (value: number) => value.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
-  const sum = (key: "requestAmount" | "driverAdvances" | "companyExpenses" | "driverWages" | "profit") =>
+  const sum = (key: "requestAmount" | "profit") =>
     data.rows.reduce((total, row) => total + row[key], 0);
   const cell = (value: number) => `<td class="number">${number(value)}</td>`;
   const rate = sum("requestAmount") === 0 ? 0 : sum("profit") / sum("requestAmount") * 100;
@@ -66,23 +64,22 @@ export function buildOrderFinancePrintHtml(data: OrderFinancePrintData) {
   <header><h1>経理統計月度财务表</h1><div class="meta">
   <span>月份：${escapeHtml(data.month)}</span><span>分区：${escapeHtml(data.region)}</span><span>币种：JPY</span>
   <span>来源：${escapeHtml(data.source)}</span><span>所属会社：${escapeHtml(data.company)}</span>
-  <span>請求書状態：${escapeHtml(data.invoiceStatus)}</span><span>入金状態：${escapeHtml(data.depositStatus)}</span><span>訂単数：${data.rows.length}</span></div></header>
+  <span>請求書状態：${escapeHtml(data.invoiceStatus)}</span><span>入金状態：${escapeHtml(data.depositStatus)}</span><span>团数：${data.rows.length}</span><span>訂単数：${data.orderCount ?? data.rows.length}</span></div></header>
   <div class="summary"><div>総請求金額<strong>¥${number(sum("requestAmount"))}</strong>
   <p class="request-breakdown">口座入金：¥${number(requestAmounts.bank)}<br>現金入金：¥${number(requestAmounts.cash)}<br>未设置入金方式：¥${number(requestAmounts.unassigned)}</p></div>
   <div>利润総和<strong>¥${number(sum("profit"))}</strong></div><div>利润率<strong>${number(rate)}%</strong></div></div>
-  <table><colgroup><col style="width:9%"><col style="width:14%"><col style="width:9%"><col style="width:7%">
-  <col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:8%">
-  <col style="width:8%"><col style="width:8%"><col style="width:7%"></colgroup>
-  <thead><tr><th>訂単日期</th><th>訂単名称</th><th>来源</th><th>運転士</th><th>車両番号</th><th>請求書<br>状態</th><th>入金<br>状態</th><th>請求金額</th><th>運転士<br>総立替</th><th>会社<br>総支出</th><th>運転士<br>総工資</th><th>訂単<br>総利润</th></tr></thead>
+  <table><colgroup><col style="width:12%"><col style="width:28%"><col style="width:15%">
+  <col style="width:12%"><col style="width:12%"><col style="width:11%"><col style="width:10%"></colgroup>
+  <thead><tr><th>訂単日期</th><th>团／訂単名称</th><th>来源</th><th>請求書<br>状態</th><th>入金<br>状態</th><th>請求金額</th><th>訂単<br>総利润</th></tr></thead>
   <tbody>${data.rows.map((row) => `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer || "未填写")}</td>
-  <td>${escapeHtml(row.source || "未填写")}</td><td>${escapeHtml(row.driver || "未安排")}</td><td>${escapeHtml(row.vehicleNumber)}</td>
-  <td class="${row.invoiceStatus === "已完成" ? "complete" : "pending"}">${escapeHtml(row.invoiceStatus)}</td>
-  <td class="${row.paid ? "complete" : "pending"}">${row.paid ? "入金済み" : "未入金"}</td>
-  ${cell(row.requestAmount)}${cell(row.driverAdvances)}${cell(row.companyExpenses)}${cell(row.driverWages)}${cell(row.profit)}</tr>`).join("")}</tbody>
-  <tfoot><tr><td colspan="7">筛选范围合计</td>${cell(sum("requestAmount"))}${cell(sum("driverAdvances"))}${cell(sum("companyExpenses"))}${cell(sum("driverWages"))}${cell(sum("profit"))}</tr></tfoot></table>
+  <td>${escapeHtml(row.source || "未填写")}</td>
+  <td class="${row.invoiceStatus === "已完成" || row.invoiceStatus === "全部已完成" ? "complete" : row.invoiceStatus.includes("部分") ? "" : "pending"}">${escapeHtml(row.invoiceStatus)}</td>
+  <td class="${row.depositStatus === "入金済み" || row.depositStatus === "全部入金済み" || (!row.depositStatus && row.paid) ? "complete" : row.depositStatus?.includes("部分") ? "" : "pending"}">${escapeHtml(row.depositStatus ?? (row.paid ? "入金済み" : "未入金"))}</td>
+  ${cell(row.requestAmount)}${cell(row.profit)}</tr>`).join("")}</tbody>
+  <tfoot><tr><td colspan="4">筛选范围合计</td>${cell(sum("requestAmount"))}${cell(sum("profit"))}</tr></tfoot></table>
   <p class="notes">依据当前月份、分区及筛选条件的已保存記録生成，金額口径与経理統計列表一致。<br>
   総請求金額按訂単入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列，三项之和等于総請求金額。<br>
-  運転士総立替与運転士工資分别列示。财务数据仅供内部核对，請妥善保管。</p>
+  财务数据仅供内部核对，請妥善保管。</p>
   </article></div></body></html>`;
 }
 

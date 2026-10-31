@@ -91,7 +91,7 @@ import { useDriverRestDays } from "@/lib/use-driver-rest-days";
 import { getJapaneseHolidays } from "@/lib/japanese-holidays";
 import { getAccountingAssigneeName } from "@/lib/accounting-assignee";
 import { findOrderConflicts, type OrderConflict } from "@/lib/order-conflicts";
-import { getAccountingBatchOrders, groupReservationOrders } from "@/lib/order-batches";
+import { getAccountingBatchOrders, groupOrdersByImportBatch, groupReservationOrders } from "@/lib/order-batches";
 import { getMonthlySameSourceOrders } from "@/lib/order-invoice-status";
 import { normalizeOrderTimeInput } from "@/lib/order-time-input";
 
@@ -1047,7 +1047,7 @@ export default function Home() {
     kind: "invoice" | "deposit";
     status: Order["invoiceStatus"] | "paid" | "unpaid";
     scope: "single" | "source";
-    origin: "reservation" | "finance";
+    origin: "reservation" | "finance" | "finance-batch";
     month: string;
   } | null>(null);
   async function finishDialogSave(saves: Promise<boolean>[], close: () => void) {
@@ -1875,7 +1875,7 @@ export default function Home() {
         ),
       ),
     }));
-  const filteredOrderFinanceOrders = monthlyFinanceOrders.filter((order) =>
+  const matchesFinanceFilters = (order: Order) =>
     (financeSourceFilter === "" ||
       (financeSourceFilter === UNSOURCED_ORDER
         ? !order.orderSource
@@ -1888,8 +1888,10 @@ export default function Home() {
     (financeDepositStatusFilter === "" ||
       (financeDepositStatusFilter === "paid"
         ? Boolean(order.depositDate)
-        : !order.depositDate)),
-  );
+        : !order.depositDate));
+  const filteredOrderFinanceOrders = groupOrdersByImportBatch(monthlyFinanceOrders)
+    .filter((group) => group.some(matchesFinanceFilters))
+    .flat();
   const balanceVisibleExpenseItems = balanceExpenseItems
     .filter((item) =>
       balanceCompanyFilter === ""
@@ -1966,6 +1968,43 @@ export default function Home() {
   const sortedFinanceOrders = [...filteredOrderFinanceOrders].sort((first, second) =>
     `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
   );
+  const financeDisplayGroups = groupOrdersByImportBatch(sortedFinanceOrders).map((groupOrders) => {
+    const firstOrder = groupOrders[0];
+    const totals = groupOrders.reduce((sum, order) => {
+      const orderTotals = getOrderFinanceForOrder(order, financeMonth);
+      return {
+        requestAmount: sum.requestAmount + orderTotals.requestAmount,
+        driverAdvances: sum.driverAdvances + orderTotals.driverAdvances,
+        companyExpenses: sum.companyExpenses + orderTotals.companyExpenses,
+        driverWages: sum.driverWages + orderTotals.driverWages,
+        fuelConsumption: sum.fuelConsumption + orderTotals.fuelConsumption,
+        profit: sum.profit + orderTotals.profit,
+      };
+    }, {
+      requestAmount: 0, driverAdvances: 0, companyExpenses: 0,
+      driverWages: 0, fuelConsumption: 0, profit: 0,
+    });
+    const invoiceCompletedCount = groupOrders.filter((order) => order.invoiceStatus === "已完成").length;
+    const depositPaidCount = groupOrders.filter((order) => Boolean(order.depositDate)).length;
+    const uniqueValues = (values: string[]) => [...new Set(values.filter(Boolean))];
+    return {
+      key: firstOrder.id,
+      orders: groupOrders,
+      totals,
+      dates: uniqueValues(groupOrders.map((order) => formatOrderDate(order.date))),
+      sources: uniqueValues(groupOrders.map((order) => order.orderSource || "未填写")),
+      invoiceStatus: invoiceCompletedCount === groupOrders.length
+        ? groupOrders.length > 1 ? "全部已完成" : "已完成"
+        : invoiceCompletedCount > 0 ? "部分完成"
+          : groupOrders.length > 1 ? "全部未完成" : "未完成",
+      depositStatus: depositPaidCount === groupOrders.length
+        ? groupOrders.length > 1 ? "全部入金済み" : "入金済み"
+        : depositPaidCount > 0 ? "部分入金"
+          : groupOrders.length > 1 ? "全部未入金" : "未入金",
+      allInvoicesComplete: invoiceCompletedCount === groupOrders.length,
+      allDepositsPaid: depositPaidCount === groupOrders.length,
+    };
+  });
   const filteredFinanceTotals = summarizeFinance(filteredOrderFinanceOrders);
   const filteredFinanceRequestAmounts = summarizeRequestAmounts(
     filteredOrderFinanceOrders.map((order) => ({
@@ -1982,7 +2021,7 @@ export default function Home() {
       .map(plate => plate || "未填写").join("／") || "-";
   }
   async function exportOrderFinance() {
-    if (sortedFinanceOrders.length === 0) {
+    if (financeDisplayGroups.length === 0) {
       alert("当前筛选范围暂无訂単财务記録。");
       return;
     }
@@ -1994,16 +2033,17 @@ export default function Home() {
         company: financeCompanyFilter === "__unassigned_company__" ? "未填写" : financeCompanyFilter || "全部会社",
         depositStatus: financeDepositStatusFilter === "paid" ? "入金済み" : financeDepositStatusFilter === "unpaid" ? "未入金" : "全部状態",
         invoiceStatus: financeInvoiceStatusFilter || "全部状態",
-        rows: sortedFinanceOrders.map((order) => ({
-          date: order.date,
-          customer: order.customer,
-          source: order.orderSource,
-          driver: getOrderDriverLabel(order),
-          vehicleNumber: getOrderVehicleNumber(order, financeMonth),
-          invoiceStatus: order.invoiceStatus,
-          paid: Boolean(order.depositDate),
-          depositMethod: order.depositMethod,
-          ...getOrderFinanceForOrder(order),
+        orderCount: sortedFinanceOrders.length,
+        requestAmounts: filteredFinanceRequestAmounts,
+        rows: financeDisplayGroups.map((group) => ({
+          date: group.dates.join("、"),
+          customer: group.orders.map((order) => order.customer || "未填写").join("、"),
+          source: group.sources.join("、"),
+          invoiceStatus: group.invoiceStatus,
+          paid: group.allDepositsPaid,
+          depositStatus: group.depositStatus,
+          depositMethod: group.orders[0].depositMethod,
+          ...group.totals,
         })),
       });
     } catch (error) {
@@ -4562,17 +4602,18 @@ export default function Home() {
   function openOrderStatusDialog(
     order: Order,
     kind: "invoice" | "deposit",
-    origin: "reservation" | "finance",
+    origin: "reservation" | "finance" | "finance-batch",
+    nextStatus?: Order["invoiceStatus"] | "paid" | "unpaid",
   ) {
     setInvoiceStatusDialog({
       orderId: order.id,
       kind,
-      status: kind === "invoice"
+      status: nextStatus ?? (kind === "invoice"
         ? order.invoiceStatus === "已完成" ? "未完成" : "已完成"
-        : order.depositDate ? "unpaid" : "paid",
+        : order.depositDate ? "unpaid" : "paid"),
       scope: "single",
       origin,
-      month: origin === "finance" ? financeMonth : orderMonth,
+      month: origin === "reservation" ? orderMonth : financeMonth,
     });
   }
   async function saveInvoiceStatusDialog() {
@@ -4591,7 +4632,7 @@ export default function Home() {
     );
     const targetOrders = dialog.scope === "source"
       ? getMonthlySameSourceOrders(ordersInDialogMonth, order, dialog.month)
-      : dialog.origin === "reservation" && order.importBatchId
+      : (dialog.origin === "reservation" || dialog.origin === "finance-batch") && order.importBatchId
         ? getAccountingBatchOrders(order, ordersInDialogMonth)
         : [order];
     const changedOrders = targetOrders.filter((candidate) =>
@@ -4622,7 +4663,8 @@ export default function Home() {
     : null;
   const invoiceStatusDialogMonth = invoiceStatusDialogContext?.month ?? orderMonth;
   const invoiceStatusDialogSingleTargets = invoiceStatusDialogOrder
-    ? invoiceStatusDialogContext?.origin === "reservation" && invoiceStatusDialogOrder.importBatchId
+    ? (invoiceStatusDialogContext?.origin === "reservation" ||
+      invoiceStatusDialogContext?.origin === "finance-batch") && invoiceStatusDialogOrder.importBatchId
       ? getAccountingBatchOrders(invoiceStatusDialogOrder, orders.filter((candidate) =>
         candidate.date <= `${invoiceStatusDialogMonth}-31` &&
         (candidate.endDate || candidate.date) >= `${invoiceStatusDialogMonth}-01`,
@@ -5223,94 +5265,96 @@ export default function Home() {
                 </div>
               </div>
               <div className="order-finance-table-region border bg-white">
-                <table className="management-table order-finance-management-table w-full min-w-[1700px] table-fixed text-center text-sm" data-table="order-finance">
+                <table className="management-table order-finance-management-table w-full min-w-[1100px] table-fixed text-center text-sm" data-table="order-finance">
                   <colgroup>
-                    <col style={{ width: "8%" }} /><col style={{ width: "14%" }} />
-                    <col style={{ width: "11%" }} /><col style={{ width: "7%" }} />
-                    <col style={{ width: "9%" }} /><col style={{ width: "7%" }} />
-                    <col style={{ width: "7%" }} /><col style={{ width: "7.4%" }} />
-                    <col style={{ width: "7.4%" }} /><col style={{ width: "7.4%" }} />
-                    <col style={{ width: "7.4%" }} /><col style={{ width: "7.4%" }} />
+                    <col style={{ width: "10%" }} /><col style={{ width: "25%" }} />
+                    <col style={{ width: "15%" }} /><col style={{ width: "12%" }} />
+                    <col style={{ width: "12%" }} /><col style={{ width: "13%" }} />
+                    <col style={{ width: "13%" }} />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">訂単日期</th>
-                      <th className="px-4 py-3 font-semibold">訂単名称</th>
+                      <th className="px-4 py-3 font-semibold">团／訂単名称</th>
                       <th className="px-4 py-3 font-semibold">来源</th>
-                      <th className="px-4 py-3 font-semibold">運転士</th>
-                      <th className="px-4 py-3 font-semibold">車両番号</th>
                       <th className="px-4 py-3 text-right font-semibold">請求書状態</th>
                       <th className="px-4 py-3 text-right font-semibold">入金状態</th>
                       <th className="px-4 py-3 text-right font-semibold">請求金額</th>
-                      <th className="px-4 py-3 text-right font-semibold">運転士総立替</th>
-                      <th className="px-4 py-3 text-right font-semibold">会社総支出</th>
-                      <th className="px-4 py-3 text-right font-semibold">運転士総工資</th>
                       <th className="px-4 py-3 text-right font-semibold">訂単総利润</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedFinanceOrders.length === 0 ? (
+                    {financeDisplayGroups.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                           该月份暂无訂単财务記録
                         </td>
                       </tr>
                     ) : (
-                      sortedFinanceOrders.map((order) => {
-                        const totals = getOrderFinanceForOrder(order);
+                      financeDisplayGroups.map((group) => {
+                        const order = group.orders[0];
+                        const isBatch = Boolean(order.importBatchId);
+                        const groupSaving = group.orders.some((member) => invoiceStatusSavingIds.has(member.id));
                         return (
-                          <tr key={order.id} className="border-t hover:bg-gray-50">
+                          <tr key={group.key} className="border-t hover:bg-gray-50">
                           <td data-label="訂単日期" className="whitespace-nowrap px-4 py-3">
-                            {formatOrderDate(order.date)}
+                            <div className="grid gap-1">{group.dates.map((date) => <span key={date}>{date}</span>)}</div>
                           </td>
-                          <td data-label="訂単名称" className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => openAccounting(order)}
-                              aria-haspopup="dialog"
-                              className="text-left font-medium text-blue-700 hover:underline"
-                            >
-                              {order.customer || "未填写"}
-                            </button>
-                            <OrderFinanceReviewButton orderId={order.id} name={order.customer || "未填写"} />
+                          <td data-label="团／訂単名称" className="px-4 py-3">
+                            {group.orders.length > 1 && (
+                              <span className="mb-1 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+                                {group.orders.length} 笔／团
+                              </span>
+                            )}
+                            <div className="grid gap-1">
+                              {group.orders.map((member) => (
+                                <div key={member.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => openAccounting(member)}
+                                    aria-haspopup="dialog"
+                                    className="text-left font-medium text-blue-700 hover:underline"
+                                  >
+                                    {member.customer || "未填写"}
+                                  </button>
+                                  <OrderFinanceReviewButton orderId={member.id} name={member.customer || "未填写"} />
+                                </div>
+                              ))}
+                            </div>
                           </td>
-                          <td data-label="来源" className="px-4 py-3">{order.orderSource || "未填写"}</td>
-                          <td data-label="運転士" className="px-4 py-3">
-                            <button type="button" onClick={() => setDriverSelectionTarget(order.id)}
-                              className="font-medium text-blue-700 hover:underline">
-                              <OrderDriverLabels order={order} />
-                            </button>
-                          </td>
-                          <td data-label="車両番号" className="px-4 py-3">{getOrderVehicleNumber(order, financeMonth)}</td>
+                          <td data-label="来源" className="px-4 py-3">{group.sources.join("、")}</td>
                           <td data-label="請求書状態" className="whitespace-nowrap px-4 py-3 text-right font-semibold">
                             <button
                               type="button"
-                              aria-label={`${order.customer} 請求書状態：${order.invoiceStatus}，点击更改`}
-                              title="点击選択状態和变更范围"
-                              disabled={invoiceStatusSavingIds.has(order.id)}
-                              onClick={() => openOrderStatusDialog(order, "invoice", "finance")}
-                              className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-wait disabled:opacity-60 ${order.invoiceStatus === "已完成" ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
+                              aria-label={`${group.orders.length} 笔訂単請求書状态：${group.invoiceStatus}，点击变更`}
+                              title={isBatch ? "点击變更当前团全部订單状态" : "点击選択状态和变更范围"}
+                              disabled={groupSaving}
+                              onClick={() => openOrderStatusDialog(
+                                order, "invoice", isBatch ? "finance-batch" : "finance",
+                                group.allInvoicesComplete ? "未完成" : "已完成",
+                              )}
+                              className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-wait disabled:opacity-60 ${group.allInvoicesComplete ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
                             >
-                              {invoiceStatusSavingIds.has(order.id) ? "保存中…" : order.invoiceStatus}
+                              {groupSaving ? "保存中…" : group.invoiceStatus}
                             </button>
                           </td>
                           <td data-label="入金状態" className="whitespace-nowrap px-4 py-3 text-right font-semibold">
                             <button
                               type="button"
-                              aria-label={`${order.customer} 入金状態：${order.depositDate ? "入金済み" : "未入金"}，点击更改`}
-                              title="点击選択状態和变更范围"
-                              disabled={invoiceStatusSavingIds.has(order.id)}
-                              onClick={() => openOrderStatusDialog(order, "deposit", "finance")}
-                              className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-wait disabled:opacity-60 ${order.depositDate ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
+                              aria-label={`${group.orders.length} 笔訂単入金状态：${group.depositStatus}，点击变更`}
+                              title={isBatch ? "点击變更当前团全部订單状态" : "点击選択状态和变更范围"}
+                              disabled={groupSaving}
+                              onClick={() => openOrderStatusDialog(
+                                order, "deposit", isBatch ? "finance-batch" : "finance",
+                                group.allDepositsPaid ? "unpaid" : "paid",
+                              )}
+                              className={`rounded border px-2 py-1 text-xs transition-colors disabled:cursor-wait disabled:opacity-60 ${group.allDepositsPaid ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100" : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
                             >
-                              {invoiceStatusSavingIds.has(order.id) ? "保存中…" : order.depositDate ? "入金済み" : "未入金"}
+                              {groupSaving ? "保存中…" : group.depositStatus}
                             </button>
                           </td>
-                          <td data-label="請求金額" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.requestAmount)}</td>
-                          <td data-label="運転士総立替" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.driverAdvances)}</td>
-                          <td data-label="会社総支出" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.companyExpenses)}</td>
-                          <td data-label="運転士総工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(totals.driverWages)}</td>
-                          <td data-label="訂単総利润" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(totals.profit)}</td>
+                          <td data-label="請求金額" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(group.totals.requestAmount)}</td>
+                          <td data-label="訂単総利润" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(group.totals.profit)}</td>
                           </tr>
                         );
                       })
@@ -7681,11 +7725,13 @@ export default function Home() {
                       />
                       <span>
                         <span className="block text-sm font-medium">
-                          {invoiceStatusDialog.origin === "reservation" && invoiceStatusDialogOrder.importBatchId
+                          {(invoiceStatusDialog.origin === "reservation" ||
+                            invoiceStatusDialog.origin === "finance-batch") && invoiceStatusDialogOrder.importBatchId
                             ? `当前导入批次（${invoiceStatusDialog.month} ${invoiceStatusDialogSingleTargets.length} 笔）`
                             : "仅此訂単"}
                         </span>
-                        {invoiceStatusDialog.origin === "reservation" && invoiceStatusDialogOrder.importBatchId && (
+                        {(invoiceStatusDialog.origin === "reservation" ||
+                          invoiceStatusDialog.origin === "finance-batch") && invoiceStatusDialogOrder.importBatchId && (
                           <span className="mt-1 block text-xs text-gray-500">
                             列表中合并显示的同批次訂単会一起变更。
                           </span>

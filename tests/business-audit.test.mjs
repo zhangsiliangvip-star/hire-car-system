@@ -156,7 +156,7 @@ test("company advance external names appear in order labels but stay excluded fr
   assert.equal(findOrderConflicts(candidate, [order]).length, 0);
   assert.equal(findOrderConflicts({ ...candidate, driver: "External" }, [order]).length, 0);
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  assert.match(source, /driver: getOrderDriverLabel\(order\)/);
+  assert.match(source, /group\.orders\.map\(getOrderDriverLabel\)/);
   assert.match(source, /allOrders\.find\(order => order\.id === selectedOrderDetailsSnapshot\.id\)/);
   assert.doesNotMatch(source, /form\[key\] = \{ \.\.\.finance, driver: defaultDriver \}/);
 });
@@ -369,6 +369,21 @@ test("reservation batches collapse strictly by persisted import ID and preserve 
     { ...base, id: "morning", time: "08:00" },
   ]);
   assert.deepEqual(plain(chronological.map((row) => row.order.id)), ["morning", "afternoon", "later"]);
+});
+
+test("finance group rows use import batches without merging legacy orders", () => {
+  const { groupOrdersByImportBatch } = load("lib\\order-batches.ts");
+  const base = { regionId: "r1", date: "2026-10-22", time: "09:00" };
+  const orders = [
+    { ...base, id: "batch-later", importBatchId: "batch", importBatchIndex: 1 },
+    { ...base, id: "legacy-one" },
+    { ...base, id: "other-region", regionId: "r2", importBatchId: "batch", importBatchIndex: 0 },
+    { ...base, id: "batch-first", importBatchId: "batch", importBatchIndex: 0 },
+    { ...base, id: "legacy-two" },
+  ];
+  assert.deepEqual(plain(groupOrdersByImportBatch(orders)).map((group) => group.map((order) => order.id)), [
+    ["batch-first", "batch-later"], ["legacy-one"], ["other-region"], ["legacy-two"],
+  ]);
 });
 
 test("batch imports save one ID per import, line positions and retain membership when editing", () => {
@@ -1044,7 +1059,7 @@ test("dated statistics sort oldest first and use departure time to break date ti
     assert.deepEqual(rows.sort(compare).map((row) => row.id),
       ["previous", "morning", "afternoon", "late"]);
   }
-  assert.match(source, /rows: sortedFinanceOrders\.map/);
+  assert.match(source, /rows: financeDisplayGroups\.map/);
   assert.match(source, /rows: filteredDriverFinanceDetails,/);
   assert.match(source, /rows: filteredVehicleFinanceDetails,/);
 });
@@ -3086,6 +3101,22 @@ test("accounting total requests split by deposit method in the page and A4 repor
   assert.match(html, /現金入金：¥2,000/);
   assert.match(html, /未设置入金方式：¥300/);
   assert.doesNotMatch(html, /総卖上/);
+  const groupedHtml = buildOrderFinancePrintHtml({
+    month: "2026-10", region: "Tokyo", source: "All", company: "All",
+    depositStatus: "All", invoiceStatus: "All", orderCount: 4,
+    requestAmounts: { bank: 1050, cash: 2000, unassigned: 300 },
+    rows: [{
+      date: "2026-10-01、2026-10-02", customer: "Group A、Group B", source: "Source",
+      invoiceStatus: "部分完成",
+      paid: false, depositStatus: "部分入金", depositMethod: "", requestAmount: 3350,
+      driverAdvances: 10, companyExpenses: 20, driverWages: 30, profit: 3290,
+    }],
+  });
+  assert.match(groupedHtml, /团数：1<\/span><span>訂単数：4/);
+  assert.match(groupedHtml, /Group A、Group B/);
+  assert.match(groupedHtml, /部分入金/);
+  assert.match(groupedHtml, /口座入金：¥1,050/);
+  assert.doesNotMatch(groupedHtml, /<th>運転士<\/th>|<th>車両番号<\/th>|運転士総立替|会社総支出|運転士総工資/);
   const page = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(page, /<option value="现金入金">現金入金<\/option>/);
   const dataRoute = fs.readFileSync(path.join(root, "app\\api\\data\\route.ts"), "utf8");
@@ -3096,7 +3127,8 @@ test("accounting total requests split by deposit method in the page and A4 repor
   for (const key of ["bank", "cash", "unassigned"]) {
     assert.ok(page.includes(`filteredFinanceRequestAmounts.${key}`));
   }
-  assert.match(page, /paid: Boolean\(order\.depositDate\),\s*depositMethod: order\.depositMethod/);
+  assert.match(page, /paid: group\.allDepositsPaid,\s*depositStatus: group\.depositStatus,\s*depositMethod: group\.orders\[0\]\.depositMethod/);
+  assert.match(page, /requestAmounts: filteredFinanceRequestAmounts/);
 });
 
 test("balance adds manual income, subtracts only manual expense and prints matching A4 totals", () => {
