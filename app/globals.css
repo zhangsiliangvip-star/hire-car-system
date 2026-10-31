@@ -217,7 +217,7 @@ body {
   }
 }
 
-@media (max-width: 1799px) {
+@media (max-width: 2399px) {
   .order-finance-table-region {
     border: 0;
     background: transparent;
@@ -314,7 +314,7 @@ body {
   }
 }
 
-@media (max-width: 1799px) {
+@media (max-width: 2399px) {
   .driver-finance-table-region {
     overflow: visible;
     border: 0;

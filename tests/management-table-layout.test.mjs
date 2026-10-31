@@ -60,7 +60,7 @@ test("order finance rows switch to labeled cards without horizontal scrolling", 
     "入金状態", "請求金額", "運転士総立替", "会社総支出", "運転士総工資", "訂単総利润"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /@media \(max-width: 1799px\)\s*\{[\s\S]*?\.order-finance-management-table thead\s*\{\s*display: none;/);
+  assert.match(css, /@media \(max-width: 2399px\)\s*\{[\s\S]*?\.order-finance-management-table thead\s*\{\s*display: none;/);
   assert.match(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });
 
@@ -73,7 +73,7 @@ test("driver wage rows hide company and accounting fields and fit as labeled car
     "超時時間", "超時工資", "奖励工資", "運転士比例工資", "運転士固定工資", "工資総额", "支付総额"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /@media \(max-width: 1799px\)\s*\{[\s\S]*?\.driver-finance-management-table thead\s*\{\s*display: none;/);
+  assert.match(css, /@media \(max-width: 2399px\)\s*\{[\s\S]*?\.driver-finance-management-table thead\s*\{\s*display: none;/);
   assert.match(css, /\.driver-finance-management-table tbody\s*\{\s*display: grid;/);
   assert.match(css, /@media \(max-width: 639px\)\s*\{[\s\S]*?\.driver-finance-management-table tbody,[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/);
 });
