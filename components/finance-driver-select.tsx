@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Driver, Order } from "@/lib/domain";
-import { rankDriversByRecentService } from "@/lib/driver-selection";
+import { rankDriversByMonthlyAttendance } from "@/lib/driver-selection";
 import { DriverSelectionDialog } from "@/components/driver-selection-dialog";
 
 export function FinanceDriverSelect({
@@ -23,7 +23,7 @@ export function FinanceDriverSelect({
   onChange: (name: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const candidates = rankDriversByRecentService(
+  const candidates = rankDriversByMonthlyAttendance(
     drivers.filter((driver) => Boolean(regionId) && driver.regionId === regionId),
     orders,
     today,

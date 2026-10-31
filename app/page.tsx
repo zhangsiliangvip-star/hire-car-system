@@ -2,6 +2,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -52,10 +53,11 @@ import { printInvoice } from "@/lib/invoice-print";
 import { printVehicleFinance, printVehicleSummary } from "@/lib/vehicle-finance-print";
 import { summarizeVehicles, totalVehicleSummaries, type VehicleMonthlySummary } from "@/lib/vehicle-finance-summary";
 import { printCompanyWages, printDriverWages } from "@/lib/driver-wage-print";
+import { groupDriverFinanceByBatch } from "@/lib/driver-finance-groups";
 import { DriverSelectionDialog } from "@/components/driver-selection-dialog";
 import { SourceSelectionDialog } from "@/components/source-selection-dialog";
 import { OrderDateFilterDialog } from "@/components/order-date-filter-dialog";
-import { rankDriversByRecentService } from "@/lib/driver-selection";
+import { rankDriversByMonthlyAttendance } from "@/lib/driver-selection";
 import { getDriverSegments, getServiceDriver, getOrderDriverNames, getOrderDriverLabel } from "@/lib/order-drivers";
 import { changeOrderVehicle, getServiceVehicle, getOrderVehiclePlates, getVehicleSegments, getCalendarVehicleRows } from "@/lib/order-vehicles";
 import { hasValidDriverPayment, isDriverWageEntry, setReservationDriverPayment,
@@ -82,7 +84,7 @@ import { OrderVehiclePlateSelect } from "@/components/order-vehicle-plate-select
 import { FinanceDriverSelect } from "@/components/finance-driver-select";
 import { DriverLoginProvider, DriverMobileDialog } from "@/components/driver-login-fields";
 import { OrderReceipts } from "@/components/order-receipts";
-import { OrderFinanceReviewButton, OrderFinanceReviewProvider } from "@/components/order-finance-review";
+import { OrderFinanceReviewProvider } from "@/components/order-finance-review";
 import { DriverExecutionBadge } from "@/components/driver-execution-badge";
 import { DriverNameLabel, OrderDriverLabels } from "@/components/driver-name-label";
 import { OperationsReports } from "@/components/operations-reports";
@@ -91,7 +93,7 @@ import { useDriverRestDays } from "@/lib/use-driver-rest-days";
 import { getJapaneseHolidays } from "@/lib/japanese-holidays";
 import { getAccountingAssigneeName } from "@/lib/accounting-assignee";
 import { findOrderConflicts, type OrderConflict } from "@/lib/order-conflicts";
-import { getAccountingBatchOrders, groupOrdersByImportBatch, groupReservationOrders } from "@/lib/order-batches";
+import { getAccountingBatchOrders, groupOrdersByImportBatch, groupOrdersByImportBatchStartMonth, groupReservationOrders } from "@/lib/order-batches";
 import { getMonthlySameSourceOrders } from "@/lib/order-invoice-status";
 import { normalizeOrderTimeInput } from "@/lib/order-time-input";
 
@@ -1715,7 +1717,7 @@ export default function Home() {
   const unregisteredDriverNames = Array.from(
     new Set(orders.flatMap(order => getOrderDriverNames(order)).filter(Boolean)),
   ).filter((name) => !driverRecords.some((driver) => driver.name === name));
-  const driverRows = [
+  const driverRows = rankDriversByMonthlyAttendance([
     ...driverRecords,
     ...unregisteredDriverNames.map((name, index) => ({
       id: `unregistered-driver-${index}`,
@@ -1728,7 +1730,7 @@ export default function Home() {
       personalSlogan: "",
       regionId: undefined,
     })),
-  ];
+  ], orders, toDateKey(new Date()));
   const unregisteredVehicleNames = Array.from(
     new Set(orders.map((order) => order.vehicle).filter(Boolean)),
   ).filter((name) => !vehicleRecords.some((vehicle) => vehicle.name === name));
@@ -1968,7 +1970,9 @@ export default function Home() {
   const sortedFinanceOrders = [...filteredOrderFinanceOrders].sort((first, second) =>
     `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`),
   );
-  const financeDisplayGroups = groupOrdersByImportBatch(sortedFinanceOrders).map((groupOrders) => {
+  const financeDisplayGroups = groupOrdersByImportBatchStartMonth(orders, financeMonth)
+    .filter((groupOrders) => groupOrders.some(matchesFinanceFilters))
+    .map((groupOrders) => {
     const firstOrder = groupOrders[0];
     const totals = groupOrders.reduce((sum, order) => {
       const orderTotals = getOrderFinanceForOrder(order, financeMonth);
@@ -1987,11 +1991,22 @@ export default function Home() {
     const invoiceCompletedCount = groupOrders.filter((order) => order.invoiceStatus === "已完成").length;
     const depositPaidCount = groupOrders.filter((order) => Boolean(order.depositDate)).length;
     const uniqueValues = (values: string[]) => [...new Set(values.filter(Boolean))];
+    const startDate = groupOrders.reduce(
+      (earliest, order) => order.date < earliest ? order.date : earliest,
+      firstOrder.date,
+    );
+    const endDate = groupOrders.reduce((latest, order) => {
+      const orderEndDate = order.endDate || order.date;
+      return orderEndDate > latest ? orderEndDate : latest;
+    }, firstOrder.endDate || firstOrder.date);
     return {
       key: firstOrder.id,
       orders: groupOrders,
       totals,
-      dates: uniqueValues(groupOrders.map((order) => formatOrderDate(order.date))),
+      customers: uniqueValues(groupOrders.map((order) => order.customer || "未填写")),
+      dateRange: startDate === endDate
+        ? formatOrderDate(startDate)
+        : `${formatOrderDate(startDate)} ～ ${formatOrderDate(endDate)}`,
       sources: uniqueValues(groupOrders.map((order) => order.orderSource || "未填写")),
       invoiceStatus: invoiceCompletedCount === groupOrders.length
         ? groupOrders.length > 1 ? "全部已完成" : "已完成"
@@ -2036,7 +2051,7 @@ export default function Home() {
         orderCount: sortedFinanceOrders.length,
         requestAmounts: filteredFinanceRequestAmounts,
         rows: financeDisplayGroups.map((group) => ({
-          date: group.dates.join("、"),
+          date: group.dateRange,
           customer: group.orders.map((order) => order.customer || "未填写").join("、"),
           source: group.sources.join("、"),
           invoiceStatus: group.invoiceStatus,
@@ -2050,14 +2065,23 @@ export default function Home() {
       alert(error instanceof Error ? error.message : "财务表导出失败，請重试。");
     }
   }
-  const [driverFinanceYear] = financeMonth.split("-").map(Number);
-  const driverFinanceHolidays = getJapaneseHolidays(driverFinanceYear);
+  const driverFinanceHolidayCache = new Map<number, Set<string>>();
+  const isDriverFinanceRedDay = (serviceDate: string) => {
+    const year = Number(serviceDate.slice(0, 4));
+    let holidays = driverFinanceHolidayCache.get(year);
+    if (!holidays) {
+      holidays = getJapaneseHolidays(year);
+      driverFinanceHolidayCache.set(year, holidays);
+    }
+    const weekday = new Date(`${serviceDate}T00:00:00Z`).getUTCDay();
+    return weekday === 0 || weekday === 6 || holidays.has(serviceDate);
+  };
   const driverFinanceCompanies = [...new Set([
     ...companyRecords.map((company) => company.name),
     ...monthlyFinanceOrders.map((order) => order.company).filter(Boolean),
     ...driverWageItems.map((item) => item.companyName).filter(Boolean),
   ])].sort((first, second) => first.localeCompare(second));
-  const companyDriverFinanceDetails = monthlyFinanceOrders
+  const buildCompanyDriverFinanceDetails = (sourceOrders: readonly Order[]) => sourceOrders
     .filter((order) => driverFinanceCompanyFilter === "" ||
       (driverFinanceCompanyFilter === "__unassigned_company__"
         ? !order.company
@@ -2083,14 +2107,7 @@ export default function Home() {
             company: order.company,
             regionName: regionNameById.get(order.regionId || "") || "未知地域",
             serviceDate,
-            isRedDay: (() => {
-              const weekday = new Date(`${serviceDate}T00:00:00Z`).getUTCDay();
-              return (
-                weekday === 0 ||
-                weekday === 6 ||
-                driverFinanceHolidays.has(serviceDate)
-              );
-            })(),
+            isRedDay: isDriverFinanceRedDay(serviceDate),
             customer: order.customer || "未填写",
             vehicleNumber:
               getServiceVehicle({ ...order, financeByDate: { day: finance } }, "day").vehiclePlate || "-",
@@ -2120,6 +2137,19 @@ export default function Home() {
         `${second.serviceDate} ${second.time}`,
       ),
     );
+  const companyDriverFinanceDetails = buildCompanyDriverFinanceDetails(monthlyFinanceOrders);
+  const driverFinanceGroupOrders = groupOrdersByImportBatch(orders).filter((batch) => {
+    const startDate = batch.reduce(
+      (earliest, order) => order.date < earliest ? order.date : earliest,
+      batch[0].date,
+    );
+    return startDate.startsWith(`${financeMonth}-`);
+  }).flat();
+  const driverFinanceDisplayGroups = groupDriverFinanceByBatch(
+    driverFinanceGroupOrders,
+    buildCompanyDriverFinanceDetails(driverFinanceGroupOrders),
+    financeMonth,
+  );
   const monthDriverWageItems = driverWageItems.filter(
     (item) =>
         item.month === financeMonth &&
@@ -2138,6 +2168,14 @@ export default function Home() {
   const selectedDriverFinanceDriver = driverFinanceDrivers.includes(driverFinanceDriverFilter)
     ? driverFinanceDriverFilter
     : "";
+  const visibleDriverFinanceGroups = driverFinanceDisplayGroups
+    .map((group) => ({
+      ...group,
+      drivers: group.drivers.filter((driverGroup) =>
+        !selectedDriverFinanceDriver || driverGroup.driver === selectedDriverFinanceDriver,
+      ),
+    }))
+    .filter((group) => group.drivers.length > 0);
   const filteredDriverFinanceDetails = companyDriverFinanceDetails.filter(
     (row) => !selectedDriverFinanceDriver || row.driver === selectedDriverFinanceDriver,
   );
@@ -2572,8 +2610,25 @@ export default function Home() {
         ? accountingPreviewOrder?.regionId
         : driverSelectionOrder?.regionId;
   const driverSelectionCandidates = driverSelectionTarget === "driver-finance-filter"
-    ? driverFinanceDrivers.map((name) => ({ id: name, name, serviceDays: 0 }))
-    : driverSelectionTarget !== null ? rankDriversByRecentService(
+    ? rankDriversByMonthlyAttendance(driverFinanceDrivers.map((name) => {
+        const driver = driverRecords.find((record) =>
+          record.name === name && (activeRegionId === ALL_REGIONS_ID || record.regionId === activeRegionId));
+        if (activeRegionId === ALL_REGIONS_ID) {
+          return {
+            id: driver?.id ?? name,
+            name,
+            regionId: undefined,
+            reading: driver?.reading ?? "",
+          };
+        }
+        return driver ?? {
+          id: name,
+          name,
+          regionId: activeRegionId,
+          reading: "",
+        };
+      }), orders, todayDateKey).map((driver) => ({ ...driver, serviceDays: 0 }))
+    : driverSelectionTarget !== null ? rankDriversByMonthlyAttendance(
         driverRecords.filter((driver) => driver.regionId === driverSelectionRegionId),
         orders,
         todayDateKey,
@@ -5265,22 +5320,22 @@ export default function Home() {
                 </div>
               </div>
               <div className="order-finance-table-region border bg-white">
-                <table className="management-table order-finance-management-table w-full min-w-[1100px] table-fixed text-center text-sm" data-table="order-finance">
+                <table className="management-table order-finance-management-table w-full min-w-[1400px] table-fixed text-center text-sm" data-table="order-finance">
                   <colgroup>
-                    <col style={{ width: "10%" }} /><col style={{ width: "25%" }} />
-                    <col style={{ width: "15%" }} /><col style={{ width: "12%" }} />
-                    <col style={{ width: "12%" }} /><col style={{ width: "13%" }} />
-                    <col style={{ width: "13%" }} />
+                    <col style={{ width: "15%" }} /><col style={{ width: "25%" }} />
+                    <col style={{ width: "15%" }} /><col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} /><col style={{ width: "12.5%" }} />
+                    <col style={{ width: "12.5%" }} />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
-                      <th className="px-4 py-3 font-semibold">訂単日期</th>
-                      <th className="px-4 py-3 font-semibold">团／訂単名称</th>
-                      <th className="px-4 py-3 font-semibold">来源</th>
-                      <th className="px-4 py-3 text-right font-semibold">請求書状態</th>
-                      <th className="px-4 py-3 text-right font-semibold">入金状態</th>
-                      <th className="px-4 py-3 text-right font-semibold">請求金額</th>
-                      <th className="px-4 py-3 text-right font-semibold">訂単総利润</th>
+                      <th className="px-2 py-3 font-semibold">用車日期</th>
+                      <th className="px-2 py-3 font-semibold">予約情報</th>
+                      <th className="px-2 py-3 font-semibold">来源</th>
+                      <th className="px-2 py-3 font-semibold">請求書状態</th>
+                      <th className="px-2 py-3 font-semibold">入金状態</th>
+                      <th className="px-2 py-3 font-semibold">請求金額</th>
+                      <th className="px-2 py-3 font-semibold">訂単総利润</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5297,33 +5352,27 @@ export default function Home() {
                         const groupSaving = group.orders.some((member) => invoiceStatusSavingIds.has(member.id));
                         return (
                           <tr key={group.key} className="border-t hover:bg-gray-50">
-                          <td data-label="訂単日期" className="whitespace-nowrap px-4 py-3">
-                            <div className="grid gap-1">{group.dates.map((date) => <span key={date}>{date}</span>)}</div>
+                          <td data-label="用車日期" className="whitespace-nowrap px-2 py-3">
+                            {group.dateRange}
                           </td>
-                          <td data-label="团／訂単名称" className="px-4 py-3">
+                          <td data-label="予約情報" className="break-words px-2 py-3">
                             {group.orders.length > 1 && (
                               <span className="mb-1 inline-block rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
                                 {group.orders.length} 笔／团
                               </span>
                             )}
-                            <div className="grid gap-1">
-                              {group.orders.map((member) => (
-                                <div key={member.id}>
-                                  <button
-                                    type="button"
-                                    onClick={() => openAccounting(member)}
-                                    aria-haspopup="dialog"
-                                    className="text-left font-medium text-blue-700 hover:underline"
-                                  >
-                                    {member.customer || "未填写"}
-                                  </button>
-                                  <OrderFinanceReviewButton orderId={member.id} name={member.customer || "未填写"} />
-                                </div>
-                              ))}
-                            </div>
+                            <button
+                              type="button"
+                              title={group.customers.join("、")}
+                              onClick={() => openAccounting(order)}
+                              aria-haspopup="dialog"
+                              className="font-medium text-blue-700 hover:underline"
+                            >
+                              {group.customers[0] || "未填写"}
+                            </button>
                           </td>
-                          <td data-label="来源" className="px-4 py-3">{group.sources.join("、")}</td>
-                          <td data-label="請求書状態" className="whitespace-nowrap px-4 py-3 text-right font-semibold">
+                          <td data-label="来源" className="break-words px-2 py-3">{group.sources.join("、")}</td>
+                          <td data-label="請求書状態" className="whitespace-nowrap px-2 py-3 font-semibold">
                             <button
                               type="button"
                               aria-label={`${group.orders.length} 笔訂単請求書状态：${group.invoiceStatus}，点击变更`}
@@ -5338,7 +5387,7 @@ export default function Home() {
                               {groupSaving ? "保存中…" : group.invoiceStatus}
                             </button>
                           </td>
-                          <td data-label="入金状態" className="whitespace-nowrap px-4 py-3 text-right font-semibold">
+                          <td data-label="入金状態" className="whitespace-nowrap px-2 py-3 font-semibold">
                             <button
                               type="button"
                               aria-label={`${group.orders.length} 笔訂単入金状态：${group.depositStatus}，点击变更`}
@@ -5353,8 +5402,8 @@ export default function Home() {
                               {groupSaving ? "保存中…" : group.depositStatus}
                             </button>
                           </td>
-                          <td data-label="請求金額" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(group.totals.requestAmount)}</td>
-                          <td data-label="訂単総利润" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(group.totals.profit)}</td>
+                          <td data-label="請求金額" className="whitespace-nowrap px-2 py-3 tabular-nums">{formatYen(group.totals.requestAmount)}</td>
+                          <td data-label="訂単総利润" className="whitespace-nowrap px-2 py-3 font-semibold tabular-nums">{formatYen(group.totals.profit)}</td>
                           </tr>
                         );
                       })
@@ -5491,49 +5540,43 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredDriverFinanceDetails.length === 0 ? (
+                    {visibleDriverFinanceGroups.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                           暂无運転士工資記録
                         </td>
                       </tr>
                     ) : (
-                      filteredDriverFinanceDetails.map((row) => (
-                        <tr key={row.id} className="border-t hover:bg-gray-50">
-                          <td
-                            data-label="服务日期"
-                            className="whitespace-nowrap px-4 py-3 font-medium"
-                            style={row.isRedDay ? { color: "#dc2626" } : undefined}
-                          >
-                            {formatOrderDate(row.serviceDate)}
-                          </td>
-                          <td data-label="訂単名称" className="px-4 py-3 font-medium">
-                            <button
-                              type="button"
-                              aria-haspopup="dialog"
-                              className="text-left text-blue-700 hover:underline"
-                              onClick={() => {
-                                const order = orders.find((item) => item.id === row.orderId);
-                                if (!order) {
-                                  alert("未找到对应訂単，請刷新后重试。");
-                                  return;
-                                }
-                                openAccounting(order);
-                              }}
-                            >
-                              {row.customer}
-                            </button>
-                          </td>
-                          <td data-label="車輌番号" className="px-4 py-3">{row.vehicleNumber || "—"}</td>
-                          <td data-label="運転士姓名" className="px-4 py-3">{row.driver}</td>
-                          <td data-label="運転士立替" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.driverAdvances)}</td>
-                          <td data-label="超時工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.overtimeFee)}</td>
-                          <td data-label="奖励工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.bonusWage)}</td>
-                          <td data-label="運転士比例工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.percentageWage)}</td>
-                          <td data-label="運転士固定工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.fixedWage)}</td>
-                          <td data-label="支付総额" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-blue-800">{formatYen(row.driverAdvances + row.totalWage)}</td>
-                        </tr>
-                      ))
+                      visibleDriverFinanceGroups.map((group) => {
+                        return group.drivers.map((driverGroup, index) => (
+                          <tr key={`${group.key}-${driverGroup.driver}`} className="border-t bg-blue-50 font-semibold">
+                            <td data-label="服务日期" className="px-4 py-3">{formatOrderDate(group.startDate)}</td>
+                            <td data-label="訂単名称" className="px-4 py-3 text-left">
+                              {group.drivers.length > 1 && (
+                                <span className="mr-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
+                                  {index + 1}/{group.drivers.length} 司机
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                aria-haspopup="dialog"
+                                onClick={() => openAccounting(group.orders[0])}
+                                className="text-left text-blue-700 hover:underline"
+                              >
+                                {group.customers.join("、")}
+                              </button>
+                            </td>
+                            <td data-label="車輌番号" className="px-4 py-3">{driverGroup.vehicles.join("、") || "—"}</td>
+                            <td data-label="運転士姓名" className="px-4 py-3">{driverGroup.driver || "—"}</td>
+                            <td data-label="運転士立替" className="px-4 py-3 text-right tabular-nums">{formatYen(driverGroup.totals.driverAdvances)}</td>
+                            <td data-label="超時工資" className="px-4 py-3 text-right tabular-nums">{formatYen(driverGroup.totals.overtimeFee)}</td>
+                            <td data-label="奖励工資" className="px-4 py-3 text-right tabular-nums">{formatYen(driverGroup.totals.bonusWage)}</td>
+                            <td data-label="運転士比例工資" className="px-4 py-3 text-right tabular-nums">{formatYen(driverGroup.totals.percentageWage)}</td>
+                            <td data-label="運転士固定工資" className="px-4 py-3 text-right tabular-nums">{formatYen(driverGroup.totals.fixedWage)}</td>
+                            <td data-label="支付総额" className="px-4 py-3 text-right tabular-nums text-blue-800">{formatYen(driverGroup.totals.paymentTotal)}</td>
+                          </tr>
+                        ));
+                      })
                     )}
                   </tbody>
                 </table>
@@ -7500,16 +7543,15 @@ export default function Home() {
               <div className="overflow-x-auto border bg-white">
                 <table className="w-full min-w-[1400px] table-fixed text-center text-sm">
                   <colgroup>
-                    <col className="w-[15%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[7%]" />
-                    <col className="w-[21%]" />
-                    <col className="w-[7%]" />
+                    <col className="w-[16%]" />
                     <col className="w-[8%]" />
                     <col className="w-[8%]" />
+                    <col className="w-[24%]" />
                     <col className="w-[9%]" />
-                    <col className="w-[8%]" />
+                    <col className="w-[9%]" />
                     <col className="w-[10%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[7%]" />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
@@ -7517,7 +7559,6 @@ export default function Home() {
                       <th className="px-2 py-3 font-semibold">配車時間</th>
                       <th className="px-2 py-3 font-semibold">手配状態</th>
                       <th className="px-2 py-3 font-semibold">予約情報</th>
-                      <th className="px-2 py-3 font-semibold">訂単状態</th>
                       <th className="px-2 py-3 font-semibold">車両</th>
                       <th className="px-2 py-3 font-semibold">運転士</th>
                       <th className="px-2 py-3 font-semibold">来源</th>
@@ -7558,11 +7599,6 @@ export default function Home() {
                                 合计{count}单
                               </span>
                             )}
-                          </td>
-                          <td className="whitespace-nowrap px-2 py-3">
-                            <span className={`rounded border px-2 py-1 text-xs ${statusStyles[order.status]}`}>
-                              {order.status}
-                            </span>
                           </td>
                           <td className="break-words px-2 py-3">
                             <button
@@ -7632,7 +7668,7 @@ export default function Home() {
                       })}
                     {monthlyOrders.length === 0 && (
                       <tr>
-                        <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
+                        <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
                           该月份暂无予約
                         </td>
                       </tr>

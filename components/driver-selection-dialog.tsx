@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { shiftStatusSchema } from "@/lib/driver/shifts";
-import { sortDriversByReading } from "@/lib/driver-selection";
+import { sortDriversByMonthlyAttendance } from "@/lib/driver-selection";
 
 type Props = {
-  drivers: { id: string; name: string; reading?: string; serviceDays: number }[];
+  drivers: { id: string; name: string; reading?: string; serviceDays?: number; attendanceDays?: number }[];
   selected: string;
   onSelect: (name: string, manual: boolean) => void;
   onClose: () => void;
@@ -60,7 +60,7 @@ export function DriverSelectionDialog({
     return () => { if (previous instanceof HTMLElement) previous.focus(); };
   }, []);
   const searchTerm = search.trim().toLocaleLowerCase();
-  const matches = sortDriversByReading(drivers.filter((driver) =>
+  const matches = sortDriversByMonthlyAttendance(drivers.filter((driver) =>
     driver.name.toLocaleLowerCase().includes(searchTerm) ||
     driver.reading?.toLocaleLowerCase().includes(searchTerm)));
   return (
@@ -93,7 +93,7 @@ export function DriverSelectionDialog({
         </div>
         {showServiceDays && (
           <>
-            <p className="mb-4 text-sm text-gray-500">按姓名读音罗马字A-Z排列；未填写读音时按姓名排序。最近30天服务日数仅供参考，同一天多单计1天。</p>
+            <p className="mb-4 text-sm text-gray-500">按前月及当月出勤日数从多到少排列；同一天多单计1天，出勤日数相同则按姓名读音排序。</p>
             <p className="mb-4 text-xs text-gray-500">按预约服务日期统计，优先采用每日财务記録中的運転士；排除休运日、取消訂単及未来日期，不作为考勤证明。</p>
           </>
         )}
@@ -114,7 +114,7 @@ export function DriverSelectionDialog({
               <span className="block font-semibold">{driver.name}</span>
               {driver.reading && <span className="mt-1 block text-xs text-gray-500">{driver.reading}</span>}
               {showServiceDays && (
-                <span className="mt-1 block text-xs text-gray-500">最近30天 · {driver.serviceDays}天</span>
+                <span className="mt-1 block text-xs text-gray-500">前月及当月 · {driver.attendanceDays ?? driver.serviceDays}天</span>
               )}
               {resting.length > 0 && <span className="absolute bottom-2 right-2 text-sm font-bold text-red-600"
                 aria-label={`希望休：${resting.map(day => day.date).join("、")}`}

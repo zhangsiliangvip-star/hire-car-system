@@ -251,13 +251,15 @@ test("driver cards show red rest in bottom-right by driver ID but remain selecta
   assert.equal(renderDialog({ days: [{ driverId: "c6000000-0000-4000-8000-000000000002", date: data.dates[0] }] })
     .html.includes(">休</span>"), false);
 });
-test("driver selection dialog displays drivers by recorded romanized reading", () => {
+test("driver selection dialog prioritizes attendance then recorded romanized reading", () => {
   const h = renderDialog({ drivers: [
-    { id: "b", name: "田中", reading: "tanaka", serviceDays: 20 },
-    { id: "a", name: "佐藤", reading: "sato", serviceDays: 1 },
+    { id: "b", name: "田中", reading: "tanaka", serviceDays: 0, attendanceDays: 20 },
+    { id: "a", name: "佐藤", reading: "sato", serviceDays: 0, attendanceDays: 1 },
+    { id: "c", name: "鈴木", reading: "suzuki", serviceDays: 0, attendanceDays: 1 },
   ] });
-  assert.ok(h.html.indexOf("佐藤") < h.html.indexOf("田中"));
-  assert.ok(h.html.indexOf("sato") < h.html.indexOf("tanaka"));
+  assert.ok(h.html.indexOf("田中") < h.html.indexOf("佐藤"));
+  assert.ok(h.html.indexOf("佐藤") < h.html.indexOf("鈴木"));
+  assert.ok(h.html.indexOf("sato") < h.html.indexOf("suzuki"));
 });
 test("rest hints fetch all actual service dates, never notes; failures explicitly warn", async () => {
   const calls = [];
@@ -273,7 +275,6 @@ test("all assignment selection entry points supply actual service dates, excludi
   const source = readFileSync(fileURLToPath(new URL("../app/page.tsx", import.meta.url)), "utf8");
   assert.match(source, /serviceDates=\{driverSelectionDates\}/);
   assert.equal((source.match(/serviceDate=\{date\}/g) || []).length, 2);
-  assert.match(source, /getOrderDateKeys\(form\)\.filter\(date => !form.offDates.includes\(date\)\)/);
   assert.match(source, /getOrderDateKeys\(driverSelectionOrder\)\.filter\(date => !driverSelectionOrder.offDates.includes\(date\)\)/);
   assert.match(source, /driverSelectionTarget === "driver-finance-filter" \? \[\]/);
   const daily = readFileSync(fileURLToPath(new URL("../components/finance-driver-select.tsx", import.meta.url)), "utf8");

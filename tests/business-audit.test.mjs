@@ -156,7 +156,7 @@ test("company advance external names appear in order labels but stay excluded fr
   assert.equal(findOrderConflicts(candidate, [order]).length, 0);
   assert.equal(findOrderConflicts({ ...candidate, driver: "External" }, [order]).length, 0);
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  assert.match(source, /group\.orders\.map\(getOrderDriverLabel\)/);
+  assert.match(source, /getOrderDriverLabel\(allOrders\.find/);
   assert.match(source, /allOrders\.find\(order => order\.id === selectedOrderDetailsSnapshot\.id\)/);
   assert.doesNotMatch(source, /form\[key\] = \{ \.\.\.finance, driver: defaultDriver \}/);
 });
@@ -172,6 +172,39 @@ test("driver reading sorts assignment options by romanized A-Z order", () => {
   assert.deepEqual(plain(sortDriversByReading(drivers).map((driver) => driver.id)), ["d", "c", "b", "a"]);
   assert.deepEqual(drivers.map((driver) => driver.id), ["c", "a", "b", "d"],
     "sorting does not mutate the source list");
+});
+
+test("driver attendance ranks distinct service days across the previous and current months", () => {
+  const { rankDriversByMonthlyAttendance } = load("lib\\driver-selection.ts");
+  const orders = [
+    { id: "a1", regionId: region, date: "2026-09-02", endDate: "2026-09-04", offDates: ["2026-09-03"],
+      status: "予約確定", driver: "Driver A", financeByDate: {} },
+    { id: "a2", regionId: region, date: "2026-10-01", endDate: "2026-10-02", offDates: [],
+      status: "予約確定", driver: "Driver A", financeByDate: {} },
+    { id: "b1", regionId: region, date: "2026-10-03", endDate: "2026-10-04", offDates: [],
+      status: "予約確定", driver: "Driver B", financeByDate: { "2026-10-04": { driver: "Driver A" } } },
+    { id: "cancelled", regionId: region, date: "2026-10-05", offDates: [],
+      status: "キャンセル", driver: "Driver A", financeByDate: {} },
+    { id: "future", regionId: region, date: "2026-10-31", offDates: [],
+      status: "予約確定", driver: "Driver B", financeByDate: {} },
+    { id: "old", regionId: region, date: "2026-08-31", offDates: [],
+      status: "予約確定", driver: "Driver B", financeByDate: {} },
+  ];
+  const drivers = [
+    { id: "b", name: "Driver B", regionId: region, reading: "b" },
+    { id: "a", name: "Driver A", regionId: region, reading: "a" },
+    { id: "c", name: "Driver C", regionId: region, reading: "c" },
+  ];
+  const ranked = plain(rankDriversByMonthlyAttendance(drivers, orders, "2026-10-04"));
+  assert.deepEqual(ranked.map(({ name, attendanceDays }) => [name, attendanceDays]), [
+    ["Driver A", 5], ["Driver B", 1], ["Driver C", 0],
+  ]);
+  assert.deepEqual(drivers.map(({ id }) => id), ["b", "a", "c"], "ranking does not mutate source drivers");
+  const page = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(page, /const driverRows = rankDriversByMonthlyAttendance\(\[/);
+  assert.match(page, /driverSelectionTarget !== null \? rankDriversByMonthlyAttendance\(/);
+  const financeSelector = fs.readFileSync(path.join(root, "components\\finance-driver-select.tsx"), "utf8");
+  assert.match(financeSelector, /rankDriversByMonthlyAttendance\(/);
 });
 
 test("outsourced driver labels have a distinct badge while staff driver labels remain unbadged", () => {
@@ -372,7 +405,7 @@ test("reservation batches collapse strictly by persisted import ID and preserve 
 });
 
 test("finance group rows use import batches without merging legacy orders", () => {
-  const { groupOrdersByImportBatch } = load("lib\\order-batches.ts");
+  const { groupOrdersByImportBatch, groupOrdersByImportBatchStartMonth } = load("lib\\order-batches.ts");
   const base = { regionId: "r1", date: "2026-10-22", time: "09:00" };
   const orders = [
     { ...base, id: "batch-later", importBatchId: "batch", importBatchIndex: 1 },
@@ -384,6 +417,48 @@ test("finance group rows use import batches without merging legacy orders", () =
   assert.deepEqual(plain(groupOrdersByImportBatch(orders)).map((group) => group.map((order) => order.id)), [
     ["batch-first", "batch-later"], ["legacy-one"], ["other-region"], ["legacy-two"],
   ]);
+  const crossMonth = [
+    { ...base, id: "sep-first", date: "2026-09-30", importBatchId: "cross-month", importBatchIndex: 0 },
+    { ...base, id: "oct-second", date: "2026-10-02", importBatchId: "cross-month", importBatchIndex: 1 },
+  ];
+  assert.deepEqual(
+    plain(groupOrdersByImportBatchStartMonth(crossMonth, "2026-09").map((group) => group.map((order) => order.id))),
+    [["sep-first", "oct-second"]],
+  );
+  assert.deepEqual(plain(groupOrdersByImportBatchStartMonth(crossMonth, "2026-10")), []);
+});
+
+test("driver finance groups use the first service month and split totals by driver", () => {
+  const batches = load("lib\\order-batches.ts");
+  const { groupDriverFinanceByBatch } = load("lib\\driver-finance-groups.ts", {
+    "@/lib/order-batches": batches,
+  });
+  const orders = [
+    { id: "batch-sep", regionId: "r1", importBatchId: "cross-month", date: "2026-09-25",
+      time: "09:00", customer: "Group A", importBatchIndex: 0 },
+    { id: "batch-oct", regionId: "r1", importBatchId: "cross-month", date: "2026-10-02",
+      time: "09:00", customer: "Group A", importBatchIndex: 1 },
+    { id: "legacy", regionId: "r1", date: "2026-09-28", time: "10:00", customer: "Legacy" },
+  ];
+  const detail = (id, orderId, serviceDate, driver, amount) => ({
+    id, orderId, serviceDate, time: "09:00", customer: "Group A", vehicleNumber: "Car",
+    driver, isRedDay: false, driverAdvances: amount, overtimeFee: 10, bonusWage: 20,
+    percentageWage: 30, fixedWage: 40, totalWage: 100,
+  });
+  const rows = [
+    detail("sep-a", "batch-sep", "2026-09-25", "Driver A", 100),
+    detail("oct-a", "batch-oct", "2026-10-01", "Driver A", 200),
+    detail("oct-b", "batch-oct", "2026-10-02", "Driver B", 300),
+    detail("legacy-row", "legacy", "2026-09-28", "Legacy Driver", 50),
+  ];
+  const september = plain(groupDriverFinanceByBatch(orders, rows, "2026-09"));
+  assert.deepEqual(september.map((group) => group.startDate), ["2026-09-25", "2026-09-28"]);
+  assert.deepEqual(september[0].drivers.map((driver) => driver.driver), ["Driver A", "Driver B"]);
+  assert.deepEqual(september[0].drivers.map((driver) => driver.rows.map((row) => row.serviceDate)), [
+    ["2026-09-25", "2026-10-01"], ["2026-10-02"],
+  ]);
+  assert.deepEqual(september[0].drivers.map((driver) => driver.totals.driverAdvances), [300, 300]);
+  assert.deepEqual(plain(groupDriverFinanceByBatch(orders, rows, "2026-10")), []);
 });
 
 test("batch imports save one ID per import, line positions and retain membership when editing", () => {
@@ -837,7 +912,7 @@ test("selection dialogs only close from their top-right cross, not backdrop Esca
   let opened = false, selected = "";
   const { FinanceDriverSelect } = load("components\\finance-driver-select.tsx", {
     react: { ...hooks, useState: () => [opened, (value) => { opened = value; }] },
-    "@/lib/driver-selection": { rankDriversByRecentService: () => [] },
+    "@/lib/driver-selection": { rankDriversByMonthlyAttendance: () => [] },
     "@/components/driver-selection-dialog": { DriverSelectionDialog() {} },
   });
   const render = () => FinanceDriverSelect({
@@ -1043,7 +1118,7 @@ test("dated statistics sort oldest first and use departure time to break date ti
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   for (const [start, end, dateKey] of [
     ["  const sortedFinanceOrders =", "  const filteredFinanceTotals =", "date"],
-    ["  const companyDriverFinanceDetails =", "  const driverFinanceDrivers =", "serviceDate"],
+    ["  const buildCompanyDriverFinanceDetails =", "  const driverFinanceDrivers =", "serviceDate"],
     ["  const filteredVehicleFinanceDetails =", "  const vehicleSummaryResult:", "serviceDate"],
   ]) {
     const section = source.slice(source.indexOf(start), source.indexOf(end));
@@ -1071,7 +1146,7 @@ test("wage driver dropdown follows monthly wages and includes drivers with manua
     source.indexOf("  const filteredOrderFinanceOrders ="),
   );
   const wages = source.slice(
-    source.indexOf("  const [driverFinanceYear] ="),
+    source.indexOf("  const driverFinanceHolidayCache ="),
     source.indexOf("  const driverFinanceCompanyLabel ="),
   );
   const script = ts.transpileModule(
@@ -1110,6 +1185,10 @@ test("wage driver dropdown follows monthly wages and includes drivers with manua
       driverFinanceDriverFilter: selected, companyRecords: [],
       driverRecords: [], driverWageItems: wageItems, activeRegionId: region,
       ALL_REGIONS_ID: "__all_regions__",
+      groupOrdersByImportBatch: load("lib\\order-batches.ts").groupOrdersByImportBatch,
+      groupDriverFinanceByBatch: load("lib\\driver-finance-groups.ts", {
+        "@/lib/order-batches": load("lib\\order-batches.ts"),
+      }).groupDriverFinanceByBatch,
       regionNameById: new Map(), accountingAccounts: [],
       getJapaneseHolidays: () => new Set(),
       calculateOrderFinance: (finance) => ({
@@ -1160,7 +1239,7 @@ test("wage driver dropdown follows monthly wages and includes drivers with manua
   const panel = source.slice(start, source.indexOf("</FinanceSummaryPanel>", start));
   assert.match(panel, /onMonthChange=\{\(month\) => \{\s*setFinanceMonth\(month\);\s*setDriverFinanceDriverFilter\(""\);/);
   assert.match(panel, /selectedDriverFinanceDriver \|\| "全部運転士"/);
-  assert.match(source, /driverFinanceDrivers\.map\(\(name\) => \(\{ id: name, name, serviceDays: 0 \}\)\)/);
+  assert.match(source, /rankDriversByMonthlyAttendance\(driverFinanceDrivers\.map\(\(name\) => \{/);
   assert.match(panel, /activeRegionId === ALL_REGIONS_ID \|\| !selectedDriverFinanceDriver/);
 });
 
@@ -2772,24 +2851,26 @@ test("new and edit reservation saves float with the same style as accounting whi
   assert.match(floating, /<svg aria-hidden="true"/);
 });
 
-test("reservation table centers fields and shows order and request status in their requested columns", () => {
+test("reservation table omits order status and preserves request status controls", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const start = source.indexOf('<table className="w-full min-w-[1400px] table-fixed text-center text-sm">');
   const table = source.slice(start, source.indexOf("</table>", start));
   const headers = [...table.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1]);
   assert.deepEqual(headers, [
-    "用車日期", "配車時間", "手配状態", "予約情報", "訂単状態",
+    "用車日期", "配車時間", "手配状態", "予約情報",
     "車両", "運転士", "来源", "請求書状態", "操作",
   ]);
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
-  assert.deepEqual(columnWidths, [15, 7, 7, 21, 7, 8, 8, 9, 8, 10]);
-  assert.match(table, /statusStyles\[order\.status\]/);
+  assert.deepEqual(columnWidths, [16, 8, 8, 24, 9, 9, 10, 9, 7]);
+  assert.equal(columnWidths.reduce((sum, width) => sum + width, 0), 100);
+  assert.doesNotMatch(table, /訂単状態|order\.status/);
   assert.match(table, /点击選択請求書状態和变更范围/);
   assert.match(table, /onClick=\{\(\) => openOrderStatusDialog\(order, "invoice", "reservation"\)\}/);
   assert.doesNotMatch(table, /同来源批量/);
   assert.match(table, /flex flex-nowrap items-center justify-center gap-2/);
   const actionButtons = table.slice(table.lastIndexOf('<td className="px-2 py-3">'), table.indexOf("</tr>", table.lastIndexOf('<td className="px-2 py-3">')));
-  assert.equal((actionButtons.match(/inline-flex w-14 items-center justify-center whitespace-nowrap rounded border py-1/g) || []).length, 2);
+  assert.equal((actionButtons.match(/inline-flex w-14 items-center justify-center whitespace-nowrap rounded border py-1/g) || []).length, 1);
+  assert.match(actionButtons, /table-action-button--delete w-14/);
   assert.doesNotMatch(actionButtons, /编辑/);
   assert.doesNotMatch(actionButtons, /hover:underline/);
   assert.doesNotMatch(table, /text-left/);

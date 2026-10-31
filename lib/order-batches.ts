@@ -22,6 +22,16 @@ export function groupOrdersByImportBatch(orders: readonly Order[]) {
     );
 }
 
+export function groupOrdersByImportBatchStartMonth(orders: readonly Order[], month: string) {
+  return groupOrdersByImportBatch(orders).filter((batch) => {
+    const firstServiceDate = batch.reduce(
+      (earliest, order) => order.date < earliest ? order.date : earliest,
+      batch[0].date,
+    );
+    return firstServiceDate.startsWith(`${month}-`);
+  });
+}
+
 export function groupReservationOrders(orders: readonly Order[]) {
   const rows: { order: Order; count: number }[] = [];
   const batches = new Map<string, { order: Order; count: number }>();

@@ -119,16 +119,27 @@ test("order finance statistics display one summarized row per import group witho
   const tableStart = page.lastIndexOf("<table", page.indexOf('data-table="order-finance"'));
   const table = page.slice(tableStart, page.indexOf("</table>", tableStart));
   assert.match(table, /order-finance-management-table/);
-  for (const label of ["訂単日期", "团／訂単名称", "来源", "請求書状態",
+  for (const label of ["用車日期", "予約情報", "来源", "請求書状態",
     "入金状態", "請求金額", "訂単総利润"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
   assert.doesNotMatch(table, /data-label="運転士"|data-label="車両番号"/);
   assert.doesNotMatch(table, /運転士総立替|会社総支出|運転士総工資/);
-  assert.match(page, /groupOrdersByImportBatch\(sortedFinanceOrders\)/);
+  assert.match(page, /groupOrdersByImportBatchStartMonth\(orders,\s*financeMonth\)/);
+  assert.match(page, /groupOrdersByImportBatchStartMonth\(orders,\s*financeMonth\)[\s\S]*?groupOrders\.some\(matchesFinanceFilters\)/);
   assert.match(page, /groupOrdersByImportBatch\(monthlyFinanceOrders\)[\s\S]*?group\.some\(matchesFinanceFilters\)/);
   assert.match(page, /group\.totals\.requestAmount/);
   assert.match(page, /group\.orders\.length > 1/);
+  assert.match(table, /min-w-\[1400px\]/);
+  assert.match(table, /<th className="px-2 py-3 font-semibold">用車日期<\/th>/);
+  assert.match(table, /<th className="px-2 py-3 font-semibold">予約情報<\/th>/);
+  assert.match(table, /\{group\.customers\[0\] \|\| "未填写"\}/);
+  assert.match(table, /title=\{group\.customers\.join\("、"\)\}/);
+  assert.match(table, /\{group\.dateRange\}/);
+  assert.match(page, /dateRange: startDate === endDate[\s\S]*formatOrderDate\(startDate\)[\s\S]*formatOrderDate\(endDate\)/);
+  assert.match(page, /date: group\.dateRange/);
+  assert.doesNotMatch(table, /openAccounting\(member\)/);
+  assert.doesNotMatch(table, /OrderFinanceReviewButton/);
   assert.match(page, /isBatch \? "finance-batch" : "finance"/);
   assert.match(page, /invoiceStatusDialog\.origin === "finance-batch"/);
   assert.match(css, /\.dashboard \.management-table\.order-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.8125rem;/);
@@ -140,18 +151,24 @@ test("order finance statistics display one summarized row per import group witho
   assert.doesNotMatch(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });
 
-test("driver wage rows display individually in a readable table without time or wage-total columns", () => {
+test("driver finance groups open accounting details by driver and use the batch start month", () => {
   const tableStart = page.lastIndexOf("<table", page.indexOf('data-table="driver-finance"'));
   const table = page.slice(tableStart, page.indexOf("</table>", tableStart));
   assert.match(table, /driver-finance-management-table/);
-  assert.match(table, /filteredDriverFinanceDetails\.map\(\(row\) => \(/);
-  assert.doesNotMatch(table, /aria-expanded|展开|收起|團／訂単名称/);
+  assert.match(page, /groupDriverFinanceByBatch\([\s\S]*?buildCompanyDriverFinanceDetails\(driverFinanceGroupOrders\),\s*financeMonth/);
+  assert.match(page, /const visibleDriverFinanceGroups = driverFinanceDisplayGroups/);
+  assert.match(page, /driverGroup\.driver === selectedDriverFinanceDriver/);
+  assert.match(table, /driverGroup\.driver/);
+  assert.match(table, /onClick=\{\(\) => openAccounting\(group\.orders\[0\]\)\}/);
+  assert.match(table, /formatOrderDate\(group\.startDate\)/);
+  assert.doesNotMatch(table, /aria-expanded=|展开|收起|driverGroup\.rows\.map/);
   assert.doesNotMatch(table, /核算担当|row\.accountingAssignee|row\.company/);
   for (const label of ["服务日期", "訂単名称", "車輌番号", "運転士姓名", "運転士立替",
     "超時工資", "奖励工資", "運転士比例工資", "運転士固定工資", "支付総额"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
   assert.doesNotMatch(table, /超時時間|工資総额/);
+  assert.match(page, /rows: filteredDriverFinanceDetails,/);
   assert.doesNotMatch(css, /\.driver-finance-management-table thead\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.driver-finance-management-table tbody\s*\{\s*display: grid;/);
   assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*min-width: 1400px !important;[^}]*font-size: 0\.875rem;/);
