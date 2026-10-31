@@ -1812,11 +1812,8 @@ export default function Home() {
     licenseExpiry: selectedDriverContact("licenseExpiry"), phone: selectedDriverContact("phone"),
     whatsapp: selectedDriverContact("whatsapp"), wechat: selectedDriverContact("wechat"),
   };
-  const ordersInSelectedMonth = orders.filter(
-    (order) =>
-      order.date <= `${orderMonth}-31` &&
-      (order.endDate || order.date) >= `${orderMonth}-01`,
-  );
+  const selectedMonthReservationGroups = groupOrdersByImportBatchStartMonth(orders, orderMonth);
+  const ordersInSelectedMonth = selectedMonthReservationGroups.flat();
   const orderVehicleFilterOptions = Array.from(
     new Set(
       ordersInSelectedMonth
@@ -1828,29 +1825,30 @@ export default function Home() {
     new Set(ordersInSelectedMonth.flatMap(order => getOrderDriverNames(order,
       date => date.startsWith(`${orderMonth}-`))).filter(Boolean)),
   ).sort((first, second) => first.localeCompare(second, "ja"));
-  const monthlyOrders = ordersInSelectedMonth.filter(
-    (order) =>
-      (!orderDateFilter ||
-        (order.date <= orderDateFilter &&
-          (order.endDate || order.date) >= orderDateFilter &&
-          !order.offDates.includes(orderDateFilter))) &&
-      (orderVehicleFilter === "" ||
-        (orderVehicleFilter === UNASSIGNED_ORDER_VEHICLE
-          ? getOrderVehiclePlates(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes("")
-          : getOrderVehiclePlates(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes(orderVehicleFilter))) &&
-      (orderDriverFilter === "" ||
-        (orderDriverFilter === UNASSIGNED_ORDER_DRIVER
-          ? getOrderDriverNames(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes("")
-          : getOrderDriverNames(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes(orderDriverFilter))) &&
-      (orderSourceFilter === "" ||
-        (orderSourceFilter === UNSOURCED_ORDER
-          ? !order.orderSource
-          : order.orderSource === orderSourceFilter)) &&
-      (orderCompanyFilter === "" ||
-        (orderCompanyFilter === "__unassigned_company__"
-          ? !order.company
-          : order.company === orderCompanyFilter)),
-  );
+  const matchesReservationFilters = (order: Order) =>
+    (!orderDateFilter ||
+      (order.date <= orderDateFilter &&
+        (order.endDate || order.date) >= orderDateFilter &&
+        !order.offDates.includes(orderDateFilter))) &&
+    (orderVehicleFilter === "" ||
+      (orderVehicleFilter === UNASSIGNED_ORDER_VEHICLE
+        ? getOrderVehiclePlates(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes("")
+        : getOrderVehiclePlates(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes(orderVehicleFilter))) &&
+    (orderDriverFilter === "" ||
+      (orderDriverFilter === UNASSIGNED_ORDER_DRIVER
+        ? getOrderDriverNames(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes("")
+        : getOrderDriverNames(order, date => orderDateFilter ? date === orderDateFilter : date.startsWith(`${orderMonth}-`)).includes(orderDriverFilter))) &&
+    (orderSourceFilter === "" ||
+      (orderSourceFilter === UNSOURCED_ORDER
+        ? !order.orderSource
+        : order.orderSource === orderSourceFilter)) &&
+    (orderCompanyFilter === "" ||
+      (orderCompanyFilter === "__unassigned_company__"
+        ? !order.company
+        : order.company === orderCompanyFilter));
+  const monthlyOrders = selectedMonthReservationGroups
+    .filter((group) => group.some(matchesReservationFilters))
+    .flat();
   const monthlyFinanceOrders = orders
     .filter(
       (order) =>
@@ -7536,8 +7534,8 @@ export default function Home() {
                   <colgroup>
                     <col className="w-[16%]" />
                     <col className="w-[24%]" />
-                    <col className="w-[9%]" />
                     <col className="w-[8%]" />
+                    <col className="w-[9%]" />
                     <col className="w-[9%]" />
                     <col className="w-[10%]" />
                     <col className="w-[10%]" />
@@ -7547,8 +7545,8 @@ export default function Home() {
                     <tr>
                       <th className="px-2 py-3 font-semibold">用車日期</th>
                       <th className="px-2 py-3 font-semibold">予約情報</th>
-                      <th className="px-2 py-3 font-semibold">来源</th>
                       <th className="px-2 py-3 font-semibold">配車時間</th>
+                      <th className="px-2 py-3 font-semibold">来源</th>
                       <th className="px-2 py-3 font-semibold">車両</th>
                       <th className="px-2 py-3 font-semibold">運転士</th>
                       <th className="px-2 py-3 font-semibold">請求書状態</th>
@@ -7581,8 +7579,8 @@ export default function Home() {
                               </span>
                             )}
                           </td>
-                          <td className="break-words px-2 py-3">{order.orderSource || "未填写"}</td>
                           <td className="whitespace-nowrap px-2 py-3">{order.time}</td>
+                          <td className="break-words px-2 py-3">{order.orderSource || "未填写"}</td>
                           <td className="break-words px-2 py-3">
                             <button
                               type="button"

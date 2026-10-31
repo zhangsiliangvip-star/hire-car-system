@@ -503,6 +503,8 @@ test("reservation table renders only the first imported order with the exact tot
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const start = source.indexOf("{groupReservationOrders(monthlyOrders)");
   const jsx = source.slice(start, source.indexOf("{monthlyOrders.length === 0", start));
+  assert.match(source, /const selectedMonthReservationGroups = groupOrdersByImportBatchStartMonth\(orders,\s*orderMonth\)/);
+  assert.match(source, /selectedMonthReservationGroups[\s\S]*?\.filter\(\(group\) => group\.some\(matchesReservationFilters\)\)[\s\S]*?\.flat\(\)/);
   const script = ts.transpileModule(`function renderRows() { return <tbody>${jsx}</tbody>; }`, {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     fileName: "batch-table.tsx",
@@ -793,7 +795,7 @@ test("calendar uses exact regional source colors with readable black or white te
 
 test("reservation date filter includes service ranges, excludes off days and preserves other filters", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  const script = source.slice(source.indexOf("  const ordersInSelectedMonth ="), source.indexOf("  const monthlyFinanceOrders ="));
+  const script = source.slice(source.indexOf("  const selectedMonthReservationGroups ="), source.indexOf("  const monthlyFinanceOrders ="));
   const base = { date: "2026-10-01", endDate: "2026-10-03", offDates: [], orderSource: "S", company: "A" };
   const orders = [
     { ...base, id: "multi" },
@@ -814,12 +816,17 @@ test("reservation date filter includes service ranges, excludes off days and pre
       UNASSIGNED_ORDER_VEHICLE: "__unassigned_vehicle__",
       UNASSIGNED_ORDER_DRIVER: "__unassigned_driver__",
       vehicleRecords: [], resolveOrderVehicle: () => undefined,
+      groupOrdersByImportBatchStartMonth: load("lib\\order-batches.ts").groupOrdersByImportBatchStartMonth,
     };
-    vm.runInNewContext(`${script}\nresult = monthlyOrders.map((order) => order.id);`, context);
+    const compiled = ts.transpileModule(
+      `${script}\nresult = monthlyOrders.map((order) => order.id);`,
+      { compilerOptions: { target: ts.ScriptTarget.ES2020 } },
+    ).outputText;
+    vm.runInNewContext(compiled, context);
     return plain(context.result);
   };
-  assert.deepEqual(evaluate("2026-10-02", "A", "S"), ["multi", "single", "cross-month"]);
-  assert.deepEqual(evaluate("", "A", "S"), ["multi", "off", "single", "later", "cross-month"]);
+  assert.deepEqual(evaluate("2026-10-02", "A", "S"), ["multi", "single"]);
+  assert.deepEqual(evaluate("", "A", "S"), ["multi", "off", "single", "later"]);
   assert.deepEqual(evaluate("2026-10-31"), []);
   assert.deepEqual(evaluate("2026-10-02", "B"), ["other-company"]);
   assert.match(source, /選択预约年份，当前\$\{orderMonth\.slice\(0, 4\)\}年/);
@@ -2593,7 +2600,7 @@ test("payment type conversions preserve unrelated finances and prevent duplicate
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const defaults = source.match(/const emptyOrderFinance: OrderFinance = \{[\s\S]*?\n\};/)[0];
   const context = {};
-  const calculations = source.slice(source.indexOf("function getOrderFinanceAmount("), source.indexOf("function isRentalOrderSource("));
+  const calculations = source.slice(source.indexOf("function getOrderFinanceAmount("), source.indexOf("function getOrderDateKeys("));
   vm.runInNewContext(ts.transpileModule(defaults + calculations + "\nglobalThis.finance = emptyOrderFinance;", {
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText, context);
@@ -2767,7 +2774,7 @@ test("manager finance PDF uses full page width and flows across pages without sc
 test("overtime requests are independent from wages and preserve historical requests", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const helpers = source.slice(source.indexOf("function getOrderFinanceAmount("), source.indexOf("/** The order as seen"));
-  const calculation = source.slice(source.indexOf("function calculateOrderFinance("), source.indexOf("function isRentalOrderSource("));
+  const calculation = source.slice(source.indexOf("function calculateOrderFinance("), source.indexOf("function getOrderDateKeys("));
   const context = {};
   vm.createContext(context);
   vm.runInContext(ts.transpileModule(helpers + calculation, {
@@ -2857,11 +2864,11 @@ test("reservation table omits order status and preserves request status controls
   const table = source.slice(start, source.indexOf("</table>", start));
   const headers = [...table.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1]);
   assert.deepEqual(headers, [
-    "用車日期", "予約情報", "来源", "配車時間",
+    "用車日期", "予約情報", "配車時間", "来源",
     "車両", "運転士", "請求書状態", "操作",
   ]);
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
-  assert.deepEqual(columnWidths, [16, 24, 9, 8, 9, 10, 10, 14]);
+  assert.deepEqual(columnWidths, [16, 24, 8, 9, 9, 10, 10, 14]);
   assert.equal(columnWidths.reduce((sum, width) => sum + width, 0), 100);
   assert.doesNotMatch(table, /訂単状態|order\.status/);
   assert.match(table, /点击選択請求書状態和变更范围/);
