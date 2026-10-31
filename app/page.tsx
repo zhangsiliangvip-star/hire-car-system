@@ -5094,8 +5094,8 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
-                            <button type="button" disabled={accountBusy} onClick={() => openLoginAccountForm(account)} className="inline-flex h-9 w-14 items-center justify-center whitespace-nowrap rounded border border-blue-200 bg-blue-50 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40">编辑</button>
-                            <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="inline-flex h-9 w-14 items-center justify-center whitespace-nowrap rounded border border-rose-200 bg-rose-50 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
+                            <button type="button" disabled={accountBusy} onClick={() => openLoginAccountForm(account)} className="h-9 w-14 rounded-md border border-blue-200 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40">编辑</button>
+                            <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="h-9 w-14 rounded-md border border-rose-200 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
                           </div>
                         </td>
                       </tr>
@@ -7860,14 +7860,14 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => openEditDriver(driver)}
-                              className="inline-flex w-14 items-center justify-center whitespace-nowrap rounded border border-blue-200 bg-blue-50 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                              className="font-medium text-blue-700 hover:underline"
                             >
                               编辑
                             </button>
                             <button
                               type="button"
                               onClick={() => deleteDriver(driver)}
-                              className="inline-flex w-14 items-center justify-center whitespace-nowrap rounded border border-rose-200 bg-rose-50 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+                              className="font-medium text-rose-700 hover:underline"
                             >
                               删除
                             </button>

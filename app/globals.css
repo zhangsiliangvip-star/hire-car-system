@@ -81,30 +81,6 @@ body {
   outline-offset: 2px;
 }
 
-.dashboard button {
-  transition-property: color, background-color, border-color, box-shadow, transform, filter;
-  transition-duration: 150ms;
-  transition-timing-function: ease;
-}
-
-.dashboard button:not(:disabled):hover {
-  box-shadow: 0 3px 8px rgb(15 23 42 / 12%);
-}
-
-.dashboard button:not(:disabled):active {
-  transform: translateY(1px) scale(0.99);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dashboard button {
-    transition-duration: 0.01ms;
-  }
-
-  .dashboard button:not(:disabled):active {
-    transform: none;
-  }
-}
-
 .dashboard .overflow-x-auto,
 .dashboard .overflow-auto {
   overscroll-behavior-x: contain;
@@ -141,75 +117,6 @@ body {
 .dashboard .management-table .truncate {
   overflow: visible;
   text-overflow: clip;
-}
-
-.dashboard table td button {
-  display: inline-flex;
-  min-height: 2rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 0.5rem;
-  background: #fff;
-  padding: 0.35rem 0.6rem;
-  color: #475569;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
-  text-decoration: none;
-  white-space: normal;
-}
-
-.dashboard table td button:not(:disabled):hover {
-  border-color: #94a3b8;
-  background: #f8fafc;
-}
-
-.dashboard table td button[class~="text-blue-700"],
-.dashboard table td button[class~="text-blue-800"] {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.dashboard table td button[class~="text-blue-700"]:not(:disabled):hover,
-.dashboard table td button[class~="text-blue-800"]:not(:disabled):hover {
-  border-color: #93c5fd;
-  background: #dbeafe;
-}
-
-.dashboard table td button[class~="text-rose-700"],
-.dashboard table td button[class~="text-red-700"] {
-  border-color: #fecdd3;
-  background: #fff1f2;
-  color: #be123c;
-}
-
-.dashboard table td button[class~="text-rose-700"]:not(:disabled):hover,
-.dashboard table td button[class~="text-red-700"]:not(:disabled):hover {
-  border-color: #fda4af;
-  background: #ffe4e6;
-}
-
-.dashboard table td button[class~="bg-blue-700"],
-.dashboard table td button[class~="bg-emerald-700"] {
-  border-color: transparent;
-  background: #1d4ed8;
-  color: #fff;
-}
-
-.dashboard table td button[class~="bg-blue-700"]:not(:disabled):hover {
-  background: #1e40af;
-}
-
-.dashboard table td button[class~="bg-emerald-700"] {
-  background: #047857;
-}
-
-.dashboard table td button[class~="bg-emerald-700"]:not(:disabled):hover {
-  background: #065f46;
 }
 
 @media (max-width: 639px) {
