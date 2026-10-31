@@ -21,7 +21,10 @@ export async function printA4Html(html: string, title: string) {
     const content = printDocument.querySelector<HTMLElement>(".content");
     const sheet = printDocument.querySelector<HTMLElement>(".sheet");
     if (!content || !sheet) throw new Error("打印版型载入失败。");
-    if (content.classList.contains("fit-page-width")) {
+    const expandsAcrossPages = content.classList.contains("expand-pages");
+    if (expandsAcrossPages) {
+      content.style.width = `${sheet.clientWidth}px`;
+    } else if (content.classList.contains("fit-page-width")) {
       const maxWidth = sheet.clientWidth * 8;
       const fitsPageAspect = () =>
         content.scrollHeight / content.scrollWidth <= sheet.clientHeight / sheet.clientWidth;
@@ -44,8 +47,10 @@ export async function printA4Html(html: string, title: string) {
         content.style.width = `${sheet.clientWidth}px`;
       }
     }
-    const scale = Math.min(1, sheet.clientHeight / content.scrollHeight, sheet.clientWidth / content.scrollWidth);
-    content.style.transform = `scale(${scale})`;
+    if (!expandsAcrossPages) {
+      const scale = Math.min(1, sheet.clientHeight / content.scrollHeight, sheet.clientWidth / content.scrollWidth);
+      content.style.transform = `scale(${scale})`;
+    }
     printWindow.addEventListener("afterprint", () => frame.remove(), { once: true });
     printWindow.focus();
     printWindow.print();

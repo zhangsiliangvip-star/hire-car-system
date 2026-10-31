@@ -44,8 +44,8 @@ export function buildOrderFinancePrintHtml(data: OrderFinancePrintData) {
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: white; color: #172033; }
   body { font: 9px Arial, "Microsoft YaHei", sans-serif; }
-  .sheet { width: 190mm; height: 276mm; overflow: hidden; }
-  .content { width: 190mm; transform-origin: top left; }
+  .sheet { width: 190mm; min-height: 276mm; height: auto; overflow: visible; }
+  .content.expand-pages { width: 190mm; transform-origin: top left; }
   h1 { font-size: 23px; text-align: center; margin: 0 0 14px; }
   header { border-bottom: 2px solid #263b53; padding-bottom: 12px; }
   .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 11px; overflow-wrap: anywhere; }
@@ -56,11 +56,13 @@ export function buildOrderFinancePrintHtml(data: OrderFinancePrintData) {
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td { border: 1px solid #bac3cd; padding: 6px 3px; overflow-wrap: anywhere; }
   th, tfoot { background: #edf1f5; font-weight: bold; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
   td { text-align: center; }
   .number { text-align: right; font-variant-numeric: tabular-nums; }
   .complete { color: #15803d; } .pending { color: #dc2626; }
   .notes { margin-top: 14px; line-height: 1.8; }
-  </style></head><body><div class="sheet"><article class="content">
+  </style></head><body><div class="sheet"><article class="content expand-pages">
   <header><h1>経理統計月度财务表</h1><div class="meta">
   <span>月份：${escapeHtml(data.month)}</span><span>分区：${escapeHtml(data.region)}</span><span>币种：JPY</span>
   <span>来源：${escapeHtml(data.source)}</span><span>所属会社：${escapeHtml(data.company)}</span>

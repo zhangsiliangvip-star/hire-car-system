@@ -2640,6 +2640,32 @@ test("tall external-driver reports expand to use the printable page width withou
     "expanded report fits the full printable height without clipping");
 });
 
+test("manager finance PDF uses full page width and flows across pages without scaling", async () => {
+  const sheet = { clientWidth: 190, clientHeight: 276 };
+  const content = {
+    style: { width: "", transform: "" },
+    classList: { contains: name => name === "expand-pages" },
+    get scrollWidth() { return Number.parseFloat(this.style.width) || sheet.clientWidth; },
+    get scrollHeight() { return 900; },
+  };
+  const printDocument = {
+    fonts: { ready: Promise.resolve() }, images: [],
+    open() {}, write() {}, close() {},
+    querySelector: selector => selector === ".content" ? content : selector === ".sheet" ? sheet : null,
+  };
+  const printWindow = { addEventListener() {}, focus() {}, print() {} };
+  const frame = {
+    style: { cssText: "" }, contentDocument: printDocument, contentWindow: printWindow,
+    remove() {},
+  };
+  const printA4Html = load("lib\\print-a4.ts", {}, {
+    document: { createElement: () => frame, body: { appendChild() {} } },
+  }).printA4Html;
+  await printA4Html("<html></html>", "manager finance report");
+  assert.equal(content.style.width, `${sheet.clientWidth}px`);
+  assert.equal(content.style.transform, "", "multi-page content must not be scaled to one sheet");
+});
+
 test("overtime requests are independent from wages and preserve historical requests", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const helpers = source.slice(source.indexOf("function getOrderFinanceAmount("), source.indexOf("/** The order as seen"));
@@ -3117,6 +3143,10 @@ test("accounting total requests split by deposit method in the page and A4 repor
   assert.match(groupedHtml, /部分入金/);
   assert.match(groupedHtml, /口座入金：¥1,050/);
   assert.doesNotMatch(groupedHtml, /<th>運転士<\/th>|<th>車両番号<\/th>|運転士総立替|会社総支出|運転士総工資/);
+  assert.match(groupedHtml, /class="content expand-pages"/);
+  assert.match(groupedHtml, /\.sheet\s*\{[^}]*min-height:\s*276mm;[^}]*height:\s*auto;[^}]*overflow:\s*visible;/);
+  assert.match(groupedHtml, /thead\s*\{\s*display:\s*table-header-group;/);
+  assert.match(groupedHtml, /tr\s*\{\s*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;/);
   const page = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(page, /<option value="现金入金">現金入金<\/option>/);
   const dataRoute = fs.readFileSync(path.join(root, "app\\api\\data\\route.ts"), "utf8");
