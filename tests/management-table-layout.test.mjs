@@ -9,7 +9,7 @@ const ast = ts.createSourceFile("page.tsx", page, ts.ScriptTarget.Latest, true, 
 const expectedColumns = {
   accounts: 8,
   "order-finance": 7,
-  "driver-finance": 12,
+  "driver-finance": 10,
   "vehicle-summary": 8,
   "vehicle-finance": 8,
   balance: 8,
@@ -133,22 +133,27 @@ test("order finance statistics display one summarized row per import group witho
   assert.match(page, /invoiceStatusDialog\.origin === "finance-batch"/);
   assert.match(css, /\.dashboard \.management-table\.order-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.8125rem;/);
   assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.45rem 0\.3rem;[^}]*line-height: 1\.4;/);
-  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.0625rem 0\.08rem;[^}]*line-height: 12\.1px;/);
-  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*font-size: 0\.75rem;/);
-  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table td :is\(button\)\s*\{[^}]*line-height: 12\.1px;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.6rem 0\.45rem;[^}]*line-height: 1\.5;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*font-size: 0\.875rem;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table td :is\(button\)\s*\{[^}]*line-height: 1\.4;/);
   assert.doesNotMatch(css, /\.order-finance-management-table thead\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });
 
-test("driver wage rows stay in a compact table without company or accounting fields", () => {
+test("driver wage rows display individually in a readable table without time or wage-total columns", () => {
   const tableStart = page.lastIndexOf("<table", page.indexOf('data-table="driver-finance"'));
   const table = page.slice(tableStart, page.indexOf("</table>", tableStart));
   assert.match(table, /driver-finance-management-table/);
+  assert.match(table, /filteredDriverFinanceDetails\.map\(\(row\) => \(/);
+  assert.doesNotMatch(table, /aria-expanded|展开|收起|團／訂単名称/);
   assert.doesNotMatch(table, /核算担当|row\.accountingAssignee|row\.company/);
   for (const label of ["服务日期", "訂単名称", "車輌番号", "運転士姓名", "運転士立替",
-    "超時時間", "超時工資", "奖励工資", "運転士比例工資", "運転士固定工資", "工資総额", "支付総额"]) {
+    "超時工資", "奖励工資", "運転士比例工資", "運転士固定工資", "支付総额"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
+  assert.doesNotMatch(table, /超時時間|工資総额/);
   assert.doesNotMatch(css, /\.driver-finance-management-table thead\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.driver-finance-management-table tbody\s*\{\s*display: grid;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*min-width: 1400px !important;[^}]*font-size: 0\.875rem;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.6rem 0\.45rem;[^}]*line-height: 1\.5;/);
 });

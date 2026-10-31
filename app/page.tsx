@@ -5468,14 +5468,13 @@ export default function Home() {
                 </div>
               </div>
               <div className="driver-finance-table-region overflow-x-auto border bg-white">
-                <table className="management-table driver-finance-management-table w-full min-w-[1900px] table-fixed text-center text-xs" data-table="driver-finance">
+                <table className="management-table driver-finance-management-table w-full min-w-[1400px] table-fixed text-center text-sm" data-table="driver-finance">
                   <colgroup>
-                    <col style={{ width: "8%" }} /><col style={{ width: "14%" }} />
-                    <col style={{ width: "9%" }} /><col style={{ width: "7%" }} />
-                    <col style={{ width: "8%" }} /><col style={{ width: "6%" }} />
+                    <col style={{ width: "10%" }} /><col style={{ width: "18%" }} />
+                    <col style={{ width: "11%" }} /><col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} /><col style={{ width: "8%" }} />
+                    <col style={{ width: "8%" }} /><col style={{ width: "9%" }} />
                     <col style={{ width: "8%" }} /><col style={{ width: "8%" }} />
-                    <col style={{ width: "9%" }} /><col style={{ width: "9%" }} />
-                    <col style={{ width: "7%" }} /><col style={{ width: "7%" }} />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
@@ -5484,60 +5483,56 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">車輌番号</th>
                       <th className="px-4 py-3 font-semibold">運転士姓名</th>
                       <th className="px-4 py-3 text-right font-semibold">運転士立替</th>
-                      <th className="px-4 py-3 text-right font-semibold">超時時間</th>
                       <th className="px-4 py-3 text-right font-semibold">超時工資</th>
                       <th className="px-4 py-3 text-right font-semibold">奖励工資</th>
                       <th className="px-4 py-3 text-right font-semibold">運転士比例工資</th>
                       <th className="px-4 py-3 text-right font-semibold">運転士固定工資</th>
-                      <th className="px-4 py-3 text-right font-semibold">工資総额</th>
                       <th className="px-4 py-3 text-right font-semibold">支付総额</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredDriverFinanceDetails.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                           暂无運転士工資記録
                         </td>
                       </tr>
                     ) : (
                       filteredDriverFinanceDetails.map((row) => (
-                      <tr key={row.id} className="border-t hover:bg-gray-50">
-                        <td
-                          data-label="服务日期"
-                          className="whitespace-nowrap px-4 py-3 font-medium"
-                          style={row.isRedDay ? { color: "#dc2626" } : undefined}
-                        >
-                          {formatOrderDate(row.serviceDate)}
-                        </td>
-                        <td data-label="訂単名称" className="px-4 py-3 font-medium">
-                          <button
-                            type="button"
-                            aria-haspopup="dialog"
-                            className="text-left text-blue-700 hover:underline"
-                            onClick={() => {
-                              const order = orders.find((item) => item.id === row.orderId);
-                              if (!order) {
-                                alert("未找到对应訂単，請刷新后重试。");
-                                return;
-                              }
-                              openAccounting(order);
-                            }}
+                        <tr key={row.id} className="border-t hover:bg-gray-50">
+                          <td
+                            data-label="服务日期"
+                            className="whitespace-nowrap px-4 py-3 font-medium"
+                            style={row.isRedDay ? { color: "#dc2626" } : undefined}
                           >
-                            {row.customer}
-                          </button>
-                        </td>
-                        <td data-label="車輌番号" className="px-4 py-3">{row.vehicleNumber || "—"}</td>
-                        <td data-label="運転士姓名" className="px-4 py-3">{row.driver}</td>
-                        <td data-label="運転士立替" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.driverAdvances)}</td>
-                        <td data-label="超時時間" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{row.overtimeHours.toLocaleString("ja-JP")} h</td>
-                        <td data-label="超時工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.overtimeFee)}</td>
-                        <td data-label="奖励工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.bonusWage)}</td>
-                        <td data-label="運転士比例工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.percentageWage)}</td>
-                        <td data-label="運転士固定工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.fixedWage)}</td>
-                        <td data-label="工資総额" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">{formatYen(row.totalWage)}</td>
-                        <td data-label="支付総额" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-blue-800">{formatYen(row.driverAdvances + row.totalWage)}</td>
-                      </tr>
+                            {formatOrderDate(row.serviceDate)}
+                          </td>
+                          <td data-label="訂単名称" className="px-4 py-3 font-medium">
+                            <button
+                              type="button"
+                              aria-haspopup="dialog"
+                              className="text-left text-blue-700 hover:underline"
+                              onClick={() => {
+                                const order = orders.find((item) => item.id === row.orderId);
+                                if (!order) {
+                                  alert("未找到对应訂単，請刷新后重试。");
+                                  return;
+                                }
+                                openAccounting(order);
+                              }}
+                            >
+                              {row.customer}
+                            </button>
+                          </td>
+                          <td data-label="車輌番号" className="px-4 py-3">{row.vehicleNumber || "—"}</td>
+                          <td data-label="運転士姓名" className="px-4 py-3">{row.driver}</td>
+                          <td data-label="運転士立替" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.driverAdvances)}</td>
+                          <td data-label="超時工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.overtimeFee)}</td>
+                          <td data-label="奖励工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.bonusWage)}</td>
+                          <td data-label="運転士比例工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.percentageWage)}</td>
+                          <td data-label="運転士固定工資" className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatYen(row.fixedWage)}</td>
+                          <td data-label="支付総额" className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-blue-800">{formatYen(row.driverAdvances + row.totalWage)}</td>
+                        </tr>
                       ))
                     )}
                   </tbody>

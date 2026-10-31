@@ -708,9 +708,9 @@ body {
 @media (max-width: 2399px) {
   .dashboard .management-table.driver-finance-management-table {
     width: 100%;
-    min-width: 0 !important;
+    min-width: 1400px !important;
     table-layout: fixed;
-    font-size: 0.75rem;
+    font-size: 0.875rem;
   }
 
   .dashboard .management-table.order-finance-management-table {
@@ -728,19 +728,19 @@ body {
   }
 
   .dashboard .management-table.driver-finance-management-table :is(th, td) {
-    padding: 0.0625rem 0.08rem;
-    line-height: 12.1px;
+    padding: 0.6rem 0.45rem;
+    line-height: 1.5;
     overflow-wrap: anywhere;
   }
 
   .dashboard .management-table.driver-finance-management-table th {
-    font-size: 0.75rem;
+    font-size: 0.875rem;
   }
 
   .dashboard .management-table.driver-finance-management-table td :is(button) {
-    padding: 0.0625rem 0.125rem;
-    font-size: 0.6875rem;
-    line-height: 12.1px;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
     white-space: normal;
   }
 
@@ -757,7 +757,7 @@ body {
 
   .dashboard .order-finance-table-region,
   .dashboard .driver-finance-table-region {
-    overflow-x: hidden;
+    overflow-x: auto;
     width: 100%;
   }
 }

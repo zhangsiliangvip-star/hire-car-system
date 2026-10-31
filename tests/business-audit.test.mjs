@@ -1165,7 +1165,7 @@ test("wage driver dropdown follows monthly wages and includes drivers with manua
 });
 
 test("driver wage print totals include manually entered wage items", () => {
-  const { buildDriverWagePrintHtml } = load("lib\\driver-wage-print.ts", {
+  const { buildDriverWagePrintHtml, buildCompanyWagePrintHtml } = load("lib\\driver-wage-print.ts", {
     "@/lib/print-a4": { printA4Html() {} },
   });
   const html = buildDriverWagePrintHtml({
@@ -1182,8 +1182,25 @@ test("driver wage print totals include manually entered wage items", () => {
   });
   assert.match(html, /工資総额<strong>¥1,500<\/strong>/);
   assert.match(html, /支付総额<strong>¥1,600<\/strong>/);
+  assert.doesNotMatch(html, /<th>工資総额<\/th>/);
   assert.match(html, /月度津贴/);
   assert.match(html, /class="content fit-page-width"/);
+
+  const companyHtml = buildCompanyWagePrintHtml({
+    month: "2026-10",
+    company: "Company A",
+    region: "東京",
+    rows: [{
+      serviceDate: "2026-10-01", time: "09:00", customer: "Test Order",
+      vehicleNumber: "品川 100", driver: "Test Driver", regionId: "region-1",
+      regionName: "東京", driverAdvances: 100, overtimeHours: 0, overtimeFee: 0,
+      percentageWage: 0, fixedWage: 1000, bonusWage: 0, totalWage: 1000,
+      accountingAssignee: "",
+    }],
+    manualItems: [],
+  });
+  assert.doesNotMatch(companyHtml, /<th>工資総额<\/th>/);
+  assert.match(companyHtml, /<th>支付総额<\/th>/);
 });
 
 test("A4 report exports omit signature fields and preserve report content", () => {
