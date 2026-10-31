@@ -52,7 +52,7 @@ test("management cells and controls center and wrap without affecting other tabl
   assert.match(css, /\.dashboard \.management-table \.truncate\s*\{[^}]*overflow: visible;[^}]*text-overflow: clip;/);
 });
 
-test("order finance rows switch to labeled cards without horizontal scrolling", () => {
+test("order finance rows stay in a compact table without horizontal scrolling", () => {
   const tableStart = page.lastIndexOf("<table", page.indexOf('data-table="order-finance"'));
   const table = page.slice(tableStart, page.indexOf("</table>", tableStart));
   assert.match(table, /order-finance-management-table/);
@@ -60,11 +60,12 @@ test("order finance rows switch to labeled cards without horizontal scrolling", 
     "入金状態", "請求金額", "運転士総立替", "会社総支出", "運転士総工資", "訂単総利润"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /@media \(max-width: 2399px\)\s*\{[\s\S]*?\.order-finance-management-table thead\s*\{\s*display: none;/);
-  assert.match(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table,\s*\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.625rem;/);
+  assert.doesNotMatch(css, /\.order-finance-management-table thead\s*\{\s*display: none;/);
+  assert.doesNotMatch(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });
 
-test("driver wage rows hide company and accounting fields and fit as labeled cards", () => {
+test("driver wage rows stay in a compact table without company or accounting fields", () => {
   const tableStart = page.lastIndexOf("<table", page.indexOf('data-table="driver-finance"'));
   const table = page.slice(tableStart, page.indexOf("</table>", tableStart));
   assert.match(table, /driver-finance-management-table/);
@@ -73,7 +74,6 @@ test("driver wage rows hide company and accounting fields and fit as labeled car
     "超時時間", "超時工資", "奖励工資", "運転士比例工資", "運転士固定工資", "工資総额", "支付総额"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /@media \(max-width: 2399px\)\s*\{[\s\S]*?\.driver-finance-management-table thead\s*\{\s*display: none;/);
-  assert.match(css, /\.driver-finance-management-table tbody\s*\{\s*display: grid;/);
-  assert.match(css, /@media \(max-width: 639px\)\s*\{[\s\S]*?\.driver-finance-management-table tbody,[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/);
+  assert.doesNotMatch(css, /\.driver-finance-management-table thead\s*\{\s*display: none;/);
+  assert.doesNotMatch(css, /\.driver-finance-management-table tbody\s*\{\s*display: grid;/);
 });

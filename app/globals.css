@@ -218,212 +218,42 @@ body {
 }
 
 @media (max-width: 2399px) {
-  .order-finance-table-region {
-    border: 0;
-    background: transparent;
-  }
-
-  .order-finance-management-table,
-  .order-finance-management-table tbody {
-    display: block;
+  .dashboard .management-table.order-finance-management-table,
+  .dashboard .management-table.driver-finance-management-table {
     width: 100%;
-  }
-
-  .order-finance-management-table {
-    table-layout: auto;
     min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 0.625rem;
   }
 
-  .order-finance-management-table colgroup,
-  .order-finance-management-table thead {
-    display: none;
-  }
-
-  .order-finance-management-table tbody {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .order-finance-management-table tr {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-content: start;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.875rem;
-    background: #fff;
-    box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
-  }
-
-  .order-finance-management-table td {
-    display: grid;
-    grid-template-columns: minmax(5.5rem, 0.75fr) minmax(0, 1.25fr);
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0 !important;
-    padding: 0.7rem 0.75rem;
-    border-bottom: 1px solid #f1f5f9;
-    text-align: left;
+  .dashboard .management-table.order-finance-management-table :is(th, td),
+  .dashboard .management-table.driver-finance-management-table :is(th, td) {
+    padding: 0.25rem 0.2rem;
+    line-height: 1.25;
     overflow-wrap: anywhere;
   }
 
-  .order-finance-management-table td::before {
-    content: attr(data-label);
-    color: #64748b;
-    font-size: 0.7rem;
-    font-weight: 600;
-    line-height: 1.35;
+  .dashboard .management-table.order-finance-management-table th,
+  .dashboard .management-table.driver-finance-management-table th {
+    font-size: 0.625rem;
   }
 
-  .order-finance-management-table td[colspan] {
-    grid-column: 1 / -1;
-    display: block;
-    text-align: center;
+  .dashboard .management-table.order-finance-management-table td :is(button),
+  .dashboard .management-table.driver-finance-management-table td :is(button) {
+    padding: 0.2rem 0.25rem;
+    font-size: 0.625rem;
+    line-height: 1.25;
+    white-space: normal;
   }
 
-  .order-finance-management-table td[colspan]::before {
-    content: none;
-  }
-
-  .order-finance-management-table td[data-label="訂単日期"],
-  .order-finance-management-table td[data-label="訂単名称"] {
-    grid-column: 1 / -1;
-  }
-
-  .order-finance-management-table td[data-label="訂単名称"] {
-    grid-template-columns: 1fr;
-    padding-top: 0.85rem;
-    padding-bottom: 0.85rem;
-    border-bottom-color: #e2e8f0;
-    background: #f8fafc;
-  }
-
-  .order-finance-management-table td[data-label="訂単名称"]::before {
-    content: none;
-  }
-
-  .order-finance-management-table td[data-label="訂単名称"] > button:first-child {
-    font-size: 1rem;
-  }
-
-  .order-finance-management-table td[data-label="訂単総利润"] {
-    background: #f0fdf4;
-    color: #166534;
-    font-weight: 700;
-  }
-}
-
-@media (max-width: 2399px) {
-  .driver-finance-table-region {
-    overflow: visible;
-    border: 0;
-    background: transparent;
-  }
-
-  .driver-finance-management-table,
-  .driver-finance-management-table tbody {
-    display: block;
+  .dashboard .order-finance-table-region,
+  .dashboard .driver-finance-table-region {
+    overflow-x: hidden;
     width: 100%;
-  }
-
-  .driver-finance-management-table {
-    table-layout: auto;
-    min-width: 0 !important;
-  }
-
-  .driver-finance-management-table colgroup,
-  .driver-finance-management-table thead {
-    display: none;
-  }
-
-  .driver-finance-management-table tbody {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  .driver-finance-management-table tr {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-content: start;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.875rem;
-    background: #fff;
-    box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
-  }
-
-  .driver-finance-management-table td {
-    display: grid;
-    grid-template-columns: minmax(5.5rem, 0.75fr) minmax(0, 1.25fr);
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0 !important;
-    padding: 0.7rem 0.75rem;
-    border-bottom: 1px solid #f1f5f9;
-    text-align: left;
-    overflow-wrap: anywhere;
-  }
-
-  .driver-finance-management-table td::before {
-    content: attr(data-label);
-    color: #64748b;
-    font-size: 0.7rem;
-    font-weight: 600;
-    line-height: 1.35;
-  }
-
-  .driver-finance-management-table td[colspan] {
-    grid-column: 1 / -1;
-    display: block;
-    text-align: center;
-  }
-
-  .driver-finance-management-table td[colspan]::before {
-    content: none;
-  }
-
-  .driver-finance-management-table td[data-label="服务日期"],
-  .driver-finance-management-table td[data-label="訂単名称"] {
-    grid-column: 1 / -1;
-  }
-
-  .driver-finance-management-table td[data-label="訂単名称"] {
-    grid-template-columns: 1fr;
-    padding-top: 0.85rem;
-    padding-bottom: 0.85rem;
-    border-bottom-color: #e2e8f0;
-    background: #f8fafc;
-  }
-
-  .driver-finance-management-table td[data-label="訂単名称"]::before {
-    content: none;
-  }
-
-  .driver-finance-management-table td[data-label="工資総额"],
-  .driver-finance-management-table td[data-label="支付総额"] {
-    background: #f0fdf4;
-    color: #166534;
-    font-weight: 700;
   }
 }
 
 @media (max-width: 639px) {
-  .driver-finance-management-table tbody,
-  .driver-finance-management-table tr {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .driver-finance-management-table tbody {
-    gap: 0.75rem;
-  }
-
-  .driver-finance-management-table td[data-label="服务日期"],
-  .driver-finance-management-table td[data-label="訂単名称"] {
-    grid-column: auto;
-  }
-
   .driver-management-table tbody,
   .driver-management-table tr {
     grid-template-columns: minmax(0, 1fr);
@@ -434,16 +264,6 @@ body {
   }
 
   .driver-management-table td:not([data-label="运転士"]) {
-    grid-template-columns: minmax(6rem, 0.65fr) minmax(0, 1.35fr);
-    padding: 0.65rem 0.75rem;
-  }
-
-  .order-finance-management-table tbody {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.75rem;
-  }
-
-  .order-finance-management-table td {
     grid-template-columns: minmax(6rem, 0.65fr) minmax(0, 1.35fr);
     padding: 0.65rem 0.75rem;
   }
