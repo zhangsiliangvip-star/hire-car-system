@@ -5093,9 +5093,13 @@ export default function Home() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <button type="button" disabled={accountBusy} onClick={() => openLoginAccountForm(account)} className="table-action-button table-action-button--edit h-9 w-14">编辑</button>
-                            <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="table-action-button table-action-button--delete h-9 w-14" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
+                          <div className="list-action-buttons">
+                            <div className="driver-action-slot">
+                              <button type="button" disabled={accountBusy} onClick={() => openLoginAccountForm(account)} className="table-action-button table-action-button--edit driver-action-button">编辑</button>
+                            </div>
+                            <div className="driver-action-slot">
+                              <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="table-action-button table-action-button--delete driver-action-button" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -7967,21 +7971,25 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-3">{vehicle.notes || "-"}</td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-3">
+                          <div className="list-action-buttons">
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => openEditVehicle(vehicle)}
-                              className="table-action-button table-action-button--edit"
+                              className="table-action-button table-action-button--edit driver-action-button"
                             >
                               编辑
                             </button>
+                            </div>
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => deleteVehicle(vehicle)}
-                              className="table-action-button table-action-button--delete"
+                              className="table-action-button table-action-button--delete driver-action-button"
                             >
                               删除
                             </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -8052,21 +8060,25 @@ export default function Home() {
                         <td className="truncate px-3 py-2" title={source.contactInfo || undefined}>{source.contactInfo || "-"}</td>
                         <td className="break-words px-3 py-2">{source.address || "-"}</td>
                         <td className="px-3 py-2">
-                          <div className="flex gap-2">
+                          <div className="list-action-buttons">
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => openEditSource(source)}
-                              className="table-action-button table-action-button--edit"
+                              className="table-action-button table-action-button--edit driver-action-button"
                             >
                               编辑
                             </button>
+                            </div>
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => deleteSource(source)}
-                              className="table-action-button table-action-button--delete"
+                              className="table-action-button table-action-button--delete driver-action-button"
                             >
                               删除
                             </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -8143,21 +8155,25 @@ export default function Home() {
                         <td data-label="振込口座" className="whitespace-pre-wrap px-4 py-3">{company.bankAccount || "-"}</td>
                         <td data-label="T番号" className="px-4 py-3">{company.taxRegistrationNumber || "-"}</td>
                         <td data-label="操作" className="px-4 py-3">
-                          <div className="flex gap-3">
+                          <div className="list-action-buttons">
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => openEditCompany(company)}
-                              className="table-action-button table-action-button--edit"
+                              className="table-action-button table-action-button--edit driver-action-button"
                             >
                               编辑
                             </button>
+                            </div>
+                            <div className="driver-action-slot">
                             <button
                               type="button"
                               onClick={() => deleteCompany(company)}
-                              className="table-action-button table-action-button--delete"
+                              className="table-action-button table-action-button--delete driver-action-button"
                             >
                               删除
                             </button>
+                            </div>
                           </div>
                         </td>
                       </tr>

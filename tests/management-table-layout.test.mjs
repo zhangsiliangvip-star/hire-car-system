@@ -64,6 +64,19 @@ test("driver edit and delete controls use distinct semantic action styles", () =
   assert.match(css, /\.driver-action-button\s*\{[^}]*width: 100%;[^}]*min-width: 0;[^}]*white-space: normal;/);
 });
 
+test("all management list edit and delete buttons use compact aligned action slots", () => {
+  for (const tableName of ["accounts", "vehicles", "sources", "companies"]) {
+    const tableStart = page.lastIndexOf("<table", page.indexOf(`data-table="${tableName}"`));
+    const tableEnd = page.indexOf("</table>", tableStart);
+    const table = page.slice(tableStart, tableEnd);
+    assert.match(table, /className="list-action-buttons"/, tableName);
+    assert.match(table, /table-action-button--edit driver-action-button/, tableName);
+    assert.match(table, /table-action-button--delete driver-action-button/, tableName);
+    assert.equal((table.match(/className="driver-action-slot"/g) || []).length, 2, tableName);
+  }
+  assert.match(css, /\.list-action-buttons\s*\{[^}]*width: min\(100%, 8rem\);[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+});
+
 test("edit, delete and PDF export actions use scoped semantic button styles", () => {
   for (const variant of ["edit", "delete", "export"]) {
     assert.match(css, new RegExp(`\\.dashboard \\.table-action-button--${variant}\\s*\\{`));
@@ -73,9 +86,9 @@ test("edit, delete and PDF export actions use scoped semantic button styles", ()
   assert.match(page, /导出财务表（A4）[\s\S]*?className="table-action-button table-action-button--export"/);
   assert.match(page, /deleteLoginAccount\(account\)[\s\S]*?className="table-action-button table-action-button--delete/);
   const reports = fs.readFileSync(new URL("../components/operations-reports.tsx", import.meta.url), "utf8");
-  assert.match(reports, /className="table-action-button table-action-button--edit"[^>]*onClick=\{\(\) => setEditing\(row\)\}/);
-  assert.match(reports, /className="table-action-button table-action-button--delete"[^>]*onClick=\{\(\) => void remove\(row\)\}/);
-  assert.match(reports, /className="table-action-button table-action-button--export"[^>]*onClick=\{\(\) => void output\(\[row\]/);
+  assert.match(reports, /className="table-action-button table-action-button--edit driver-action-button"[^>]*disabled=\{busy\} onClick=\{\(\) => setEditing\(row\)\}/);
+  assert.match(reports, /className="table-action-button table-action-button--delete driver-action-button"[^>]*disabled=\{busy\} onClick=\{\(\) => void remove\(row\)\}/);
+  assert.match(reports, /className="table-action-button table-action-button--export driver-action-button"[^>]*disabled=\{busy\} onClick=\{\(\) => void output\(\[row\]/);
   assert.match(page, /onClick=\{deleteOrder\}[\s\S]*?className="table-action-button table-action-button--delete"/);
 });
 

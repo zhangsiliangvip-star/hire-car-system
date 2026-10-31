@@ -346,10 +346,10 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
             {i === 1 && r.orderOptions && !r.header?.assignmentId &&
               <span className="block text-xs text-amber-800">未关联訂単 · 請人工确认</span>}
           </td>)}
-            <td data-label="操作" className="border-b text-center"><div className="flex justify-center gap-1">
-              <button className="table-action-button table-action-button--edit" disabled={busy} onClick={() => setEditing(row)}>编辑</button>
-              <button className="table-action-button table-action-button--delete" disabled={busy} onClick={() => void remove(row)}>删除</button>
-              <button className="table-action-button table-action-button--export" disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 運行日報`)}>导出PDF</button>
+            <td data-label="操作" className="border-b text-center"><div className="list-action-buttons list-action-buttons--three">
+              <div className="driver-action-slot"><button className="table-action-button table-action-button--edit driver-action-button" disabled={busy} onClick={() => setEditing(row)}>编辑</button></div>
+              <div className="driver-action-slot"><button className="table-action-button table-action-button--delete driver-action-button" disabled={busy} onClick={() => void remove(row)}>删除</button></div>
+              <div className="driver-action-slot"><button className="table-action-button table-action-button--export driver-action-button" disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 運行日報`)}>导出PDF</button></div>
             </div></td></tr>;
         })}{!filtered.length && <tr><td colSpan={13} className="p-3 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
       </table></div></>}

@@ -194,7 +194,7 @@ test("operation list includes required columns, first/last stops, open reports a
   assert.match(styles, /@media \(max-width: 639px\)\s*\{[\s\S]*?\.dashboard \.operations-report-table thead\s*\{\s*display: none;/);
   assert.match(styles, /\.dashboard \.operations-report-table td\[data-label\]::before\s*\{[^}]*content: attr\(data-label\);/);
   const actionCell = elements(tree).filter(e => e.type === "td").at(-1);
-  assert.ok(actionCell.props.children.props.className.split(" ").includes("justify-center"));
+  assert.ok(actionCell.props.children.props.className.split(" ").includes("list-action-buttons"));
   assert.equal(headings.some(e => e.props.children === "会社"), false);
   assert.equal(elements(tree).some(e => e.type === "td" && e.props.children === row.company), false);
   for (const value of ["08:00", "09:00", "18:00", "10:30"])
