@@ -104,6 +104,10 @@ test("driver management places both slogan editors at their requested locations"
   const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const driverView = page.slice(page.indexOf('{activeView === "drivers"'), page.indexOf('{activeView === "vehicles"'));
   assert.ok(driverView.indexOf("全体标语") < driverView.indexOf("<DriverLoginProvider>"));
+  assert.match(driverView, /driver-management-table/);
+  assert.match(driverView, /data-label="姓名读音（罗马字）"/);
+  assert.match(driverView, /aria-label="運転士列表"/);
+  assert.doesNotMatch(driverView, /overflow-x-auto/);
   assert.ok(driverView.indexOf(">運転士</th>") < driverView.indexOf(">个人标语</th>"));
   assert.match(driverView, /onBlur=\{\(event\) => \{[\s\S]*?setDriverRecords/);
   assert.match(page, /fetch\("\/api\/admin\/driver-greetings"/);

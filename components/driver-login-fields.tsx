@@ -82,7 +82,7 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
     (regionId && data.manageableRegionId === regionId)));
   const disabled = busy || !canManageDriver || Boolean(loadError) || account?.status === "revoked";
   return <>
-    <td className="px-4 py-3">
+    <td data-label="登录邮箱" className="px-4 py-3">
       {!canManageDriver && !loadError && <p className="text-xs text-gray-500">仅管理员或本地域账号可管理</p>}
       {canManageDriver && account ? <><span>{account.email}</span><p className="text-xs text-gray-500">{account.status === "active" ? "已启用" : account.status === "suspended" ? "已暂停" : "已撤销"}</p></>
         : canManageDriver ? <input aria-label={`${name}登录邮箱`} type="email" autoComplete="off" disabled={disabled}
@@ -91,9 +91,9 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
       {data && !data.enabled && <p className="text-xs text-gray-500">運転士登录管理尚未开放</p>}
       {data?.enabled && !data.canManage && <p className="max-w-xs text-xs text-amber-700">尚未配置隔离库账号管理密钥，创建／重置暂不可用。</p>}
     </td>
-    <td className="px-4 py-3">
+    <td data-label="登录密码" className="px-4 py-3">
       {canManageDriver && <>
-      <div className="grid grid-cols-[minmax(0,1fr)_3rem_5rem] items-center gap-2">
+      <div className="driver-login-controls grid grid-cols-[minmax(0,1fr)_3rem_5rem] items-center gap-2">
         <input aria-label={`${name}${account ? "新密码" : "初始密码"}`} type={visible ? "text" : "password"}
           autoComplete="new-password" minLength={8} maxLength={128} disabled={disabled}
           className="h-10 w-full rounded-md border px-3 text-sm" value={password} onChange={event => setPassword(event.target.value)} placeholder={account ? "输入新密码" : "设置初始密码"} />

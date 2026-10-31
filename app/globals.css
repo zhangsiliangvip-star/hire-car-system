@@ -119,6 +119,119 @@ body {
   text-overflow: clip;
 }
 
+@media (max-width: 1799px) {
+  .driver-table-region {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .driver-management-table,
+  .driver-management-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .driver-management-table {
+    table-layout: auto;
+  }
+
+  .driver-management-table colgroup,
+  .driver-management-table thead {
+    display: none;
+  }
+
+  .driver-management-table tbody {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .driver-management-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.875rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+  }
+
+  .driver-management-table td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 0.7fr) minmax(0, 1.3fr);
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0 !important;
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .driver-management-table td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .driver-management-table td[colspan] {
+    grid-column: 1 / -1;
+  }
+
+  .driver-management-table td[data-label="運転士"] {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .driver-management-table td[data-label="運転士"]::before {
+    content: none;
+  }
+
+  .driver-management-table td[data-label="个人标语"] input {
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .driver-management-table td[data-label="操作"] > div {
+    justify-content: flex-start;
+  }
+
+  .driver-login-controls {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.35rem;
+  }
+
+  .driver-login-controls input {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 639px) {
+  .driver-management-table tbody,
+  .driver-management-table tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .driver-management-table tbody {
+    gap: 0.75rem;
+  }
+
+  .driver-management-table td:not([data-label="运転士"]) {
+    grid-template-columns: minmax(6rem, 0.65fr) minmax(0, 1.35fr);
+    padding: 0.65rem 0.75rem;
+  }
+}
+
 .calendar-grid {
   -webkit-text-size-adjust: none;
   text-size-adjust: none;

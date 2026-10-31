@@ -7798,8 +7798,12 @@ export default function Home() {
                 {driverGlobalSloganError && <p role="alert" className="w-full text-sm text-red-700">{driverGlobalSloganError}</p>}
               </div>
               <DriverLoginProvider>
-              <div className="overflow-x-auto border bg-white">
-                <table className="management-table w-full min-w-[1800px] table-fixed text-center text-sm" data-table="drivers">
+              <div
+                className="driver-table-region border bg-white"
+                role="region"
+                aria-label="運転士列表"
+              >
+                <table className="management-table driver-management-table w-full table-fixed text-center text-sm" data-table="drivers">
                   <colgroup>
                     <col style={{ width: "7%" }} /><col style={{ width: "12%" }} />
                     <col style={{ width: "12%" }} /><col style={{ width: "8%" }} />
@@ -7824,9 +7828,9 @@ export default function Home() {
                   <tbody>
                     {driverRows.map((driver) => (
                       <tr key={driver.id} className="border-t">
-                        <td className={`whitespace-nowrap px-4 py-3 font-medium ${isDriverLicenseExpired(driver) ? "text-red-600" : ""}`}>{driver.name}</td>
-                        <td className="whitespace-nowrap px-4 py-3">{driver.reading || "-"}</td>
-                        <td className="min-w-52 px-4 py-2">
+                        <td data-label="運転士" className={`whitespace-nowrap px-4 py-3 font-medium ${isDriverLicenseExpired(driver) ? "text-red-600" : ""}`}>{driver.name}</td>
+                        <td data-label="姓名读音（罗马字）" className="whitespace-nowrap px-4 py-3">{driver.reading || "-"}</td>
+                        <td data-label="个人标语" className="min-w-52 px-4 py-2">
                           <input
                             type="text"
                             maxLength={100}
@@ -7848,14 +7852,14 @@ export default function Home() {
                             placeholder="离开此栏時自動保存"
                           />
                         </td>
-                        <td className="px-4 py-3">{driver.phone || "-"}</td>
-                        <td className="px-4 py-3">{driver.wechat || "-"}</td>
-                        <td className="px-4 py-3">{driver.whatsapp || "-"}</td>
-                        <td className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
+                        <td data-label="携帯番号" className="px-4 py-3">{driver.phone || "-"}</td>
+                        <td data-label="微信号" className="px-4 py-3">{driver.wechat || "-"}</td>
+                        <td data-label="WhatsApp" className="px-4 py-3">{driver.whatsapp || "-"}</td>
+                        <td data-label="免許有効期限" className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
                         {driver.id.startsWith("unregistered-driver-")
-                          ? <td colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士記録</td>
+                          ? <td data-label="登录信息" colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士記録</td>
                           : <DriverLoginFields driverId={driver.id} name={driver.name} regionId={driver.regionId} />}
-                        <td className="px-4 py-3">
+                        <td data-label="操作" className="px-4 py-3">
                           <div className="flex gap-3">
                             <button
                               type="button"
