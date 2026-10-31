@@ -709,15 +709,6 @@ function calculateOrderFinance(
   };
 }
 
-function isRentalOrderSource(source: string) {
-  return /租車|租車|レンタカー|レンタル/i.test(source || "");
-}
-
-function isOrderArranged(order: Pick<Order, "date" | "endDate" | "offDates" | "driver" | "financeByDate" | "orderSource">) {
-  const drivers = getOrderDriverNames(order);
-  return (drivers.length > 0 && drivers.every(Boolean)) || isRentalOrderSource(order.orderSource);
-}
-
 function getOrderDateKeys(order: Pick<Order, "date" | "endDate">): string[] {
   const startTime = new Date(`${order.date}T00:00:00Z`).getTime();
   const endTime = new Date(`${order.endDate || order.date}T00:00:00Z`).getTime();
@@ -7544,24 +7535,22 @@ export default function Home() {
                 <table className="w-full min-w-[1400px] table-fixed text-center text-sm">
                   <colgroup>
                     <col className="w-[16%]" />
-                    <col className="w-[8%]" />
-                    <col className="w-[8%]" />
                     <col className="w-[24%]" />
                     <col className="w-[9%]" />
+                    <col className="w-[8%]" />
                     <col className="w-[9%]" />
                     <col className="w-[10%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[7%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[14%]" />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-2 py-3 font-semibold">用車日期</th>
-                      <th className="px-2 py-3 font-semibold">配車時間</th>
-                      <th className="px-2 py-3 font-semibold">手配状態</th>
                       <th className="px-2 py-3 font-semibold">予約情報</th>
+                      <th className="px-2 py-3 font-semibold">来源</th>
+                      <th className="px-2 py-3 font-semibold">配車時間</th>
                       <th className="px-2 py-3 font-semibold">車両</th>
                       <th className="px-2 py-3 font-semibold">運転士</th>
-                      <th className="px-2 py-3 font-semibold">来源</th>
                       <th className="px-2 py-3 font-semibold">請求書状態</th>
                       <th className="px-2 py-3 font-semibold">操作</th>
                     </tr>
@@ -7575,16 +7564,8 @@ export default function Home() {
                           <td className="whitespace-nowrap px-2 py-3">
                             {formatOrderDate(order.date)}
                             {order.endDate && order.endDate !== order.date && ` ～ ${formatOrderDate(order.endDate)}`}
-                          </td>
-                          <td className="whitespace-nowrap px-2 py-3">{order.time}</td>
-                          <td className="px-2 py-3">
-                            <span
-                              className={`rounded border px-2 py-1 text-xs ${isOrderArranged(order) ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}
-                            >
-                              {isOrderArranged(order) ? "完成" : "未完成"}
-                            </span>
-                          </td>
-                          <td className="break-words px-2 py-3">
+                            </td>
+                            <td className="break-words px-2 py-3">
                             <button
                               type="button"
                               onClick={() => openEditOrder(order)}
@@ -7600,6 +7581,8 @@ export default function Home() {
                               </span>
                             )}
                           </td>
+                          <td className="break-words px-2 py-3">{order.orderSource || "未填写"}</td>
+                          <td className="whitespace-nowrap px-2 py-3">{order.time}</td>
                           <td className="break-words px-2 py-3">
                             <button
                               type="button"
@@ -7624,7 +7607,6 @@ export default function Home() {
                               <OrderDriverLabels order={order} />
                             </button>
                           </td>
-                          <td className="break-words px-2 py-3">{order.orderSource || "未填写"}</td>
                           <td className="px-2 py-3">
                             <div className="flex flex-col items-center gap-1">
                               <button
@@ -7668,7 +7650,7 @@ export default function Home() {
                       })}
                     {monthlyOrders.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                        <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
                           该月份暂无予約
                         </td>
                       </tr>
