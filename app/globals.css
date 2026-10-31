@@ -81,6 +81,30 @@ body {
   outline-offset: 2px;
 }
 
+.dashboard button {
+  transition-property: color, background-color, border-color, box-shadow, transform, filter;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+.dashboard button:not(:disabled):hover {
+  box-shadow: 0 3px 8px rgb(15 23 42 / 12%);
+}
+
+.dashboard button:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard button {
+    transition-duration: 0.01ms;
+  }
+
+  .dashboard button:not(:disabled):active {
+    transform: none;
+  }
+}
+
 .dashboard .overflow-x-auto,
 .dashboard .overflow-auto {
   overscroll-behavior-x: contain;
@@ -223,26 +247,26 @@ body {
     width: 100%;
     min-width: 0 !important;
     table-layout: fixed;
-    font-size: 0.625rem;
+    font-size: 0.5625rem;
   }
 
   .dashboard .management-table.order-finance-management-table :is(th, td),
   .dashboard .management-table.driver-finance-management-table :is(th, td) {
-    padding: 0.25rem 0.2rem;
-    line-height: 1.25;
+    padding: 0.125rem 0.1rem;
+    line-height: 1.15;
     overflow-wrap: anywhere;
   }
 
   .dashboard .management-table.order-finance-management-table th,
   .dashboard .management-table.driver-finance-management-table th {
-    font-size: 0.625rem;
+    font-size: 0.5625rem;
   }
 
   .dashboard .management-table.order-finance-management-table td :is(button),
   .dashboard .management-table.driver-finance-management-table td :is(button) {
-    padding: 0.2rem 0.25rem;
-    font-size: 0.625rem;
-    line-height: 1.25;
+    padding: 0.125rem 0.15rem;
+    font-size: 0.5625rem;
+    line-height: 1.15;
     white-space: normal;
   }
 

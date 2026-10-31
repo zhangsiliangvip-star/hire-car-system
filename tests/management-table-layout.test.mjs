@@ -46,10 +46,23 @@ test("management views allocate every column explicitly without changing table d
 });
 
 test("management cells and controls center and wrap without affecting other tables", () => {
+  assert.match(css, /\.dashboard button\s*\{[^}]*transition-property: color, background-color, border-color, box-shadow, transform, filter;[^}]*transition-duration: 150ms;/);
+  assert.match(css, /\.dashboard button:not\(:disabled\):hover\s*\{[^}]*box-shadow:/);
+  assert.match(css, /\.dashboard button:not\(:disabled\):active\s*\{[^}]*transform: translateY\(1px\) scale\(0\.99\);/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.dashboard button:not\(:disabled\):active\s*\{\s*transform: none;/);
   assert.match(css, /\.dashboard \.management-table :is\(th, td\)\s*\{[^}]*text-align: center;[^}]*vertical-align: middle;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/);
   assert.match(css, /\.dashboard \.management-table :is\(button, input, select\)\s*\{[^}]*max-width: 100%;[^}]*min-width: 0;[^}]*text-align: center;/);
   assert.match(css, /\.dashboard \.management-table td > \.flex,[^{]*\{[^}]*justify-content: center;[^}]*flex-wrap: wrap;/);
   assert.match(css, /\.dashboard \.management-table \.truncate\s*\{[^}]*overflow: visible;[^}]*text-overflow: clip;/);
+});
+
+test("driver edit and delete controls use the reservation action button style", () => {
+  const driverViewStart = page.indexOf('{activeView === "drivers"');
+  const driverViewEnd = page.indexOf('{activeView === "vehicles"', driverViewStart);
+  const driverView = page.slice(driverViewStart, driverViewEnd);
+  assert.match(driverView, /openEditDriver\(driver\)[\s\S]*?inline-flex w-14 items-center justify-center whitespace-nowrap rounded border border-blue-200 bg-blue-50 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100/);
+  assert.match(driverView, /deleteDriver\(driver\)[\s\S]*?inline-flex w-14 items-center justify-center whitespace-nowrap rounded border border-rose-200 bg-rose-50 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100/);
+  assert.doesNotMatch(driverView, /className="font-medium text-(?:blue|rose)-700 hover:underline"/);
 });
 
 test("order finance rows stay in a compact table without horizontal scrolling", () => {
@@ -60,7 +73,8 @@ test("order finance rows stay in a compact table without horizontal scrolling", 
     "入金状態", "請求金額", "運転士総立替", "会社総支出", "運転士総工資", "訂単総利润"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table,\s*\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.625rem;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table,\s*\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.5625rem;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\),\s*\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.125rem 0\.1rem;/);
   assert.doesNotMatch(css, /\.order-finance-management-table thead\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });
