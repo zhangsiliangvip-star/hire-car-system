@@ -10,6 +10,8 @@ import { ReportDutyFields } from "@/components/report-duty-fields";
 
 const fieldClass = "rounded border border-gray-300 bg-white px-2 py-1.5 text-sm disabled:bg-gray-100";
 const buttonClass = "rounded border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50";
+const operationReportColumns = ["日期", "車両番号", "運転手", "出勤点呼時間", "出库地点", "出発時間",
+  "接客地点", "下客地点", "归库地点", "到着時間", "退勤点呼時間", "工作総時长", "操作"] as const;
 type Command = ReturnType<typeof operationCommandSchema.parse>;
 
 async function submitCommand(command: Command, signal: AbortSignal) {
@@ -323,26 +325,33 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
     {!data && !error && <p role="status">正在读取運転士日報…</p>}
     {data && !data.enabled && <p role="status">運行管理尚未在此环境启用，目前仅在隔离测试版开放。</p>}
     {data?.enabled && <><p className="text-sm text-gray-600">共 {filtered.length} 份日報（含出库中）</p>
-      <div className="overflow-x-auto rounded border bg-white"><table className="w-full min-w-[1700px] border-collapse text-sm">
-        <thead className="bg-gray-50"><tr>{["日期", "車両番号", "運転手", "出勤点呼時間", "出库地点", "出発時間",
-          "接客地点", "下客地点", "归库地点", "到着時間", "退勤点呼時間", "工作総時长", "操作"].map(label =>
-          <th key={label} className="whitespace-nowrap border-b p-2 text-center">{label}</th>)}</tr></thead>
+      <div className="rounded border bg-white"><table className="operations-report-table w-full table-fixed border-collapse">
+        <colgroup>
+          <col style={{ width: "6%" }} /><col style={{ width: "7%" }} /><col style={{ width: "7%" }} />
+          <col style={{ width: "7%" }} /><col style={{ width: "8%" }} /><col style={{ width: "6%" }} />
+          <col style={{ width: "8%" }} /><col style={{ width: "8%" }} /><col style={{ width: "8%" }} />
+          <col style={{ width: "6%" }} /><col style={{ width: "7%" }} /><col style={{ width: "7%" }} />
+          <col style={{ width: "15%" }} />
+        </colgroup>
+        <thead className="bg-gray-50"><tr>{operationReportColumns.map(label =>
+          <th key={label} className="border-b text-center">{label}</th>)}</tr></thead>
         <tbody>{filtered.map(row => {
           const r = row.report; const stops = r.stops.filter(stop => stop.address.trim()); const hours = dutyDuration(r);
           const cells = [operationDateLabel(r.serviceDate), r.header?.vehicleNumber || "—",
             r.header?.driverName || row.driverName, duty(r, "Start"), r.departureAddress, stamp(r.departedAt),
             stops[0]?.address || "—", stops.at(-1)?.address || "—", r.returnAddress || "—", stamp(r.returnedAt),
             duty(r, "End"), hours === null ? "点呼未完整" : durationLabel(hours)];
-          return <tr key={r.id}>{cells.map((value, i) => <td key={i} className="max-w-56 whitespace-pre-wrap break-words border-b p-2 text-center">{value}
+          return <tr key={r.id}>{cells.map((value, i) => <td key={i} data-label={operationReportColumns[i]}
+            className="whitespace-pre-wrap break-words border-b text-center">{value}
             {i === 1 && r.orderOptions && !r.header?.assignmentId &&
               <span className="block text-xs text-amber-800">未关联訂単 · 請人工确认</span>}
           </td>)}
-            <td className="border-b p-2 text-center"><div className="flex justify-center gap-2 whitespace-nowrap">
+            <td data-label="操作" className="border-b text-center"><div className="flex justify-center gap-1">
               <button className="table-action-button table-action-button--edit" disabled={busy} onClick={() => setEditing(row)}>编辑</button>
               <button className="table-action-button table-action-button--delete" disabled={busy} onClick={() => void remove(row)}>删除</button>
               <button className="table-action-button table-action-button--export" disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 運行日報`)}>导出PDF</button>
             </div></td></tr>;
-        })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
+        })}{!filtered.length && <tr><td colSpan={13} className="p-3 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
       </table></div></>}
     {editing && <OperationReportEditor key={editing.report.id} row={editing} onClose={() => setEditing(null)}
       onSaved={() => { setEditing(null); setNotice("日報已保存，修改記録已保留。"); setData(null); setRevision(v => v + 1); }} />}

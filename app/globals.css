@@ -183,7 +183,83 @@ body {
   box-shadow: 0 2px 5px rgb(4 120 87 / 14%);
 }
 
+.dashboard .operations-report-table {
+  min-width: 0;
+  font-size: 0.6875rem;
+  line-height: 1.15;
+}
+
+.dashboard .operations-report-table :is(th, td) {
+  padding: 0.2rem 0.125rem;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+.dashboard .operations-report-table th {
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.dashboard .operations-report-table .table-action-button {
+  min-height: 1.5rem;
+  padding: 0.15rem 0.25rem;
+  font-size: 0.625rem;
+  line-height: 1.1;
+}
+
 @media (max-width: 639px) {
+  .dashboard .operations-report-table,
+  .dashboard .operations-report-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .dashboard .operations-report-table thead {
+    display: none;
+  }
+
+  .dashboard .operations-report-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .dashboard .operations-report-table :is(th, td) {
+    min-width: 0;
+    padding: 0.4rem;
+    text-align: left;
+  }
+
+  .dashboard .operations-report-table td[data-label] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    border-bottom: 0;
+  }
+
+  .dashboard .operations-report-table td[data-label]::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.625rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .dashboard .operations-report-table td[data-label="操作"] {
+    grid-column: 1 / -1;
+  }
+
+  .dashboard .operations-report-table td[data-label="操作"] > div {
+    flex-direction: row;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .dashboard .operations-report-table td[colspan] {
+    display: block;
+    grid-column: 1 / -1;
+  }
+
   .driver-table-region {
     overflow: visible;
     border: 0;

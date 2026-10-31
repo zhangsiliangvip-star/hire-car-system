@@ -174,6 +174,8 @@ test("operation list includes required columns, first/last stops, open reports a
   let tree = h.render();
   const html = renderToStaticMarkup(tree);
   writeLayout("list", html);
+  assert.match(html, /operations-report-table w-full table-fixed/);
+  assert.doesNotMatch(html, /min-w-\[1700px\]|overflow-x-auto/);
   for (const label of ["会社", "車両番号", "日期", "出勤点呼時間", "出库地点", "出発時間", "接客地点", "下客地点",
     "归库地点", "到着時間", "退勤点呼時間", "工作総時长", "编辑", "删除", "导出PDF", "月批量打印", "26小時30分"])
     assert.ok(html.includes(label), label);
@@ -182,8 +184,15 @@ test("operation list includes required columns, first/last stops, open reports a
   assert.doesNotMatch(html, />状態<|>已归库<|>出库中</);
   const headings = elements(tree).filter(e => e.type === "th");
   assert.equal(headings.length, 13);
+  for (const label of ["日期", "車両番号", "運転手", "出勤点呼時間", "出库地点", "出発時間",
+    "接客地点", "下客地点", "归库地点", "到着時間", "退勤点呼時間", "工作総時长", "操作"])
+    assert.ok(elements(tree).some(e => e.type === "td" && e.props["data-label"] === label), label);
   for (const cell of elements(tree).filter(e => e.type === "th" || e.type === "td"))
     assert.ok(cell.props.className.split(" ").includes("text-center"));
+  const styles = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(styles, /\.dashboard \.operations-report-table\s*\{[^}]*min-width: 0;[^}]*font-size: 0\.6875rem;/);
+  assert.match(styles, /@media \(max-width: 639px\)\s*\{[\s\S]*?\.dashboard \.operations-report-table thead\s*\{\s*display: none;/);
+  assert.match(styles, /\.dashboard \.operations-report-table td\[data-label\]::before\s*\{[^}]*content: attr\(data-label\);/);
   const actionCell = elements(tree).filter(e => e.type === "td").at(-1);
   assert.ok(actionCell.props.children.props.className.split(" ").includes("justify-center"));
   assert.equal(headings.some(e => e.props.children === "会社"), false);
