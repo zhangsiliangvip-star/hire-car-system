@@ -726,7 +726,6 @@ body {
 }
 
 @media (min-width: 640px) and (max-width: 2399px) {
-  .dashboard .management-table.driver-management-table,
   .dashboard .management-table.company-management-table {
     width: 100%;
     min-width: 0 !important;
@@ -734,19 +733,16 @@ body {
     font-size: 0.625rem;
   }
 
-  .dashboard .management-table.driver-management-table :is(th, td),
   .dashboard .management-table.company-management-table :is(th, td) {
     padding: 0.25rem 0.2rem;
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
 
-  .dashboard .management-table.driver-management-table th,
   .dashboard .management-table.company-management-table th {
     font-size: 0.625rem;
   }
 
-  .dashboard .management-table.driver-management-table td :is(button, input),
   .dashboard .management-table.company-management-table td :is(button) {
     max-width: 100%;
     min-width: 0 !important;
@@ -755,8 +751,34 @@ body {
     line-height: 1.25;
   }
 
+  .dashboard .management-table.driver-management-table {
+    width: 100%;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 0.875rem;
+  }
+
+  .dashboard .management-table.driver-management-table :is(th, td) {
+    padding: 0.375rem 0.25rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard .management-table.driver-management-table th {
+    font-size: 0.875rem;
+  }
+
+  .dashboard .management-table.driver-management-table td :is(button) {
+    max-width: 100%;
+    min-width: 0 !important;
+    padding: 0.35rem 0.2rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
+
   .dashboard .management-table.driver-management-table td :is(input) {
     width: 100%;
+    font-size: 0.875rem;
   }
 
   .dashboard .driver-table-region,

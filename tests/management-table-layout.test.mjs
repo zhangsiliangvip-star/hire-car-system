@@ -88,7 +88,8 @@ test("driver and company lists fit the viewport and use cards on mobile", () => 
     "営業所地址", "車庫位置", "振込口座", "T番号", "操作"]) {
     assert.match(companyTable, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /@media \(min-width: 640px\) and \(max-width: 2399px\)\s*\{[\s\S]*?\.dashboard \.management-table\.driver-management-table,\s*\.dashboard \.management-table\.company-management-table\s*\{[^}]*min-width: 0 !important;[^}]*table-layout: fixed;/);
+  assert.match(css, /@media \(min-width: 640px\) and \(max-width: 2399px\)\s*\{[\s\S]*?\.dashboard \.management-table\.driver-management-table\s*\{[^}]*min-width: 0 !important;[^}]*table-layout: fixed;[^}]*font-size: 0\.875rem;/);
+  assert.match(css, /\.dashboard \.management-table\.company-management-table\s*\{[^}]*font-size: 0\.625rem;/);
   assert.match(css, /@media \(max-width: 639px\)\s*\{[\s\S]*?\.company-management-table thead\s*\{\s*display: none;/);
   assert.match(css, /\.company-management-table td::before\s*\{\s*content: attr\(data-label\);/);
 });
