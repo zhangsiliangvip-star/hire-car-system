@@ -293,7 +293,7 @@ body {
   .dashboard .management-table.order-finance-management-table :is(th, td),
   .dashboard .management-table.driver-finance-management-table :is(th, td) {
     padding: 0.0625rem 0.08rem;
-    line-height: 1.1;
+    line-height: 12.1px;
     overflow-wrap: anywhere;
   }
 
@@ -306,7 +306,7 @@ body {
   .dashboard .management-table.driver-finance-management-table td :is(button) {
     padding: 0.0625rem 0.125rem;
     font-size: 0.625rem;
-    line-height: 1.15;
+    line-height: 12.1px;
     white-space: normal;
   }
 
@@ -314,19 +314,12 @@ body {
     font-size: 0.75rem;
   }
 
-  .dashboard .management-table.driver-finance-management-table :is(th, td) {
-    padding: 0 0.05rem;
-    line-height: 1.05;
-  }
-
   .dashboard .management-table.driver-finance-management-table th {
     font-size: 0.75rem;
   }
 
   .dashboard .management-table.driver-finance-management-table td :is(button) {
-    padding: 0 0.0625rem;
     font-size: 0.6875rem;
-    line-height: 1.05;
   }
 
   .dashboard .order-finance-table-region,

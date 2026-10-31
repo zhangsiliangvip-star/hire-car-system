@@ -100,9 +100,9 @@ test("order finance rows stay in a compact table without horizontal scrolling", 
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
   assert.match(css, /\.dashboard \.management-table\.order-finance-management-table,\s*\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.6875rem;/);
-  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\),\s*\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.0625rem 0\.08rem;[^}]*line-height: 1\.1;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\),\s*\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.0625rem 0\.08rem;[^}]*line-height: 12\.1px;/);
   assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*font-size: 0\.75rem;/);
-  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0 0\.05rem;[^}]*line-height: 1\.05;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table td :is\(button\),\s*\.dashboard \.management-table\.driver-finance-management-table td :is\(button\)\s*\{[^}]*line-height: 12\.1px;/);
   assert.doesNotMatch(css, /\.order-finance-management-table thead\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });
