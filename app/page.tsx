@@ -8103,8 +8103,8 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <div className="overflow-x-auto border bg-white">
-                <table className="management-table w-full min-w-[1900px] table-fixed text-center text-sm" data-table="companies">
+              <div className="company-table-region border bg-white">
+                <table className="management-table company-management-table w-full min-w-[1900px] table-fixed text-center text-sm" data-table="companies">
                   <colgroup>
                     <col style={{ width: "13%" }} /><col style={{ width: "6%" }} />
                     <col style={{ width: "7%" }} /><col style={{ width: "7%" }} />
@@ -8129,8 +8129,8 @@ export default function Home() {
                   <tbody>
                     {companyRows.map((company) => (
                       <tr key={company.id} className="border-t">
-                        <td className="px-4 py-3 font-medium">{company.name}</td>
-                        <td className="px-4 py-3">
+                        <td data-label="会社名称" className="px-4 py-3 font-medium">{company.name}</td>
+                        <td data-label="会社印章" className="px-4 py-3">
                           <button type="button" onClick={() => openCompanySeal(company)}
                             className="rounded border px-2 py-1 text-blue-700 hover:bg-blue-50"
                             aria-label={`设置印章：${company.name}`}>
@@ -8139,14 +8139,14 @@ export default function Home() {
                               : "上传印章"}
                           </button>
                         </td>
-                        <td className="px-4 py-3">{company.operationsManager || "-"}</td>
-                        <td className="px-4 py-3">{company.maintenanceManager || "-"}</td>
-                        <td className="px-4 py-3">{company.phone || "-"}</td>
-                        <td className="px-4 py-3">{company.rollCallAddress || "-"}</td>
-                        <td className="px-4 py-3">{company.garageAddress || "-"}</td>
-                        <td className="whitespace-pre-wrap px-4 py-3">{company.bankAccount || "-"}</td>
-                        <td className="px-4 py-3">{company.taxRegistrationNumber || "-"}</td>
-                        <td className="px-4 py-3">
+                        <td data-label="運行管理者" className="px-4 py-3">{company.operationsManager || "-"}</td>
+                        <td data-label="整備管理者" className="px-4 py-3">{company.maintenanceManager || "-"}</td>
+                        <td data-label="会社电话" className="px-4 py-3">{company.phone || "-"}</td>
+                        <td data-label="営業所地址" className="px-4 py-3">{company.rollCallAddress || "-"}</td>
+                        <td data-label="車庫位置" className="px-4 py-3">{company.garageAddress || "-"}</td>
+                        <td data-label="振込口座" className="whitespace-pre-wrap px-4 py-3">{company.bankAccount || "-"}</td>
+                        <td data-label="T番号" className="px-4 py-3">{company.taxRegistrationNumber || "-"}</td>
+                        <td data-label="操作" className="px-4 py-3">
                           <div className="flex gap-3">
                             <button
                               type="button"

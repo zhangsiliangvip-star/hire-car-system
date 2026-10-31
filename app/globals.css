@@ -143,7 +143,76 @@ body {
   text-overflow: clip;
 }
 
-@media (max-width: 1799px) {
+.dashboard table td button {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+  padding: 0.35rem 0.6rem;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  white-space: normal;
+}
+
+.dashboard table td button:not(:disabled):hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.dashboard table td button[class~="text-blue-700"],
+.dashboard table td button[class~="text-blue-800"] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dashboard table td button[class~="text-blue-700"]:not(:disabled):hover,
+.dashboard table td button[class~="text-blue-800"]:not(:disabled):hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.dashboard table td button[class~="text-rose-700"],
+.dashboard table td button[class~="text-red-700"] {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.dashboard table td button[class~="text-rose-700"]:not(:disabled):hover,
+.dashboard table td button[class~="text-red-700"]:not(:disabled):hover {
+  border-color: #fda4af;
+  background: #ffe4e6;
+}
+
+.dashboard table td button[class~="bg-blue-700"],
+.dashboard table td button[class~="bg-emerald-700"] {
+  border-color: transparent;
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.dashboard table td button[class~="bg-blue-700"]:not(:disabled):hover {
+  background: #1e40af;
+}
+
+.dashboard table td button[class~="bg-emerald-700"] {
+  background: #047857;
+}
+
+.dashboard table td button[class~="bg-emerald-700"]:not(:disabled):hover {
+  background: #065f46;
+}
+
+@media (max-width: 639px) {
   .driver-table-region {
     overflow: visible;
     border: 0;
@@ -277,6 +346,47 @@ body {
   }
 }
 
+@media (min-width: 640px) and (max-width: 2399px) {
+  .dashboard .management-table.driver-management-table,
+  .dashboard .management-table.company-management-table {
+    width: 100%;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 0.625rem;
+  }
+
+  .dashboard .management-table.driver-management-table :is(th, td),
+  .dashboard .management-table.company-management-table :is(th, td) {
+    padding: 0.25rem 0.2rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard .management-table.driver-management-table th,
+  .dashboard .management-table.company-management-table th {
+    font-size: 0.625rem;
+  }
+
+  .dashboard .management-table.driver-management-table td :is(button, input),
+  .dashboard .management-table.company-management-table td :is(button) {
+    max-width: 100%;
+    min-width: 0 !important;
+    padding: 0.2rem 0.25rem;
+    font-size: 0.625rem;
+    line-height: 1.25;
+  }
+
+  .dashboard .management-table.driver-management-table td :is(input) {
+    width: 100%;
+  }
+
+  .dashboard .driver-table-region,
+  .dashboard .company-table-region {
+    overflow-x: hidden;
+    width: 100%;
+  }
+}
+
 @media (max-width: 639px) {
   .driver-management-table tbody,
   .driver-management-table tr {
@@ -290,6 +400,100 @@ body {
   .driver-management-table td:not([data-label="运転士"]) {
     grid-template-columns: minmax(6rem, 0.65fr) minmax(0, 1.35fr);
     padding: 0.65rem 0.75rem;
+  }
+
+  .company-table-region {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .company-management-table,
+  .company-management-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .company-management-table {
+    table-layout: auto;
+    min-width: 0 !important;
+  }
+
+  .company-management-table colgroup,
+  .company-management-table thead {
+    display: none;
+  }
+
+  .company-management-table tbody {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .company-management-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.875rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+  }
+
+  .company-management-table td {
+    display: grid;
+    grid-template-columns: minmax(4.5rem, 0.8fr) minmax(0, 1.2fr);
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0 !important;
+    padding: 0.6rem;
+    border-bottom: 1px solid #f1f5f9;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .company-management-table td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .company-management-table td[data-label="会社名称"],
+  .company-management-table td[data-label="営業所地址"],
+  .company-management-table td[data-label="車庫位置"],
+  .company-management-table td[data-label="振込口座"],
+  .company-management-table td[data-label="操作"] {
+    grid-column: 1 / -1;
+  }
+
+  .company-management-table td[data-label="会社名称"] {
+    grid-template-columns: 1fr;
+    padding: 0.85rem 1rem;
+    border-bottom-color: #e2e8f0;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .company-management-table td[data-label="会社名称"]::before {
+    content: none;
+  }
+
+  .company-management-table td[data-label="会社印章"] > button {
+    width: 100%;
+  }
+
+  .company-management-table td[data-label="会社印章"] img {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .company-management-table td[data-label="操作"] > div {
+    justify-content: flex-start;
   }
 }
 

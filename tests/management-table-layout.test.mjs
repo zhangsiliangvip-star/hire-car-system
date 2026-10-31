@@ -46,6 +46,10 @@ test("management views allocate every column explicitly without changing table d
 });
 
 test("management cells and controls center and wrap without affecting other tables", () => {
+  assert.match(css, /\.dashboard table td button\s*\{[^}]*display: inline-flex;[^}]*border-radius: 0\.5rem;[^}]*font-weight: 600;/);
+  assert.match(css, /\.dashboard table td button\[class~="text-blue-700"\],[\s\S]*?background: #eff6ff;[^}]*color: #1d4ed8;/);
+  assert.match(css, /\.dashboard table td button\[class~="text-rose-700"\],[\s\S]*?background: #fff1f2;[^}]*color: #be123c;/);
+  assert.match(css, /\.dashboard table td button\[class~="bg-blue-700"\],[\s\S]*?color: #fff;/);
   assert.match(css, /\.dashboard button\s*\{[^}]*transition-property: color, background-color, border-color, box-shadow, transform, filter;[^}]*transition-duration: 150ms;/);
   assert.match(css, /\.dashboard button:not\(:disabled\):hover\s*\{[^}]*box-shadow:/);
   assert.match(css, /\.dashboard button:not\(:disabled\):active\s*\{[^}]*transform: translateY\(1px\) scale\(0\.99\);/);
@@ -63,6 +67,20 @@ test("driver edit and delete controls use the reservation action button style", 
   assert.match(driverView, /openEditDriver\(driver\)[\s\S]*?inline-flex w-14 items-center justify-center whitespace-nowrap rounded border border-blue-200 bg-blue-50 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100/);
   assert.match(driverView, /deleteDriver\(driver\)[\s\S]*?inline-flex w-14 items-center justify-center whitespace-nowrap rounded border border-rose-200 bg-rose-50 py-1 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100/);
   assert.doesNotMatch(driverView, /className="font-medium text-(?:blue|rose)-700 hover:underline"/);
+});
+
+test("driver and company lists fit the viewport and use cards on mobile", () => {
+  const companyStart = page.indexOf('data-table="companies"');
+  const companyEnd = page.indexOf("</table>", companyStart);
+  const companyTable = page.slice(page.lastIndexOf("<table", companyStart), companyEnd);
+  assert.match(companyTable, /company-management-table/);
+  for (const label of ["会社名称", "会社印章", "運行管理者", "整備管理者", "会社电话",
+    "営業所地址", "車庫位置", "振込口座", "T番号", "操作"]) {
+    assert.match(companyTable, new RegExp(`data-label="${label}"`));
+  }
+  assert.match(css, /@media \(min-width: 640px\) and \(max-width: 2399px\)\s*\{[\s\S]*?\.dashboard \.management-table\.driver-management-table,\s*\.dashboard \.management-table\.company-management-table\s*\{[^}]*min-width: 0 !important;[^}]*table-layout: fixed;/);
+  assert.match(css, /@media \(max-width: 639px\)\s*\{[\s\S]*?\.company-management-table thead\s*\{\s*display: none;/);
+  assert.match(css, /\.company-management-table td::before\s*\{\s*content: attr\(data-label\);/);
 });
 
 test("order finance rows stay in a compact table without horizontal scrolling", () => {
