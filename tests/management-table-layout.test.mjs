@@ -54,12 +54,27 @@ test("management cells and controls center and wrap without affecting other tabl
   assert.match(css, /\.dashboard \.management-table \.truncate\s*\{[^}]*overflow: visible;[^}]*text-overflow: clip;/);
 });
 
-test("driver edit and delete controls retain their original text-link style", () => {
+test("driver edit and delete controls use distinct semantic action styles", () => {
   const driverViewStart = page.indexOf('{activeView === "drivers"');
   const driverViewEnd = page.indexOf('{activeView === "vehicles"', driverViewStart);
   const driverView = page.slice(driverViewStart, driverViewEnd);
-  assert.match(driverView, /openEditDriver\(driver\)[\s\S]*?className="font-medium text-blue-700 hover:underline"/);
-  assert.match(driverView, /deleteDriver\(driver\)[\s\S]*?className="font-medium text-rose-700 hover:underline"/);
+  assert.match(driverView, /openEditDriver\(driver\)[\s\S]*?className="table-action-button table-action-button--edit"/);
+  assert.match(driverView, /deleteDriver\(driver\)[\s\S]*?className="table-action-button table-action-button--delete"/);
+});
+
+test("edit, delete and PDF export actions use scoped semantic button styles", () => {
+  for (const variant of ["edit", "delete", "export"]) {
+    assert.match(css, new RegExp(`\\.dashboard \\.table-action-button--${variant}\\s*\\{`));
+  }
+  assert.match(css, /\.dashboard \.table-action-button:focus-visible\s*\{/);
+  assert.match(css, /\.dashboard \.table-action-button:disabled\s*\{/);
+  assert.match(page, /导出财务表（A4）[\s\S]*?className="table-action-button table-action-button--export"/);
+  assert.match(page, /deleteLoginAccount\(account\)[\s\S]*?className="table-action-button table-action-button--delete/);
+  const reports = fs.readFileSync(new URL("../components/operations-reports.tsx", import.meta.url), "utf8");
+  assert.match(reports, /className="table-action-button table-action-button--edit"[^>]*onClick=\{\(\) => setEditing\(row\)\}/);
+  assert.match(reports, /className="table-action-button table-action-button--delete"[^>]*onClick=\{\(\) => void remove\(row\)\}/);
+  assert.match(reports, /className="table-action-button table-action-button--export"[^>]*onClick=\{\(\) => void output\(\[row\]/);
+  assert.match(page, /onClick=\{deleteOrder\}[\s\S]*?className="table-action-button table-action-button--delete"/);
 });
 
 test("driver and company lists fit the viewport and use cards on mobile", () => {
@@ -84,8 +99,10 @@ test("order finance rows stay in a compact table without horizontal scrolling", 
     "入金状態", "請求金額", "運転士総立替", "会社総支出", "運転士総工資", "訂単総利润"]) {
     assert.match(table, new RegExp(`data-label="${label}"`));
   }
-  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table,\s*\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.5625rem;/);
-  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\),\s*\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.125rem 0\.1rem;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table,\s*\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*table-layout: fixed;[^}]*font-size: 0\.6875rem;/);
+  assert.match(css, /\.dashboard \.management-table\.order-finance-management-table :is\(th, td\),\s*\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0\.0625rem 0\.08rem;[^}]*line-height: 1\.1;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table\s*\{[^}]*font-size: 0\.75rem;/);
+  assert.match(css, /\.dashboard \.management-table\.driver-finance-management-table :is\(th, td\)\s*\{[^}]*padding: 0 0\.05rem;[^}]*line-height: 1\.05;/);
   assert.doesNotMatch(css, /\.order-finance-management-table thead\s*\{\s*display: none;/);
   assert.doesNotMatch(css, /\.order-finance-management-table tbody\s*\{\s*display: grid;/);
 });

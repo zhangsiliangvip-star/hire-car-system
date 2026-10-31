@@ -188,6 +188,43 @@ test("driver list exposes email and write-only password fields; inputs clear on 
   assert.match(profileSource, /暂時跳过，进入行程/);
   assert.doesNotMatch(profileSource, / required[ >]/);
 });
+
+test("admin login account list excludes driver mobile accounts without deleting them", async () => {
+  const rows = [
+    { id: "staff-id", email: "staff@example.com", full_name: "Staff", company: "Company",
+      position: "Manager", region_id: "region-id", account_type: "staff", role: "user", email_confirmed: true },
+    { id: "driver-id", email: "driver@example.com", full_name: "Driver", company: "",
+      position: "", region_id: "region-id", account_type: "driver", role: "user", email_confirmed: true },
+  ];
+  let selectedColumns = "";
+  const query = {
+    select(columns) { selectedColumns = columns; return this; },
+    order() { return this; },
+    range() { return { data: rows, error: null }; },
+  };
+  const route = load("app\\api\\admin\\accounts\\route.ts", {
+    "@/lib/supabase/authorization": {
+      getAuthenticatedProfile: async () => ({
+        profile: { role: "admin" }, supabase: { from: () => query },
+      }),
+    },
+    "@/lib/supabase/admin": { createAdminClient() {} },
+    "@/lib/api-response": { jsonResponse: (data) => data },
+    "@/lib/supabase/pagination": {
+      readAllPages: async (fetchPage) => {
+        await fetchPage(0, 100);
+        return rows;
+      },
+    },
+    "@/lib/delete-password": { verifyDeletePassword: () => ({}) },
+    "@/lib/driver/test-runtime": { isDriverPwaEnabled: () => true },
+  });
+  const accounts = await route.GET();
+  assert.match(selectedColumns, /account_type/);
+  assert.deepEqual(JSON.parse(JSON.stringify(accounts)).map((account) => account.id), ["staff-id"]);
+  assert.equal(rows.length, 2, "listing filters driver accounts but does not delete database profiles");
+});
+
 test("driver profile displays four optional fields and skipping posts no contact changes", async () => {
   const states = [profile, profile, false, "", 0], buttons = [], inputs = [], calls = [];
   let cursor = 0, destination;

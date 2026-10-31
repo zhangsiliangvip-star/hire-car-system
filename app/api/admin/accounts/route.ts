@@ -43,6 +43,7 @@ function toAccountProfile(row: {
   company: string;
   position: string;
   region_id: string;
+  account_type: "pending" | "staff" | "driver" | undefined;
   role: AccountProfile["role"];
   email_confirmed: boolean;
 }): AccountProfile {
@@ -77,13 +78,13 @@ export async function GET() {
     const data = await readAllPages((from, to) =>
       identity.supabase
         .from("profiles")
-        .select("id, email, full_name, company, position, region_id, role, email_confirmed")
+        .select("id, email, full_name, company, position, region_id, account_type, role, email_confirmed")
         .order("created_at")
         .order("id")
         .range(from, to),
     );
 
-    return jsonResponse(data.map(toAccountProfile));
+    return jsonResponse(data.filter((row) => row.account_type !== "driver").map(toAccountProfile));
   } catch (error) {
     console.error("Failed to list user accounts.", error);
     return jsonResponse({ error: "无法读取账号列表。" }, { status: 500 });

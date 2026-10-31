@@ -5094,8 +5094,8 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
-                            <button type="button" disabled={accountBusy} onClick={() => openLoginAccountForm(account)} className="h-9 w-14 rounded-md border border-blue-200 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40">编辑</button>
-                            <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="h-9 w-14 rounded-md border border-rose-200 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
+                            <button type="button" disabled={accountBusy} onClick={() => openLoginAccountForm(account)} className="table-action-button table-action-button--edit h-9 w-14">编辑</button>
+                            <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="table-action-button table-action-button--delete h-9 w-14" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
                           </div>
                         </td>
                       </tr>
@@ -5118,7 +5118,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={exportOrderFinance}
-                  className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+                  className="table-action-button table-action-button--export"
                 >
                   导出财务表（A4）
                 </button>
@@ -5355,14 +5355,14 @@ export default function Home() {
                       alert(error instanceof Error ? error.message : "工資表导出失败，請重试。");
                     }
                   }}
-                  className="rounded border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+                  className="table-action-button table-action-button--export"
                 >
                   导出工資表（A4）
                 </button>
                 <button
                   type="button"
                   onClick={exportCompanyWages}
-                  className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+                  className="table-action-button table-action-button--export"
                 >
                   会社全员工資総表（A4）
                 </button>
@@ -5617,7 +5617,7 @@ export default function Home() {
                               );
                             }
                           }}
-                          className="rounded border border-rose-200 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50"
+                          className="table-action-button table-action-button--delete"
                         >
                           删除
                         </button>
@@ -5661,7 +5661,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={exportVehicleFinance}
-                  className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+                  className="table-action-button table-action-button--export"
                 >
                   导出車両财务表（A4）
                 </button>
@@ -5804,7 +5804,7 @@ export default function Home() {
                                     ),
                                   })
                                 }
-                                className="rounded border border-rose-200 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50"
+                                className="table-action-button table-action-button--delete"
                               >
                                 删除
                               </button>
@@ -6025,7 +6025,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => exportBalance()}
-                    className="rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+                    className="table-action-button table-action-button--export"
                   >
                     导出收支報表（A4）
                   </button>
@@ -6033,7 +6033,7 @@ export default function Home() {
                     type="button"
                     onClick={() => exportBalance("companyAdvances")}
                     title="A4 PDF 导出"
-                    className="rounded border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+                    className="table-action-button table-action-button--export"
                   >
                     外注運転士出金明細
                   </button>
@@ -6284,7 +6284,7 @@ export default function Home() {
                                   type="button"
                                   onClick={() => deleteBalanceExpenseItem(item)}
                                   disabled={balanceExpensesMigrationPending}
-                                  className="rounded border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="table-action-button table-action-button--delete disabled:cursor-not-allowed"
                                 >
                                   删除
                                 </button>
@@ -7579,7 +7579,7 @@ export default function Home() {
                               <button
                                 type="button"
                                 onClick={() => requestOrderDeletion(order)}
-                                className="inline-flex w-14 items-center justify-center whitespace-nowrap rounded border py-1 border-rose-200 bg-rose-50 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100"
+                                className="table-action-button table-action-button--delete w-14"
                               >
                                 删除
                               </button>
@@ -7860,14 +7860,14 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => openEditDriver(driver)}
-                              className="font-medium text-blue-700 hover:underline"
+                              className="table-action-button table-action-button--edit"
                             >
                               编辑
                             </button>
                             <button
                               type="button"
                               onClick={() => deleteDriver(driver)}
-                              className="font-medium text-rose-700 hover:underline"
+                              className="table-action-button table-action-button--delete"
                             >
                               删除
                             </button>
@@ -7975,14 +7975,14 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => openEditVehicle(vehicle)}
-                              className="font-medium text-blue-700 hover:underline"
+                              className="table-action-button table-action-button--edit"
                             >
                               编辑
                             </button>
                             <button
                               type="button"
                               onClick={() => deleteVehicle(vehicle)}
-                              className="font-medium text-rose-700 hover:underline"
+                              className="table-action-button table-action-button--delete"
                             >
                               删除
                             </button>
@@ -8060,14 +8060,14 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => openEditSource(source)}
-                              className="font-medium text-blue-700 hover:underline"
+                              className="table-action-button table-action-button--edit"
                             >
                               编辑
                             </button>
                             <button
                               type="button"
                               onClick={() => deleteSource(source)}
-                              className="font-medium text-rose-700 hover:underline"
+                              className="table-action-button table-action-button--delete"
                             >
                               删除
                             </button>
@@ -8151,14 +8151,14 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => openEditCompany(company)}
-                              className="font-medium text-blue-700 hover:underline"
+                              className="table-action-button table-action-button--edit"
                             >
                               编辑
                             </button>
                             <button
                               type="button"
                               onClick={() => deleteCompany(company)}
-                              className="font-medium text-rose-700 hover:underline"
+                              className="table-action-button table-action-button--delete"
                             >
                               删除
                             </button>
@@ -8799,7 +8799,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={deleteOrder}
-                  className="rounded bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700"
+                  className="table-action-button table-action-button--delete"
                 >
                   删除予約
                 </button>
@@ -9629,7 +9629,7 @@ export default function Home() {
               </h2>
               <button
                 type="button"
-                className="ml-3 rounded border border-blue-700 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+                className="table-action-button table-action-button--export ml-3"
                 onClick={async () => {
                   const primaryMeta = accountingOrderMeta[accountingPreviewOrder.id];
                   const sourceName = (primaryMeta?.orderSource ?? accountingPreviewOrder.orderSource).trim();
@@ -9707,7 +9707,7 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                className="ml-auto mr-4 rounded border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+                className="table-action-button table-action-button--export ml-auto mr-4"
                 onClick={async () => {
                   try {
                     await printOrderExpenses({
@@ -10726,7 +10726,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={isDeleting || deleteCompleted || !deletePassword}
-                className="rounded bg-rose-700 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50"
+                className="table-action-button table-action-button--delete"
               >
                 {deleteCompleted ? "已删除" : isDeleting ? "正在删除…" : "确认删除"}
               </button>

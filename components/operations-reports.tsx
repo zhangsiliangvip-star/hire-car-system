@@ -313,7 +313,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
         min={`${month}-01`} max={new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10)}
         disabled={busy || Boolean(editing)} onChange={e => setDate(e.target.value)} /></label>
       <button className={buttonClass} disabled={busy || Boolean(editing)} onClick={() => { setData(null); setRevision(v => v + 1); }}>刷新</button>
-      <button className={buttonClass} disabled={busy || Boolean(editing) || !filtered.length}
+      <button className="table-action-button table-action-button--export" disabled={busy || Boolean(editing) || !filtered.length}
         onClick={() => void output(filtered, `${month.slice(5)}月 運行日報`)}>月批量打印（{filtered.length}份）</button>
     </div>
     <p className="text-xs text-gray-600">日本時間 · 每10秒同步。工時＝退勤点呼－出勤点呼；日期或時間缺失時不计算。
@@ -338,9 +338,9 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
               <span className="block text-xs text-amber-800">未关联訂単 · 請人工确认</span>}
           </td>)}
             <td className="border-b p-2 text-center"><div className="flex justify-center gap-2 whitespace-nowrap">
-              <button className={buttonClass} disabled={busy} onClick={() => setEditing(row)}>编辑</button>
-              <button className={`${buttonClass} text-red-700`} disabled={busy} onClick={() => void remove(row)}>删除</button>
-              <button className={buttonClass} disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 運行日報`)}>导出PDF</button>
+              <button className="table-action-button table-action-button--edit" disabled={busy} onClick={() => setEditing(row)}>编辑</button>
+              <button className="table-action-button table-action-button--delete" disabled={busy} onClick={() => void remove(row)}>删除</button>
+              <button className="table-action-button table-action-button--export" disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 運行日報`)}>导出PDF</button>
             </div></td></tr>;
         })}{!filtered.length && <tr><td colSpan={13} className="p-6 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
       </table></div></>}
