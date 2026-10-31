@@ -7532,13 +7532,13 @@ export default function Home() {
               <div className="overflow-x-auto border bg-white">
                 <table className="w-full min-w-[1400px] table-fixed text-center text-sm">
                   <colgroup>
-                    <col className="w-[16%]" />
+                    <col className="w-[12%]" />
                     <col className="w-[18%]" />
                     <col className="w-[11%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[15%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[16%]" />
                     <col className="w-[14%]" />
-                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>

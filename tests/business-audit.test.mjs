@@ -2868,7 +2868,7 @@ test("reservation table omits order status and preserves request status controls
     "運転士", "請求書状態", "操作",
   ]);
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
-  assert.deepEqual(columnWidths, [16, 18, 11, 12, 15, 14, 14]);
+  assert.deepEqual(columnWidths, [12, 18, 11, 13, 16, 14, 16]);
   assert.equal(columnWidths.reduce((sum, width) => sum + width, 0), 100);
   assert.doesNotMatch(table, /配車時間|order\.time/);
   assert.doesNotMatch(table, /訂単状態|order\.status/);
