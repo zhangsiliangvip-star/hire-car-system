@@ -167,20 +167,35 @@ test("driver login routes first login to optional profile and subsequent login t
     assert.equal(destination, prompted ? "/driver" : "/driver/profile");
   }
 });
-test("driver list exposes email and write-only password fields; inputs clear on hide and no password storage added", () => {
+test("driver mobile settings expose email and write-only password fields; inputs clear on hide", () => {
   const source = readFileSync(fileURLToPath(new URL("../components/driver-login-fields.tsx", import.meta.url)), "utf8");
   assert.match(source, /type=\{visible \? "text" : "password"\}/);
   assert.match(source, /setPassword\(""\)/);
   assert.match(source, /document.visibilityState === "hidden"/);
   assert.doesNotMatch(source, /localStorage|sessionStorage/);
   assert.doesNotMatch(source, /保存后不回显密码/);
-  assert.match(source, /grid-cols-\[minmax\(0,1fr\)_3rem_5rem\]/);
-  assert.equal((source.match(/className="h-10 /g) || []).length, 4);
+  assert.match(source, /className="driver-login-controls"/);
+  assert.match(source, /driver-mobile-primary-button/);
+  assert.match(source, /driver-mobile-secondary-button/);
   const page = readFileSync(fileURLToPath(new URL("../app/page.tsx", import.meta.url)), "utf8");
   const driverTable = page.slice(page.indexOf('data-table="drivers"'), page.indexOf("</table>", page.indexOf('data-table="drivers"')));
   const loginManagement = page.slice(page.indexOf('{activeView === "login"'), page.indexOf('{activeView === "orderFinance"'));
-  assert.match(driverTable, /登录邮箱<\/th>/); assert.match(driverTable, /登录密码<\/th>/);
-  assert.match(driverTable, /<DriverLoginFields driverId=\{driver\.id\}/);
+  assert.doesNotMatch(driverTable, /登录邮箱<\/th>|登录密码<\/th>/);
+  assert.match(driverTable, /<DriverMobileDialog/);
+  assert.doesNotMatch(driverTable, /个人标语<\/th>|登录邮箱<\/th>|登录密码<\/th>/);
+  assert.ok(driverTable.indexOf("openEditDriver(driver)") < driverTable.indexOf("<DriverMobileDialog"));
+  assert.ok(driverTable.indexOf("<DriverMobileDialog") < driverTable.indexOf("deleteDriver(driver)"));
+  const mobileDialog = readFileSync(fileURLToPath(new URL("../components/driver-login-fields.tsx", import.meta.url)), "utf8");
+  assert.match(mobileDialog, /role="dialog" aria-modal="true"/);
+  assert.match(mobileDialog, /onBlur=\{event => onSloganBlur\(event\.currentTarget\.value\)\}/);
+  assert.match(mobileDialog, /<DriverLoginFields driverId=\{driverId\}/);
+  assert.match(mobileDialog, /const isLoggedIn = account\?\.status === "active"/);
+  assert.match(mobileDialog, /isLoggedIn \? "手机端已登录" : "手机端"/);
+  assert.match(mobileDialog, /className=\{`table-action-button driver-mobile-launch-button\$\{isLoggedIn \? " is-active" : ""\}`\}/);
+  assert.match(mobileDialog, /className="driver-mobile-dialog__driver-name"/);
+  const styles = readFileSync(fileURLToPath(new URL("../app/globals.css", import.meta.url)), "utf8");
+  assert.match(styles, /\.driver-mobile-launch-button\.is-active\s*\{[^}]*background: #dcfce7;[^}]*color: #15803d;/);
+  assert.match(styles, /\.driver-mobile-dialog__driver-name\s*\{[^}]*font-size: clamp\(1\.5rem, 5vw, 1\.875rem\);[^}]*font-weight: 800;/);
   assert.doesNotMatch(loginManagement, /DriverLoginFields|driver-login-accounts/);
   assert.match(source, /manageableRegionId === regionId/);
   assert.match(page, /regionId=\{driver\.regionId\}/);

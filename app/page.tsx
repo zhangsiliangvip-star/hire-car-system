@@ -80,7 +80,7 @@ import { AuditHistory } from "@/components/audit-history";
 import { DEFAULT_VEHICLE_NAME_OPTIONS as vehicleNameOptions, MANUAL_VEHICLE_NAME, VehicleNameSelect } from "@/components/vehicle-name-select";
 import { OrderVehiclePlateSelect } from "@/components/order-vehicle-plate-select";
 import { FinanceDriverSelect } from "@/components/finance-driver-select";
-import { DriverLoginFields, DriverLoginProvider } from "@/components/driver-login-fields";
+import { DriverLoginProvider, DriverMobileDialog } from "@/components/driver-login-fields";
 import { OrderReceipts } from "@/components/order-receipts";
 import { OrderFinanceReviewButton, OrderFinanceReviewProvider } from "@/components/order-finance-review";
 import { DriverExecutionBadge } from "@/components/driver-execution-badge";
@@ -7801,23 +7801,19 @@ export default function Home() {
                 <DriverLoginProvider>
                 <table className="management-table driver-management-table w-full min-w-[1800px] table-fixed text-center text-sm" data-table="drivers">
                   <colgroup>
-                    <col style={{ width: "7%" }} /><col style={{ width: "12%" }} />
-                    <col style={{ width: "12%" }} /><col style={{ width: "8%" }} />
-                    <col style={{ width: "8%" }} /><col style={{ width: "8%" }} />
-                    <col style={{ width: "8%" }} /><col style={{ width: "17%" }} />
-                    <col style={{ width: "14%" }} /><col style={{ width: "6%" }} />
+                    <col style={{ width: "12%" }} /><col style={{ width: "18%" }} />
+                    <col style={{ width: "13%" }} /><col style={{ width: "13%" }} />
+                    <col style={{ width: "13%" }} /><col style={{ width: "14%" }} />
+                    <col style={{ width: "17%" }} />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">運転士</th>
                       <th className="px-4 py-3 font-semibold">姓名读音（罗马字）</th>
-                      <th className="px-4 py-3 font-semibold">个人标语</th>
                       <th className="px-4 py-3 font-semibold">携帯番号</th>
                       <th className="px-4 py-3 font-semibold">微信号</th>
                       <th className="px-4 py-3 font-semibold">WhatsApp</th>
                       <th className="px-4 py-3 font-semibold">免許有効期限</th>
-                      <th className="px-4 py-3 font-semibold">登录邮箱</th>
-                      <th className="px-4 py-3 font-semibold">登录密码</th>
                       <th className="px-4 py-3 font-semibold">操作</th>
                     </tr>
                   </thead>
@@ -7826,35 +7822,10 @@ export default function Home() {
                       <tr key={driver.id} className="border-t">
                         <td data-label="運転士" className={`whitespace-nowrap px-4 py-3 font-medium ${isDriverLicenseExpired(driver) ? "text-red-600" : ""}`}>{driver.name}</td>
                         <td data-label="姓名读音（罗马字）" className="whitespace-nowrap px-4 py-3">{driver.reading || "-"}</td>
-                        <td data-label="个人标语" className="min-w-52 px-4 py-2">
-                          <input
-                            type="text"
-                            maxLength={100}
-                            aria-label={`${driver.name}个人标语`}
-                            value={driverSloganDrafts[driver.id] ?? driver.personalSlogan ?? ""}
-                            disabled={driver.id.startsWith("unregistered-driver-")}
-                            onChange={(event) => setDriverSloganDrafts((current) => ({
-                              ...current, [driver.id]: event.target.value,
-                            }))}
-                            onBlur={(event) => {
-                              if (driver.id.startsWith("unregistered-driver-")) return;
-                              const personalSlogan = event.currentTarget.value.trim();
-                              if (personalSlogan === (driver.personalSlogan ?? "")) return;
-                              setDriverRecords((current) => current.map((record) =>
-                                record.id === driver.id ? { ...record, personalSlogan } : record,
-                              ));
-                            }}
-                            className="w-full min-w-44 rounded border p-2 text-sm disabled:bg-gray-100"
-                            placeholder="离开此栏時自動保存"
-                          />
-                        </td>
                         <td data-label="携帯番号" className="px-4 py-3">{driver.phone || "-"}</td>
                         <td data-label="微信号" className="px-4 py-3">{driver.wechat || "-"}</td>
                         <td data-label="WhatsApp" className="px-4 py-3">{driver.whatsapp || "-"}</td>
                         <td data-label="免許有効期限" className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
-                        {driver.id.startsWith("unregistered-driver-")
-                          ? <td colSpan={2} className="px-4 py-3 text-gray-500">請先编辑保存为正式運転士記録</td>
-                          : <DriverLoginFields driverId={driver.id} name={driver.name} regionId={driver.regionId} />}
                         <td data-label="操作" className="px-4 py-3">
                           <div className="flex gap-3">
                             <button
@@ -7864,6 +7835,25 @@ export default function Home() {
                             >
                               编辑
                             </button>
+                            <DriverMobileDialog
+                              driverId={driver.id}
+                              name={driver.name}
+                              regionId={driver.regionId}
+                              disabled={driver.id.startsWith("unregistered-driver-")}
+                              slogan={driverSloganDrafts[driver.id] ?? driver.personalSlogan ?? ""}
+                              onSloganChange={(value) => setDriverSloganDrafts((current) => ({
+                                ...current, [driver.id]: value,
+                              }))}
+                              onSloganBlur={(value) => {
+                                if (driver.id.startsWith("unregistered-driver-")) return;
+                                const personalSlogan = value.trim();
+                                setDriverSloganDrafts((current) => ({ ...current, [driver.id]: personalSlogan }));
+                                if (personalSlogan === (driver.personalSlogan ?? "")) return;
+                                setDriverRecords((current) => current.map((record) =>
+                                  record.id === driver.id ? { ...record, personalSlogan } : record,
+                                ));
+                              }}
+                            />
                             <button
                               type="button"
                               onClick={() => deleteDriver(driver)}

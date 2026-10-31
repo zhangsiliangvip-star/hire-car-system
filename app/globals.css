@@ -183,6 +183,259 @@ body {
   box-shadow: 0 2px 5px rgb(4 120 87 / 14%);
 }
 
+.driver-mobile-dialog-backdrop {
+  background: rgb(15 23 42 / 52%);
+  padding: 1rem;
+  backdrop-filter: blur(3px);
+}
+
+.driver-mobile-dialog {
+  border: 1px solid #e2e8f0;
+  padding: 0;
+}
+
+.driver-mobile-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #f8fafc, #eff6ff);
+  padding: 1.25rem 1.5rem;
+}
+
+.driver-mobile-dialog__eyebrow {
+  margin-bottom: 0.25rem;
+  color: #2563eb;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.driver-mobile-dialog__driver-name {
+  color: #0f172a;
+  font-size: clamp(1.5rem, 5vw, 1.875rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.driver-mobile-launch-button {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.driver-mobile-launch-button:not(:disabled):hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.driver-mobile-launch-button.is-active {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.driver-mobile-launch-button.is-active:not(:disabled):hover {
+  border-color: #4ade80;
+  background: #bbf7d0;
+}
+
+.driver-mobile-close-button {
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  background: #fff;
+  padding: 0.45rem 0.75rem;
+  color: #475569;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+
+.driver-mobile-close-button:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.driver-mobile-dialog__body {
+  display: grid;
+  gap: 0.875rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.driver-mobile-settings-section {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem;
+  background: #fff;
+  padding: 0.875rem 1rem;
+  color: #334155;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.driver-mobile-settings-label {
+  margin-bottom: 0.625rem;
+  color: #334155;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.driver-mobile-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.625rem;
+  background: #fff;
+  padding: 0.625rem 0.75rem;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 400;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.driver-mobile-input::placeholder {
+  color: #94a3b8;
+}
+
+.driver-mobile-input:focus {
+  border-color: #60a5fa;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 14%);
+}
+
+.driver-mobile-input:disabled {
+  cursor: not-allowed;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.driver-mobile-field-hint {
+  display: block;
+  margin-top: 0.4rem;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 400;
+}
+
+.driver-mobile-account-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.625rem;
+  background: #f8fafc;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.driver-mobile-account-status {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.driver-mobile-account-status.is-active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.driver-mobile-account-status.is-suspended {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.driver-mobile-account-status.is-revoked {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.driver-mobile-login-fields {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.driver-mobile-login-fields > section {
+  min-width: 0;
+}
+
+.driver-login-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.driver-mobile-secondary-button,
+.driver-mobile-primary-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+  border-radius: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
+}
+
+.driver-mobile-secondary-button {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.driver-mobile-secondary-button:not(:disabled):hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.driver-mobile-primary-button {
+  border-color: #1d4ed8;
+  background: #2563eb;
+  color: #fff;
+}
+
+.driver-mobile-primary-button:not(:disabled):hover {
+  border-color: #1e40af;
+  background: #1d4ed8;
+  box-shadow: 0 2px 5px rgb(37 99 235 / 20%);
+}
+
+.driver-mobile-secondary-button:disabled,
+.driver-mobile-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.driver-mobile-dialog [role="alert"],
+.driver-mobile-dialog [role="status"] {
+  margin-top: 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.75rem;
+}
+
+.driver-mobile-dialog [role="alert"] {
+  background: #fff1f2;
+}
+
+.driver-mobile-dialog [role="status"] {
+  background: #f0fdf4;
+}
+
 .dashboard .operations-report-table {
   min-width: 0;
   font-size: 0.6875rem;
@@ -347,12 +600,39 @@ body {
     justify-content: flex-start;
   }
 
-  .driver-login-controls {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 0.35rem;
+  .driver-mobile-dialog-backdrop {
+    align-items: flex-end;
+    padding: 0.5rem;
   }
 
-  .driver-login-controls input {
+  .driver-mobile-dialog {
+    max-height: min(88vh, 42rem);
+    border-radius: 1.25rem;
+  }
+
+  .driver-mobile-dialog__header {
+    padding: 1rem 1rem 0.875rem;
+  }
+
+  .driver-mobile-dialog__body {
+    gap: 0.75rem;
+    padding: 0.875rem 1rem 1rem;
+  }
+
+  .driver-mobile-settings-section {
+    padding: 0.75rem;
+  }
+
+  .driver-login-controls {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .driver-login-controls > input {
+    grid-column: 1 / -1;
+  }
+
+  .driver-mobile-primary-button {
     grid-column: 1 / -1;
   }
 }

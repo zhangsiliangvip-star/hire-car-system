@@ -1168,6 +1168,7 @@ test("driver wage print totals include manually entered wage items", () => {
   assert.match(html, /工資総额<strong>¥1,500<\/strong>/);
   assert.match(html, /支付総额<strong>¥1,600<\/strong>/);
   assert.match(html, /月度津贴/);
+  assert.match(html, /class="content fit-page-width"/);
 });
 
 test("A4 report exports omit signature fields and preserve report content", () => {
@@ -1214,6 +1215,8 @@ test("A4 report exports omit signature fields and preserve report content", () =
     assert.ok(html.includes(metadata), title);
     assert.match(html, /<table/);
   }
+  assert.equal(reports.slice(0, 2).reduce((total, [html]) =>
+    total + (html.match(/class="content fit-page-width"/g)?.length ?? 0), 0), 2);
   assert.match(reports[0][0], /工資総额<strong>¥500<\/strong>/);
   assert.match(reports[5][0], /Keep this note/);
 });
