@@ -53,6 +53,7 @@ import { printInvoice } from "@/lib/invoice-print";
 import { printVehicleFinance, printVehicleSummary } from "@/lib/vehicle-finance-print";
 import { summarizeVehicles, totalVehicleSummaries, type VehicleMonthlySummary } from "@/lib/vehicle-finance-summary";
 import { printCompanyWages, printDriverWages } from "@/lib/driver-wage-print";
+import { downloadDriverWageBatch } from "@/lib/driver-wage-download";
 import { groupDriverFinanceByBatch } from "@/lib/driver-finance-groups";
 import { DriverSelectionDialog } from "@/components/driver-selection-dialog";
 import { SourceSelectionDialog } from "@/components/source-selection-dialog";
@@ -1345,6 +1346,8 @@ export default function Home() {
   const [financeInvoiceStatusFilter, setFinanceInvoiceStatusFilter] = useState("");
   const [driverFinanceDriverFilter, setDriverFinanceDriverFilter] = useState("");
   const [driverFinanceCompanyFilter, setDriverFinanceCompanyFilter] = useState("");
+  const [driverWageBatchDownloading, setDriverWageBatchDownloading] = useState(false);
+  const driverWageBatchDownloadingRef = useRef(false);
   const [vehicleFinanceVehicleFilter, setVehicleFinanceVehicleFilter] = useState("");
   const [orderSourceFilter, setOrderSourceFilter] = useState("");
   const [orderCompanyFilter, setOrderCompanyFilter] = useState("");
@@ -2088,6 +2091,7 @@ export default function Home() {
             0,
             totals.driverWages - overtimeFee - bonusWage,
           );
+          const serviceVehicle = getServiceVehicle({ ...order, financeByDate: { day: finance } }, "day");
 
           return {
             id: `${order.id}-${serviceDate}`,
@@ -2098,8 +2102,8 @@ export default function Home() {
             serviceDate,
             isRedDay: isDriverFinanceRedDay(serviceDate),
             customer: order.customer || "未填写",
-            vehicleNumber:
-              getServiceVehicle({ ...order, financeByDate: { day: finance } }, "day").vehiclePlate || "-",
+            vehicleNumber: serviceVehicle.vehiclePlate || "-",
+            isOutsourcedVehicle: isOutsourcedVehicle(serviceVehicle.vehicle),
             time: order.time,
             driver: finance.driver,
             requestAmount: totals.requestAmount,
@@ -2283,6 +2287,37 @@ export default function Home() {
         setDriverWageItemDrafts((current) => current.filter((draft) => draft.id !== item.id));
       },
     );
+  }
+  async function exportAllDriverWages() {
+    if (driverWageBatchDownloadingRef.current) return;
+    if (activeRegionId === ALL_REGIONS_ID) {
+      alert("請先選択一个分区，再批量下载工资单。");
+      return;
+    }
+    const drivers = [...new Set([
+      ...companyDriverFinanceDetails.map((row) => row.driver),
+      ...monthDriverWageItems.map((item) => item.driver),
+    ])].filter(Boolean).sort((first, second) => first.localeCompare(second, "ja"));
+    if (!drivers.length) {
+      alert("所选月份及所属会社暂无運転士工資記録。");
+      return;
+    }
+    driverWageBatchDownloadingRef.current = true;
+    setDriverWageBatchDownloading(true);
+    try {
+      await downloadDriverWageBatch(drivers.map((driver) => ({
+        driver,
+        month: financeMonth,
+        region: `${regionNameById.get(activeRegionId) || ""} ／ ${driverFinanceCompanyLabel}`,
+        rows: companyDriverFinanceDetails.filter((row) => row.driver === driver),
+        manualItems: monthDriverWageItems.filter((item) => item.driver === driver),
+      })));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "工资单批量下载失败，請重试。");
+    } finally {
+      driverWageBatchDownloadingRef.current = false;
+      setDriverWageBatchDownloading(false);
+    }
   }
   async function exportCompanyWages() {
     if (companyDriverFinanceDetails.length === 0 && monthDriverWageItems.length === 0) {
@@ -5452,6 +5487,14 @@ export default function Home() {
                 >
                   会社全员工資総表（A4）
                 </button>
+                <button
+                  type="button"
+                  onClick={exportAllDriverWages}
+                  disabled={driverWageBatchDownloading}
+                  className="table-action-button table-action-button--export"
+                >
+                  {driverWageBatchDownloading ? "工资单下载中…" : "批量下载全月工资单（PDF）"}
+                </button>
                 </>
               }
               trailingHeaderActions={
@@ -5508,9 +5551,9 @@ export default function Home() {
               <div className="driver-finance-table-region overflow-x-auto border bg-white">
                 <table className="management-table driver-finance-management-table w-full min-w-[1400px] table-fixed text-center text-sm" data-table="driver-finance">
                   <colgroup>
-                    <col style={{ width: "10%" }} /><col style={{ width: "18%" }} />
-                    <col style={{ width: "11%" }} /><col style={{ width: "10%" }} />
-                    <col style={{ width: "10%" }} /><col style={{ width: "8%" }} />
+                    <col style={{ width: "16%" }} /><col style={{ width: "16%" }} />
+                    <col style={{ width: "9%" }} /><col style={{ width: "10%" }} />
+                    <col style={{ width: "8%" }} /><col style={{ width: "8%" }} />
                     <col style={{ width: "8%" }} /><col style={{ width: "9%" }} />
                     <col style={{ width: "8%" }} /><col style={{ width: "8%" }} />
                   </colgroup>
@@ -5537,15 +5580,13 @@ export default function Home() {
                       </tr>
                     ) : (
                       visibleDriverFinanceGroups.map((group) => {
-                        return group.drivers.map((driverGroup, index) => (
+                        return group.drivers.map((driverGroup) => (
                           <tr key={`${group.key}-${driverGroup.driver}`} className="border-t bg-blue-50 font-semibold">
-                            <td data-label="服务日期" className="px-4 py-3">{formatOrderDate(group.startDate)}</td>
+                            <td data-label="服务日期" className="whitespace-nowrap px-4 py-3">
+                              {formatOrderDate(group.startDate)}
+                              {group.endDate !== group.startDate && ` ～ ${formatOrderDate(group.endDate)}`}
+                            </td>
                             <td data-label="訂単名称" className="px-4 py-3 text-left">
-                              {group.drivers.length > 1 && (
-                                <span className="mr-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
-                                  {index + 1}/{group.drivers.length} 司机
-                                </span>
-                              )}
                               <button
                                 type="button"
                                 aria-haspopup="dialog"

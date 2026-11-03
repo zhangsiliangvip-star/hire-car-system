@@ -54,6 +54,10 @@ export function groupDriverFinanceByBatch(
         ? `${batch[0].regionId || ""}:${batch[0].importBatchId}`
         : `order:${batch[0].id}`,
       startDate,
+      endDate: batch.reduce(
+        (latest, order) => (order.endDate || order.date) > latest ? (order.endDate || order.date) : latest,
+        startDate,
+      ),
       orders: batch,
       customers: uniqueValues(batch.map((order) => order.customer || "未填写")),
       drivers: [...driverDetails.entries()]

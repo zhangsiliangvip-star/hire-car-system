@@ -40,6 +40,14 @@ Drivers can edit `備考` in assigned-order cards and details, then choose `保�
 
 Login-account, driver, vehicle, source and company lists and accounting, wage, vehicle-finance and balance tables use field-specific column widths with centered headers, values and controls. Long names, addresses and identifiers wrap instead of being clipped. Narrow screens scroll each table horizontally rather than compressing its fields. Login-account status and role use labeled badges, with equally sized edit/delete buttons; the current account cannot be deleted. These styles are scoped to management tables; calendars, dialogs and printed reports retain their existing layouts.
 
+## Wage table and monthly PDF downloads
+
+The wage table shows one full-trip summary per driver, including the trip's start/end dates. Cross-month trips appear only in their starting month. Monthly driver filters, payroll totals, manual wage items and exported daily wage details continue to use actual service dates in the selected month.
+
+Individual and batch wage PDFs leave the vehicle-number cell completely blank for outsourced vehicles, using each service day's effective vehicle (including daily overrides). Ordinary vehicle numbers and all wage amounts remain unchanged.
+
+In a specific region, choose the month and optional company filter, then select `批量下载全月工资单（PDF）`. Desktop Chrome/Edge lets you select a local folder once. Each driver with saved monthly finance or manual wage records receives a separate `driver-nameYYYY-MM.pdf`, regardless of the individual driver filter. The daily template and monthly amounts match the existing individual wage export. Long reports flow over multiple A4 pages without shrinking the whole month onto one page. Files are generated locally; existing same-name files require confirmation before replacement. Canceling the folder picker writes nothing; unsupported browsers display an explicit message. If a batch fails, the message reports how many files were saved.
+
 ## Supabase setup
 
 1. Create a Supabase project and add the project URL, publishable key, service-role key, and a unique `DELETE_CONFIRMATION_PASSWORD` to `.env.local`, using [.env.example](./.env.example) as the template. Set the same variables in the Vercel project. Both the service-role key and delete confirmation password are server-only and must never use a `NEXT_PUBLIC_` prefix.

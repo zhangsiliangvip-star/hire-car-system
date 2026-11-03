@@ -453,12 +453,43 @@ test("driver finance groups use the first service month and split totals by driv
   ];
   const september = plain(groupDriverFinanceByBatch(orders, rows, "2026-09"));
   assert.deepEqual(september.map((group) => group.startDate), ["2026-09-25", "2026-09-28"]);
+  assert.equal(september[0].endDate, "2026-10-02");
   assert.deepEqual(september[0].drivers.map((driver) => driver.driver), ["Driver A", "Driver B"]);
   assert.deepEqual(september[0].drivers.map((driver) => driver.rows.map((row) => row.serviceDate)), [
     ["2026-09-25", "2026-10-01"], ["2026-10-02"],
   ]);
   assert.deepEqual(september[0].drivers.map((driver) => driver.totals.driverAdvances), [300, 300]);
   assert.deepEqual(plain(groupDriverFinanceByBatch(orders, rows, "2026-10")), []);
+});
+
+test("batch wage downloads retain daily rows, include each recorded driver and do not use the individual driver filter", async () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const script = source.slice(source.indexOf("  async function exportAllDriverWages()"),
+    source.indexOf("  async function exportCompanyWages()"));
+  const calls = [];
+  const rows = Array.from({ length: 10 }, (_, index) => ({
+    driver: `Driver ${index}`, serviceDate: "2026-10-01", fixedWage: 100,
+  }));
+  rows.push({ driver: "Driver 0", serviceDate: "2026-10-02", fixedWage: 200 });
+  const context = {
+    driverWageBatchDownloadingRef: { current: false },
+    setDriverWageBatchDownloading: (value) => calls.push(value),
+    activeRegionId: "r1", ALL_REGIONS_ID: "all",
+    companyDriverFinanceDetails: rows, monthDriverWageItems: [],
+    financeMonth: "2026-10", driverFinanceCompanyLabel: "A",
+    regionNameById: new Map([["r1", "Tokyo"]]),
+    downloadDriverWageBatch: async (data) => calls.push(plain(data)),
+    alert: (message) => { throw new Error(message); },
+    selectedDriverFinanceDriver: "Driver 0",
+  };
+  vm.runInNewContext(script, context);
+  await context.exportAllDriverWages();
+  assert.deepEqual(calls.filter((value) => typeof value === "boolean"), [true, false]);
+  const batch = calls.find(Array.isArray);
+  assert.equal(batch.length, 10);
+  assert.deepEqual(batch.find((item) => item.driver === "Driver 0").rows.map((row) => row.serviceDate),
+    ["2026-10-01", "2026-10-02"]);
+  assert.equal(context.driverWageBatchDownloadingRef.current, false);
 });
 
 test("batch imports save one ID per import, line positions and retain membership when editing", () => {
@@ -1208,6 +1239,7 @@ test("wage driver dropdown follows monthly wages and includes drivers with manua
       getOrderVehicleNumber: () => "-",
       getFinanceDayOrder: (order) => order,
       getServiceVehicle: load("lib\\order-vehicles.ts").getServiceVehicle,
+      isOutsourcedVehicle: load("lib\\vehicle-order.ts").isOutsourcedVehicle,
       getAccountingAssigneeName: () => "",
       isDriverWageEntry: load("lib\\reservation-driver-payment.ts").isDriverWageEntry,
     };
@@ -1248,6 +1280,30 @@ test("wage driver dropdown follows monthly wages and includes drivers with manua
   assert.match(panel, /selectedDriverFinanceDriver \|\| "全部運転士"/);
   assert.match(source, /rankDriversByMonthlyAttendance\(driverFinanceDrivers\.map\(\(name\) => \{/);
   assert.match(panel, /activeRegionId === ALL_REGIONS_ID \|\| !selectedDriverFinanceDriver/);
+});
+
+test("outsourced wage vehicle numbers are blank without changing daily amounts or ordinary plates", () => {
+  const { buildDriverWagePrintHtml } = load("lib\\driver-wage-print.ts", {
+    "@/lib/print-a4": { printA4Html() {} },
+  });
+  const row = {
+    serviceDate: "2026-10-01", time: "09:00", customer: "External",
+    vehicleNumber: "外注番号999", isOutsourcedVehicle: true,
+    driverAdvances: 100, overtimeHours: 0, overtimeFee: 0,
+    percentageWage: 0, fixedWage: 1000, bonusWage: 0,
+    totalWage: 1000, accountingAssignee: "",
+  };
+  const html = buildDriverWagePrintHtml({
+    driver: "Driver", month: "2026-10", region: "Tokyo", manualItems: [],
+    rows: [row, { ...row, customer: "Ordinary", vehicleNumber: "品川 100", isOutsourcedVehicle: false }],
+  });
+  assert.doesNotMatch(html, /外注番号999/);
+  assert.match(html, /<td><\/td><td class="number">100<\/td>/);
+  assert.match(html, /<td>品川 100<\/td>/);
+  assert.match(html, /工資総额<strong>¥2,000<\/strong>/);
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /const serviceVehicle = getServiceVehicle\(\{ \.\.\.order, financeByDate: \{ day: finance \} \}, "day"\)/);
+  assert.match(source, /isOutsourcedVehicle: isOutsourcedVehicle\(serviceVehicle\.vehicle\)/);
 });
 
 test("driver wage print totals include manually entered wage items", () => {

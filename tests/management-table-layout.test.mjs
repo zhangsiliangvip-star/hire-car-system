@@ -160,8 +160,11 @@ test("driver finance groups open accounting details by driver and use the batch 
   assert.match(page, /const visibleDriverFinanceGroups = driverFinanceDisplayGroups/);
   assert.match(page, /driverGroup\.driver === selectedDriverFinanceDriver/);
   assert.match(table, /driverGroup\.driver/);
+  assert.match(table, /group\.drivers\.map\(\(driverGroup\) =>/);
   assert.match(table, /onClick=\{\(\) => openAccounting\(group\.orders\[0\]\)\}/);
   assert.match(table, /formatOrderDate\(group\.startDate\)/);
+  assert.match(table, /group\.endDate !== group\.startDate[\s\S]*formatOrderDate\(group\.endDate\)/);
+  assert.doesNotMatch(table, /\{index \+ 1\}\/\{group\.drivers\.length\} 司机/);
   assert.doesNotMatch(table, /aria-expanded=|展开|收起|driverGroup\.rows\.map/);
   assert.doesNotMatch(table, /核算担当|row\.accountingAssignee|row\.company/);
   for (const label of ["服务日期", "訂単名称", "車輌番号", "運転士姓名", "運転士立替",
