@@ -70,7 +70,7 @@ test("Aviationstack current-flight query uses the server key, flight and arrival
     }] });
   });
 
-  assert.equal(requestUrl.origin + requestUrl.pathname, "https://api.aviationstack.com/v1/flights");
+  assert.equal(requestUrl.origin + requestUrl.pathname, "https://api.apilayer.net/aviationstack/v1/flights");
   assert.equal(requestUrl.searchParams.get("access_key"), "test-key");
   assert.equal(requestUrl.searchParams.get("flight_iata"), "NH123");
   assert.equal(requestUrl.searchParams.get("arr_iata"), "HND");
