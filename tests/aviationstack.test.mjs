@@ -87,59 +87,16 @@ test("Aviationstack current-flight query uses the server key, flight and arrival
   });
 });
 
-test("Aviationstack future schedule uses arrival airport and service date", async () => {
+test("Aviationstack free-tier mode defers future service dates without provider requests", async () => {
   const serviceDate = addDays(japanToday(), 5);
-  let requestUrl;
-  const status = await aviationstack.getAviationstackFlightStatus("nh123", serviceDate, "NRT", "test-key", async (url) => {
-    requestUrl = new URL(url);
-    return Response.json({ data: [{
-      flight: { iataNumber: "AM5748", number: "5748" },
-      airline: { iataCode: "AM" },
-      codeshared: {
-        airline: { iataCode: "NH" },
-        flight: { iataNumber: "NH123", number: "123" },
-      },
-      arrival: {
-        iataCode: "NRT",
-        scheduledTime: `${serviceDate} 18:45:00`,
-        terminal: "T1",
-      },
-    }] });
+  const status = await aviationstack.getAviationstackFlightStatus("NH123", serviceDate, "NRT", "", async () => {
+    throw new Error("Future flights are not available on the free plan.");
   });
 
-  assert.equal(requestUrl.origin + requestUrl.pathname, "https://api.aviationstack.com/v1/flightsFuture");
-  assert.equal(requestUrl.searchParams.get("access_key"), "test-key");
-  assert.equal(requestUrl.searchParams.get("iataCode"), "NRT");
-  assert.equal(requestUrl.searchParams.get("type"), "arrival");
-  assert.equal(requestUrl.searchParams.get("date"), serviceDate);
-  assert.equal(requestUrl.searchParams.get("airline_iata"), "NH");
-  assert.equal(requestUrl.searchParams.get("flight_number"), "123");
-  assert.deepEqual(JSON.parse(JSON.stringify(status)), {
-    flightNumber: "NH123",
-    status: "scheduled",
-    terminal: "T1",
-    arrivalTime: new Date(`${serviceDate}T18:45:00+09:00`).toISOString(),
-    updatedAt: status.updatedAt,
-  });
-});
-
-test("Aviationstack deduplicates concurrent future schedule requests", async () => {
-  const serviceDate = addDays(japanToday(), 13);
-  let requests = 0;
-  const request = async () => {
-    requests += 1;
-    return Response.json({ data: [
-      { flight: { iataNumber: "NH311" }, arrival: { iataCode: "CTS", scheduledTime: `${serviceDate} 08:00:00` } },
-    ] });
-  };
-  const [first, second] = await Promise.all([
-    aviationstack.getAviationstackFlightStatus("NH311", serviceDate, "CTS", "test-key", request),
-    aviationstack.getAviationstackFlightStatus("NH311", serviceDate, "CTS", "test-key", request),
-  ]);
-
-  assert.equal(first.status, "scheduled");
-  assert.equal(second.status, "scheduled");
-  assert.equal(requests, 1);
+  assert.equal(status.flightNumber, "NH123");
+  assert.equal(status.status, "tracking_pending");
+  assert.equal(status.terminal, null);
+  assert.equal(status.arrivalTime, null);
 });
 
 test("pickup airport inference recognizes Japanese and English airport names without guessing", () => {
@@ -172,15 +129,6 @@ test("Aviationstack normalizes flight statuses and unmatched records", async () 
       Response.json({ data: flight ? [{ flight_date: serviceDate, ...flight }] : [] }));
     assert.equal(result.status, expected);
   }
-});
-
-test("Aviationstack defers dates beyond the future-schedule range", async () => {
-  const date = addDays(japanToday(), 800);
-  const result = await aviationstack.getAviationstackFlightStatus("NH207", date, "HND", "test-key", async () => {
-    throw new Error("Must not query outside the provider's future-schedule range.");
-  });
-  assert.equal(result.status, "tracking_pending");
-  assert.equal(result.terminal, null);
 });
 
 test("Aviationstack rejects missing credentials, malformed responses, and provider errors", async () => {

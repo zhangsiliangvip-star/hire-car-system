@@ -18,13 +18,6 @@ const airlineSchema = z.object({
   iata: z.string().nullish(),
   iataCode: z.string().nullish(),
 }).passthrough().nullish();
-const futureCodeshareSchema = z.object({
-  airline: airlineSchema,
-  flight: z.object({
-    iataNumber: z.string().nullish(),
-    number: z.string().nullish(),
-  }).passthrough().nullish(),
-}).passthrough().nullish();
 const arrivalSchema = z.object({
   iata: z.string().nullish(),
   iataCode: z.string().nullish(),
@@ -43,16 +36,6 @@ const flightSchema = z.object({
   arrival: arrivalSchema.nullish(),
   departure: z.object({ delay: delaySchema }).passthrough().nullish(),
 }).passthrough();
-const futureFlightSchema = z.object({
-  flight: flightIdentitySchema,
-  airline: airlineSchema,
-  codeshared: futureCodeshareSchema,
-  arrival: z.object({
-    iataCode: z.string().nullish(),
-    scheduledTime: z.string().nullish(),
-    terminal: z.string().nullish(),
-  }).passthrough().nullish(),
-}).passthrough();
 const providerErrorSchema = z.object({
   code: z.union([z.string(), z.number()]).optional(),
   message: z.string().optional(),
@@ -61,11 +44,6 @@ const responseSchema = z.object({
   data: z.array(flightSchema).optional(),
   error: providerErrorSchema.optional(),
 }).passthrough();
-const futureResponseSchema = z.object({
-  data: z.array(futureFlightSchema).optional(),
-  error: providerErrorSchema.optional(),
-}).passthrough();
-
 export type FlightStatus = "tracking_pending" | "scheduled" | "delayed" | "en_route" | "landed" | "cancelled" | "diverted" | "unknown" | "not_found";
 export type AviationstackFlightStatus = {
   flightNumber: string;
@@ -82,10 +60,7 @@ export class AviationstackError extends Error {
 }
 
 const cache = new Map<string, { expiresAt: number; value: AviationstackFlightStatus }>();
-const futureFlightCache = new Map<string, { expiresAt: number; flights: z.infer<typeof futureFlightSchema>[] }>();
-const pendingFutureFlights = new Map<string, Promise<z.infer<typeof futureFlightSchema>[]>>();
 const CACHE_TTL_MS = 5 * 60_000;
-const FUTURE_BOARD_TTL_MS = 30 * 60_000;
 
 const pickupAirportAliases: Record<z.infer<typeof arrivalAirportSchema>, readonly string[]> = {
   HND: ["羽田", "haneda"],
@@ -198,24 +173,15 @@ function flightIdentifiers(flight: {
     codeshared?: { flight_iata?: string | null; flight_number?: string | null; airline_iata?: string | null } | null;
   } | null;
   airline?: { iata?: string | null; iataCode?: string | null } | null;
-  codeshared?: {
-    airline?: { iata?: string | null; iataCode?: string | null } | null;
-    flight?: { iataNumber?: string | null; number?: string | null } | null;
-  } | null;
 }) {
   const airline = (flight.airline?.iata ?? flight.airline?.iataCode)?.replace(/\s+/g, "").toUpperCase();
   const codeshare = flight.flight?.codeshared;
-  const futureCodeshare = flight.codeshared;
-  const codeshareAirline = (futureCodeshare?.airline?.iata ?? futureCodeshare?.airline?.iataCode)
-    ?.replace(/\s+/g, "").toUpperCase();
   return [
     flight.flight?.iata,
     flight.flight?.iataNumber,
     flight.flight?.number && airline ? `${airline}${flight.flight.number}` : null,
     codeshare?.flight_iata,
     codeshare?.flight_number && codeshare.airline_iata ? `${codeshare.airline_iata}${codeshare.flight_number}` : null,
-    futureCodeshare?.flight?.iataNumber,
-    futureCodeshare?.flight?.number && codeshareAirline ? `${codeshareAirline}${futureCodeshare.flight.number}` : null,
   ]
     .filter((identifier): identifier is string => Boolean(identifier))
     .map((identifier) => identifier.replace(/\s+/g, "").toUpperCase());
@@ -228,12 +194,6 @@ function japanDate(date: Date) {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
-}
-
-function oneYearAfter(date: string) {
-  const [year, month, day] = date.split("-").map(Number);
-  const limit = new Date(Date.UTC(year + 1, month - 1, day));
-  return `${limit.getUTCFullYear()}-${String(limit.getUTCMonth() + 1).padStart(2, "0")}-${String(limit.getUTCDate()).padStart(2, "0")}`;
 }
 
 function statusValue(
@@ -269,55 +229,6 @@ async function fetchJson(url: URL, request: typeof fetch) {
   }
 }
 
-async function getFutureFlights(
-  arrivalAirport: z.infer<typeof arrivalAirportSchema>,
-  serviceDate: string,
-  flightNumber: string,
-  apiKey: string,
-  request: typeof fetch,
-) {
-  const key = `${arrivalAirport}:${serviceDate}:${flightNumber}`;
-  const cached = futureFlightCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.flights;
-
-  const pending = pendingFutureFlights.get(key);
-  if (pending) return pending;
-
-  const flightRequest = (async () => {
-    const url = new URL("https://api.aviationstack.com/v1/flightsFuture");
-    url.searchParams.set("access_key", apiKey);
-    url.searchParams.set("iataCode", arrivalAirport);
-    url.searchParams.set("type", "arrival");
-    url.searchParams.set("date", serviceDate);
-    const numberMatch = flightNumber.match(/(\d+[A-Z]?)$/);
-    const numericFlightNumber = numberMatch?.[1] ?? flightNumber;
-    const airlineIata = numberMatch ? flightNumber.slice(0, -numericFlightNumber.length) : "";
-    url.searchParams.set("flight_number", numericFlightNumber);
-    if (/^[A-Z0-9]{2}$/.test(airlineIata)) url.searchParams.set("airline_iata", airlineIata);
-
-    const parsed = futureResponseSchema.safeParse(await fetchJson(url, request));
-    if (!parsed.success) throw new AviationstackError("bad_response");
-    if (parsed.data.error) throw new AviationstackError("request_failed");
-    if (!parsed.data.data) throw new AviationstackError("bad_response");
-
-    for (const [cachedKey, entry] of futureFlightCache) {
-      if (entry.expiresAt <= Date.now()) futureFlightCache.delete(cachedKey);
-    }
-    if (futureFlightCache.size >= 500) {
-      const oldestKey = futureFlightCache.keys().next().value;
-      if (oldestKey) futureFlightCache.delete(oldestKey);
-    }
-    futureFlightCache.set(key, { expiresAt: Date.now() + FUTURE_BOARD_TTL_MS, flights: parsed.data.data });
-    return parsed.data.data;
-  })();
-  pendingFutureFlights.set(key, flightRequest);
-  try {
-    return await flightRequest;
-  } finally {
-    if (pendingFutureFlights.get(key) === flightRequest) pendingFutureFlights.delete(key);
-  }
-}
-
 export async function getAviationstackFlightStatus(
   inputFlightNumber: string,
   inputServiceDate: string,
@@ -328,7 +239,6 @@ export async function getAviationstackFlightStatus(
   const flightNumber = flightNumberSchema.parse(inputFlightNumber.replace(/\s+/g, ""));
   const serviceDate = serviceDateSchema.parse(inputServiceDate);
   const arrivalAirport = arrivalAirportSchema.parse(inputArrivalAirport);
-  if (!apiKey?.trim()) throw new AviationstackError("not_configured");
 
   const cacheKey = `${flightNumber}:${arrivalAirport}:${serviceDate}`;
   const cached = cache.get(cacheKey);
@@ -336,28 +246,12 @@ export async function getAviationstackFlightStatus(
 
   const today = japanDate(new Date());
   if (serviceDate > today) {
-    if (serviceDate > oneYearAfter(today)) {
-      const value = statusValue(flightNumber, "tracking_pending", null, null);
-      cacheStatus(cacheKey, value, CACHE_TTL_MS);
-      return value;
-    }
-
-    const flights = await getFutureFlights(arrivalAirport, serviceDate, flightNumber, apiKey, request);
-    const flight = flights.find((item) =>
-      flightIdentifiers(item).includes(flightNumber) &&
-      (!item.arrival?.iataCode || item.arrival.iataCode.toUpperCase() === arrivalAirport),
-    );
-    const value = flight
-      ? statusValue(
-          flightNumber,
-          "scheduled",
-          flight.arrival?.terminal?.trim().slice(0, 80) || null,
-          isoDateTime(flight.arrival?.scheduledTime, "Asia/Tokyo"),
-        )
-      : notFoundValue(flightNumber);
-    cacheStatus(cacheKey, value, flight ? CACHE_TTL_MS : 60_000);
+    const value = statusValue(flightNumber, "tracking_pending", null, null);
+    cacheStatus(cacheKey, value, CACHE_TTL_MS);
     return value;
   }
+
+  if (!apiKey?.trim()) throw new AviationstackError("not_configured");
 
   const url = new URL("https://api.aviationstack.com/v1/flights");
   url.searchParams.set("access_key", apiKey);
