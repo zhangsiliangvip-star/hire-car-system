@@ -253,7 +253,7 @@ export async function getAviationstackFlightStatus(
 
   if (!apiKey?.trim()) throw new AviationstackError("not_configured");
 
-  const url = new URL("https://api.aviationstack.com/v1/flights");
+  const url = new URL("https://api.apilayer.net/aviationstack/v1/flights");
   url.searchParams.set("access_key", apiKey);
   url.searchParams.set("flight_iata", flightNumber);
   url.searchParams.set("arr_iata", arrivalAirport);
