@@ -37,6 +37,7 @@ export type Database = {
         region_id: string;
         import_batch_id: string | null;
         import_batch_index: number | null;
+        split_group_id: string | null;
         vehicle: string;
         vehicle_plate: string;
         date: string;
@@ -46,6 +47,7 @@ export type Database = {
         phone: string;
         pickup: string;
         destination: string;
+        flight_number: string;
         time: string;
         status: "仮予約" | "予約確定" | "運行中" | "完了" | "キャンセル";
         notes: string;
@@ -68,11 +70,22 @@ export type Database = {
         region_id: string;
         name: string;
         reading: string;
+        address: string;
+        postal_code: string;
+        company_name: string;
         phone: string;
         wechat: string;
         whatsapp: string;
         license_expiry: string | null;
+        employment_status: "在職" | "休暇" | "離職";
+        employment_type: "常勤" | "非常勤";
+        show_in_schedule: boolean;
         personal_slogan: string;
+        bank_name: string;
+        bank_branch: string;
+        bank_account_type: "" | "普通" | "当座" | "貯蓄";
+        bank_account_number: string;
+        bank_account_holder: string;
       }>;
       vehicles: AuditedTable<{
         id: string;
@@ -89,6 +102,7 @@ export type Database = {
         notes: string;
         status: "运营中" | "停运中";
         calendar_order: number | null;
+        show_in_calendar: boolean;
       }>;
       vehicle_monthly_finances: AuditedTable<{
         id: string;
@@ -167,6 +181,8 @@ export type Database = {
       driver_monthly_shift: { Args: { target_month: string }; Returns: Json };
       submit_driver_monthly_shift: { Args: { target_month: string; expected_version: number; target_request: string; rest_dates: string[]; note: string }; Returns: Json };
       staff_driver_rest_days: { Args: { service_dates: string[] }; Returns: Json };
+      staff_driver_monthly_shift: { Args: { target_driver: string; target_month: string }; Returns: Json };
+      staff_submit_driver_monthly_shift: { Args: { target_driver: string; target_month: string; expected_version: number; target_request: string; rest_dates: string[]; note: string }; Returns: Json };
       driver_finance_data: { Args: { target_month: string }; Returns: Json };
       ensure_driver_historical_finance_links: { Args: { target_month: string }; Returns: undefined };
       driver_historical_finance_data: { Args: { target_month: string }; Returns: Json };
@@ -185,6 +201,10 @@ export type Database = {
       delete_orders_with_related_data: {
         Args: { target_order_ids: string[] };
         Returns: Json;
+      };
+      merge_split_orders: {
+        Args: { target_order: string; source_order: string; target_version: Json; source_version: Json };
+        Returns: string;
       };
       is_admin: {
         Args: Record<string, never>;
@@ -232,7 +252,7 @@ export type Database = {
           assignment_id: string; order_id: string; service_date: string;
           departure_time: string; pickup: string; destination: string;
           vehicle: string; status: string; version: number;
-          order_name: string; trip_summary: string; notes: string;
+          order_name: string; trip_summary: string; notes: string; flight_number: string;
         }[];
       };
       acknowledge_driver_assignment: {
@@ -257,6 +277,25 @@ export type Database = {
       };
       staff_order_receipts: {
         Args: { target_order: string; target_date: string };
+        Returns: Json;
+      };
+      staff_order_advances: {
+        Args: { target_order: string; target_date: string };
+        Returns: Json;
+      };
+      staff_switch_advance_category: {
+        Args: { target_order: string; target_date: string; target_claim: string;
+          expected_version: number; target_category: string };
+        Returns: Json;
+      };
+      staff_switch_advance_item: {
+        Args: { target_order: string; target_date: string; target_claim: string;
+          expected_version: number; target_category: string; target_expense: string | null };
+        Returns: Json;
+      };
+      staff_delete_advance_item: {
+        Args: { target_order: string; target_date: string; target_claim: string;
+          expected_version: number; target_expense: string };
         Returns: Json;
       };
       admin_order_finance_pending: {

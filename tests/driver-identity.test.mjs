@@ -7,7 +7,7 @@ import vm from "node:vm";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
-function load(relative, mocks = {}, environment = process.env) {
+function load(relative, mocks = {}, environment = process.env, globals = {}) {
   const filename = fileURLToPath(new URL(`../${relative}`, import.meta.url));
   const output = ts.transpileModule(readFileSync(filename, "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
@@ -19,10 +19,163 @@ function load(relative, mocks = {}, environment = process.env) {
     require: (name) => Object.hasOwn(mocks, name) ? mocks[name] : require(name),
     process: { ...process, env: environment }, Response, Headers, URL,
     console: { error() {} },
+    ...globals,
   }, { filename });
   return compiledModule.exports;
 }
 const runtime = load("lib/driver/test-runtime.ts");
+const session = load("lib/supabase/session.ts");
+
+test("browser SDK keeps both accounts and cookies when one account logs out", async () => {
+  const { createBrowserClient } = require("@supabase/ssr");
+  const jar = new Map();
+  const optionsUsed = [];
+  const users = {
+    staff: { id: "staff", email: "staff@example.invalid", aud: "authenticated", role: "authenticated",
+      app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" },
+    driver: { id: "driver", email: "driver@example.invalid", aud: "authenticated", role: "authenticated",
+      app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" },
+  };
+  const jwt = user => [
+    Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url"),
+    Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url"),
+    "synthetic-signature",
+  ].join(".");
+  const tokens = { staff: jwt(users.staff), driver: jwt(users.driver) };
+  const fakeFetch = async (url, init) => {
+    if (String(url).includes("/token?grant_type=password")) {
+      const user = JSON.parse(init.body).email.startsWith("driver") ? users.driver : users.staff;
+      return Response.json({ access_token: tokens[user.id], refresh_token: `refresh-${user.id}`,
+        expires_in: 3600, token_type: "bearer", user });
+    }
+    if (String(url).includes("/token?grant_type=refresh_token")) {
+      const user = JSON.parse(init.body).refresh_token.includes("driver") ? users.driver : users.staff;
+      return Response.json({ access_token: tokens[user.id], refresh_token: `rotated-${user.id}`,
+        expires_in: 3600, token_type: "bearer", user });
+    }
+    if (String(url).includes("/user")) {
+      const authorization = new Headers(init.headers).get("authorization");
+      return Response.json(authorization === `Bearer ${tokens.driver}` ? users.driver : users.staff);
+    }
+    assert.match(String(url), /\/logout\?scope=local$/);
+    return new Response(null, { status: 204 });
+  };
+  const browser = load("lib/supabase/browser.ts", {
+    "@/lib/supabase/config": { getSupabaseConfig: () => ({ url: "https://test.supabase.co", publishableKey: "test" }) },
+    "@/lib/supabase/session": session,
+    "@supabase/ssr": { createBrowserClient: (url, key, options) => {
+      optionsUsed.push(options);
+      return createBrowserClient(url, key, {
+        ...options, auth: { autoRefreshToken: false, detectSessionInUrl: false },
+        global: { fetch: fakeFetch },
+        cookies: {
+          getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+          setAll: values => values.forEach(({ name, value }) => value ? jar.set(name, value) : jar.delete(name)),
+        },
+      });
+    } },
+  }, process.env, { window: {} });
+  const staff = browser.createClient();
+  const driver = browser.createClient("driver");
+  assert.notEqual(staff, driver);
+  assert.equal(browser.createClient(), staff);
+  assert.equal(browser.createClient("driver"), driver);
+  assert.equal(optionsUsed.length, 2);
+  assert.ok(optionsUsed.every(options => options.isSingleton === false));
+  assert.equal(optionsUsed[0].cookieOptions.name, "sb-test-auth-token");
+  assert.equal(optionsUsed[1].cookieOptions.name, "sb-test-auth-token-driver");
+  assert.equal(optionsUsed[1].auth.persistSession, true);
+  assert.equal(optionsUsed[1].auth.autoRefreshToken, true);
+  for (const [client, user] of [[staff, users.staff], [driver, users.driver]]) {
+    const result = await client.auth.signInWithPassword({ email: user.email, password: "synthetic-password" });
+    assert.equal(result.error, null);
+  }
+  assert.equal((await staff.auth.getSession()).data.session.user.id, "staff");
+  assert.equal((await driver.auth.getSession()).data.session.user.id, "driver");
+  assert.ok(jar.has("sb-test-auth-token"));
+  assert.ok(jar.has("sb-test-auth-token-driver"));
+  const reopenedDriver = createBrowserClient("https://test.supabase.co", "test", {
+    isSingleton: false,
+    cookieOptions: { name: "sb-test-auth-token-driver" },
+    auth: { autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: fakeFetch },
+    cookies: {
+      getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+      setAll: values => values.forEach(({ name, value }) => value ? jar.set(name, value) : jar.delete(name)),
+    },
+  });
+  assert.equal((await reopenedDriver.auth.getSession()).data.session.user.id, "driver");
+  assert.equal((await reopenedDriver.auth.refreshSession()).error, null);
+  assert.equal((await staff.auth.getSession()).data.session.user.id, "staff");
+  const staffCookie = jar.get("sb-test-auth-token");
+  assert.equal((await driver.auth.refreshSession()).error, null);
+  assert.equal((await driver.auth.getSession()).data.session.refresh_token, "rotated-driver");
+  assert.equal(jar.get("sb-test-auth-token"), staffCookie);
+  assert.equal((await driver.auth.signOut({ scope: "local" })).error, null);
+  assert.equal((await driver.auth.getSession()).data.session, null);
+  assert.equal((await staff.auth.getSession()).data.session.user.id, "staff");
+  assert.equal(jar.has("sb-test-auth-token-driver"), false);
+  assert.ok(jar.has("sb-test-auth-token"));
+  await driver.auth.signInWithPassword({ email: users.driver.email, password: "synthetic-password" });
+  assert.equal((await staff.auth.signOut({ scope: "local" })).error, null);
+  assert.equal((await driver.auth.getSession()).data.session.user.id, "driver");
+  assert.equal(jar.has("sb-test-auth-token"), false);
+  assert.ok(jar.has("sb-test-auth-token-driver"));
+  await driver.auth.signOut({ scope: "local" });
+});
+
+test("server clients select the same session cookies without cross-account refresh writes", async () => {
+  const jar = new Map([["sb-test-auth-token", "staff-session"], ["sb-test-auth-token-driver", "driver-session"]]);
+  const server = load("lib/supabase/server.ts", {
+    "@/lib/supabase/config": { getSupabaseConfig: () => ({ url: "https://test.supabase.co", publishableKey: "test" }) },
+    "@/lib/supabase/session": session,
+    "next/headers": { cookies: async () => ({
+      getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+      set: (name, value) => jar.set(name, value),
+    }) },
+    "@supabase/ssr": { createServerClient: (_url, _key, options) => ({
+      name: options.cookieOptions.name,
+      read: () => options.cookies.getAll().find(cookie => cookie.name === options.cookieOptions.name).value,
+      refresh: () => options.cookies.setAll([{ name: options.cookieOptions.name, value: "refreshed", options: {} }]),
+    }) },
+  });
+  const staff = await server.createClient();
+  const driver = await server.createClient("driver");
+  assert.equal(staff.read(), "staff-session");
+  assert.equal(driver.read(), "driver-session");
+  driver.refresh();
+  assert.equal(staff.read(), "staff-session");
+  assert.equal(driver.read(), "refreshed");
+});
+
+test("email callbacks keep the destination session scope and reject external destinations", async () => {
+  for (const [next, expectedScope, destination] of [
+    ["/driver/profile", "driver", "/driver/profile"],
+    ["/reset-password", "staff", "/reset-password"],
+    ["https://other.example/driver/profile", "staff", "/"],
+  ]) for (const failed of [false, true]) {
+    let selectedScope;
+    const route = load("app/auth/confirm/route.ts", {
+      "next/server": { NextResponse: { redirect: url => new Response(null, {
+        status: 307, headers: { Location: url.toString() },
+      }) } },
+      "@/lib/driver/test-runtime": runtime,
+      "@/lib/supabase/server": { createClient: async scope => {
+        selectedScope = scope;
+        return { auth: { verifyOtp: async () => ({ error: failed ? new Error("Synthetic failure") : null }) } };
+      } },
+    });
+    const url = new URL("https://test.example/auth/confirm");
+    url.searchParams.set("next", next);
+    url.searchParams.set("token_hash", "synthetic-token");
+    url.searchParams.set("type", "invite");
+    const response = await route.GET({ nextUrl: url, url: url.toString() });
+    assert.equal(selectedScope, expectedScope);
+    const login = expectedScope === "driver" ? "/driver/login" : "/login";
+    assert.equal(new URL(response.headers.get("Location")).pathname, failed ? login : destination);
+    assert.match(response.headers.get("Cache-Control"), /no-store/);
+  }
+});
 const validEnvironment = {
   DRIVER_PWA_TEST_MODE: "zsipqwipauzgbqvppwjf",
   NEXT_PUBLIC_SUPABASE_URL: "https://zsipqwipauzgbqvppwjf.supabase.co",
@@ -74,7 +227,8 @@ async function me({ enabled = true, user = { id: "self" }, authError = null,
     "@/lib/api-response": { jsonResponse },
     "@/lib/driver/test-runtime": { isDriverPwaEnabled: () => enabled },
     "@/lib/supabase/server": {
-      createClient: async () => {
+      createClient: async scope => {
+        assert.equal(scope, "driver");
         created++;
         return {
           auth: { getUser: async () => ({ data: { user }, error: authError }) },
@@ -136,8 +290,9 @@ test("identity endpoint fails explicitly on Auth, RPC or nonunique identity erro
 });
 
 async function proxyResult(pathname, { enabled = true, staff = false, driver = false,
-  rpcError = null, signedIn = true, nodeEnv = "production" } = {}) {
+  rpcError = null, signedIn = true, nodeEnv = "production", sessions = null } = {}) {
   let rpcCalls = 0;
+  let cookieName;
   const withCookies = (response) => Object.assign(response, { cookies: { getAll: () => [], set() {} } });
   const next = {
     next: () => withCookies(new Response(null)),
@@ -145,17 +300,21 @@ async function proxyResult(pathname, { enabled = true, staff = false, driver = f
     redirect: (url) => withCookies(new Response(null, { status: 307, headers: { Location: url.toString() } })),
   };
   const proxy = load("proxy.ts", {
-    "@supabase/ssr": { createServerClient: () => ({
-      auth: { getClaims: async () => ({ data: { claims: signedIn ? { sub: "self" } : null } }) },
+    "@supabase/ssr": { createServerClient: (_url, _key, options) => {
+      cookieName = options.cookieOptions.name;
+      const user = sessions ? sessions[cookieName] : signedIn ? "self" : null;
+      return {
+      auth: { getClaims: async () => ({ data: { claims: user ? { sub: user } : null } }) },
       rpc: async (name) => {
         assert.ok(["is_staff", "driver_identity"].includes(name), name);
         rpcCalls++;
-        if (name === "driver_identity") return { data: driver ? [{ driver_id: "d" }] : [], error: rpcError };
-        return { data: staff, error: rpcError };
+        if (name === "driver_identity") return { data: (sessions ? user === "driver" : driver) ? [{ driver_id: "d" }] : [], error: rpcError };
+        return { data: sessions ? user === "staff" : staff, error: rpcError };
       },
-    }) },
+    }; } },
     "next/server": { NextResponse: next },
-    "@/lib/supabase/config": { getSupabaseConfig: () => ({ url: "test", publishableKey: "test" }) },
+    "@/lib/supabase/config": { getSupabaseConfig: () => ({ url: "https://test.supabase.co", publishableKey: "test" }) },
+    "@/lib/supabase/session": session,
     "@/lib/driver/test-runtime": { ...runtime, isDriverPwaEnabled: () => enabled },
   }, { NODE_ENV: nodeEnv });
   const url = new URL(pathname, "https://test.example");
@@ -163,7 +322,7 @@ async function proxyResult(pathname, { enabled = true, staff = false, driver = f
     nextUrl: url, url: url.toString(),
     cookies: { getAll: () => [], set() {} },
   });
-  return { response, rpcCalls };
+  return { response, rpcCalls, cookieName };
 }
 
 test("development HMR bypasses login without exempting app routes or production", async () => {
@@ -202,7 +361,7 @@ test("signed-in users skip the login form only for the matching role", async () 
   for (const next of ["//evil.example", "https://evil.example", "/login", "/driver/login"]) {
     assert.equal(await location(`/login?next=${encodeURIComponent(next)}`, { staff: true }), "/", next);
   }
-  assert.equal(await location("/login", { driver: true }), "/driver");
+  assert.equal(await location("/login", { driver: true }), 200);
   assert.equal(await location("/driver/login", { driver: true }), "/driver");
   assert.equal(await location("/driver/login", { staff: true }), 200);
   assert.equal(await location("/login"), 200);
@@ -211,11 +370,38 @@ test("signed-in users skip the login form only for the matching role", async () 
   assert.equal(await location("/driver/login", { signedIn: false }), 200);
   assert.equal(await location("/login", { enabled: false }), "/");
 });
+test("proxy uses independent staff and driver cookies on the same device", async () => {
+  const sessions = { "sb-test-auth-token": "staff", "sb-test-auth-token-driver": "driver" };
+  for (const path of ["/", "/api/data", "/driver-finance-review", "/api/driver-finance-review"]) {
+    const result = await proxyResult(path, { sessions });
+    assert.equal(result.cookieName, "sb-test-auth-token");
+    assert.equal(result.response.status, 200);
+  }
+  for (const path of ["/driver", "/driver/report", "/api/driver/me", "/api/driver/reports"]) {
+    const result = await proxyResult(path, { sessions });
+    assert.equal(result.cookieName, "sb-test-auth-token-driver");
+    assert.equal(result.response.status, 200);
+  }
+  assert.equal((await proxyResult("/api/driver/me", { sessions: { "sb-test-auth-token": "staff" } })).response.status, 401);
+  assert.equal((await proxyResult("/api/data", { sessions: { "sb-test-auth-token-driver": "driver" } })).response.status, 401);
+  assert.equal((await proxyResult("/login", { sessions })).response.headers.get("Location"), "https://test.example/");
+  assert.equal((await proxyResult("/driver/login", { sessions })).response.headers.get("Location"), "https://test.example/driver");
+  assert.equal((await proxyResult("/auth/confirm?next=/driver/profile", { sessions })).cookieName, "sb-test-auth-token-driver");
+  assert.equal((await proxyResult("/auth/confirm?next=/reset-password", { sessions })).cookieName, "sb-test-auth-token");
+});
 test("logout only ends the current device session", () => {
   for (const file of ["app/page.tsx", "app/driver/driver-brand.tsx", "app/driver/login/page.tsx"]) {
     const source = readFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), "utf8");
     assert.doesNotMatch(source, /auth\.signOut\(\)/, file);
     assert.match(source, /auth\.signOut\(\{ scope: "local" \}\)/, file);
+  }
+});
+test("every driver browser surface uses the independent driver client", () => {
+  for (const file of ["driver-brand.tsx", "trips.tsx", "login/page.tsx", "profile/page.tsx",
+    "calendar/calendar.tsx", "finance/finance.tsx", "report/report.tsx", "shifts/shifts.tsx"]) {
+    const source = readFileSync(fileURLToPath(new URL(`../app/driver/${file}`, import.meta.url)), "utf8");
+    assert.doesNotMatch(source, /createClient\(\)/, file);
+    assert.match(source, /createClient\("driver"\)/, file);
   }
 });
 test("test proxy rejects driver or pending access to legacy pages and all backend APIs", async () => {

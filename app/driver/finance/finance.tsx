@@ -1,6 +1,7 @@
 "use client";
 
 import DriverNavigation from "@/app/driver/navigation";
+import { ReceiptDialog } from "@/components/order-receipts";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { createDriverRequestId, japanDate } from "@/lib/driver/orders";
@@ -35,12 +36,10 @@ export default function DriverFinance() {
   const pending = useRef<{ key: string; id: string } | null>(null);
   const trip = data?.trips.find(item => item.assignmentId === selected);
   const overtimeClaim = trip?.claims.find(item => item.category === "overtime");
-  const overtimeReadOnly = Boolean(overtimeClaim && overtimeClaim.status !== "rejected");
   const fuelClaim = data?.fuelClaims.find(item => item.date === date);
-  const fuelReadOnly = Boolean(fuelClaim && fuelClaim.status !== "rejected");
   const advanceSections = (["company", "trip"] as const).map(category => {
     const claim = trip?.claims.find(item => item.category === category);
-    return { category, claim, readOnly: Boolean(claim && claim.status !== "rejected") };
+    return { category, claim };
   });
   const orderDirty = (["company", "trip"] as const).some(type =>
     JSON.stringify(expenses.filter(item => item.type === type)) !==
@@ -84,7 +83,7 @@ export default function DriverFinance() {
       }
       else setRevision(value => value + 1);
     }
-    const { data: subscription } = createClient().auth.onAuthStateChange(event => {
+    const { data: subscription } = createClient("driver").auth.onAuthStateChange(event => {
       if (event === "SIGNED_OUT") {
         pickingReceipt.current = false;
         ++generation.current; controller.abort(); setData(null); setSelected(""); setExpenses([]); setHours("");
@@ -140,7 +139,7 @@ export default function DriverFinance() {
     lock.current = true; setBusy(true); setError("");
     const current = generation.current;
     try {
-      const supabase = createClient();
+      const supabase = createClient("driver");
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (current !== generation.current) return;
       if (authError || !auth.user) throw new Error("登录已失效，請重新登录。");
@@ -162,7 +161,7 @@ export default function DriverFinance() {
   async function viewReceipt(path: string, bucket = "driver-finance-receipts") {
     const current = generation.current;
     try {
-      const { data: signed, error: signingError } = await createClient().storage.from(bucket).createSignedUrl(path, 60);
+      const { data: signed, error: signingError } = await createClient("driver").storage.from(bucket).createSignedUrl(path, 60);
       if (current !== generation.current) return;
       if (signingError || !signed) throw new Error("票据读取失败，請重试。");
       setReceipt(signed.signedUrl);
@@ -175,14 +174,28 @@ export default function DriverFinance() {
     const category = event.currentTarget.value;
     if (category === "company" || category === "trip") void submit(category);
   }
+  async function refreshWages(current: number) {
+    try {
+      const response = await fetch(`/api/driver/finance?month=${encodeURIComponent(month)}`, { cache: "no-store" });
+      const result = await response.json();
+      if (current !== generation.current) return;
+      if (!response.ok) throw new Error(result.error || "月工資读取失败。");
+      const saved = financeDataSchema.parse(result);
+      setData(value => value ? { ...value, wages: saved.wages, manualItems: saved.manualItems } : null);
+    } catch (cause) {
+      if (current !== generation.current) return;
+      console.error("Driver wages refresh after finance save failed.", cause);
+      throw new Error("费用已保存，但月工資汇总刷新失败；請点击“刷新财务”核对，不要重复录入同笔费用。");
+    }
+  }
   async function submitFuel() {
-    if (lock.current || fuelReadOnly) return;
+    if (lock.current) return;
     const content = { date, assignmentId: fuelAssignment, amount: Number(fuelAmount), receipts: fuelReceipts,
       expectedVersion: fuelClaim?.version || 0 };
     const key = JSON.stringify(content);
     if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
     const parsed = fuelSubmissionSchema.safeParse({ ...content, requestId: pending.current.id });
-    if (!parsed.success) { setError("請選択当天关联訂単，填写正整数燃油費并检查油票。"); return; }
+    if (!parsed.success) { setError("請選択当天关联訂単并检查燃油費及油票；已提交的燃油費可改为0。"); return; }
     const current = generation.current;
     lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
@@ -193,7 +206,10 @@ export default function DriverFinance() {
       if (!response.ok) throw new Error(result.error || "燃油費申報未确认。");
       const saved = fuelClaimSchema.parse(result.claim);
       setData(value => value ? { ...value, fuelClaims: [...value.fuelClaims.filter(item => item.date !== saved.date), saved] } : null);
-      pending.current = null; setNotice("燃油費已提交；后台确认后追加到关联訂単当天燃油費，不加入運転士立替和应発金額。");
+      pending.current = null; setNotice(saved.status === "approved"
+        ? "燃油費已保存并按差额更新关联訂単当天燃油費，不加入運転士立替和应発金額。"
+        : "燃油費已提交，待后台确认；請勿重复手工录入。");
+      if (saved.status === "approved") await refreshWages(current);
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver fuel submission failed.", cause);
@@ -224,7 +240,10 @@ export default function DriverFinance() {
         item.assignmentId === claim.assignmentId ? { ...item, claims: [
           ...item.claims.filter(value => value.category !== claim.category), claim,
         ] } : item) } : null);
-      pending.current = null; setNotice(`${financeCategoryLabels[claim.category]}已提交，待后台确认；其他分类可继续填写。`);
+      pending.current = null; setNotice(claim.status === "approved"
+        ? `${financeCategoryLabels[claim.category]}已保存并更新訂単当天财务；其他分类可继续填写。`
+        : `${financeCategoryLabels[claim.category]}已提交，待后台确认；其他分类可继续填写。`);
+      if (claim.status === "approved") await refreshWages(current);
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver finance submit failed.", cause); setError(cause instanceof Error ? cause.message : "提交失败。");
@@ -244,7 +263,7 @@ export default function DriverFinance() {
       <button type="button" aria-pressed={view === "claims"} onClick={() => { setView("claims"); setReceipt(""); }}>立替申報</button>
       <button type="button" aria-pressed={view === "wages"} onClick={() => { setView("wages"); setReceipt(""); }}>月工資</button>
     </div>
-    <p className="driver-muted">本人有效行程可申報社報／旅報、超時和燃油費；历史訂単可补录社報／旅報及超時。后台审核后入账。切后台会清除未提交草稿，請先提交。</p>
+    <p className="driver-muted">本人有效行程可申報社報／旅報、超時和燃油費；历史訂単可补录社報／旅報及超時。提交后直接入账，仍可修改金额、明細及票据。已入账费用按新旧差额更新，超時小時数替换当天原值，保留修改記録。切后台会清除未提交草稿，請先保存。</p>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy}
       onChange={event => { if (event.target.value && canLeave()) {
         setLoading(true); setData(null); setSelected(""); setExpenses([]); setHours(""); setError(""); setNotice(""); setReceipt("");
@@ -282,14 +301,16 @@ export default function DriverFinance() {
           <option key={item.assignmentId} value={item.assignmentId}>{item.historical ? "历史訂単 · " : ""}{item.pickup} → {item.destination}</option>)}
       </select></label>
       {!dayTrips.length && <p className="driver-empty">当天暂无本人可申報的行程。</p>}
-      {trip && advanceSections.map(({ category, claim, readOnly }) =>
+      {trip && advanceSections.map(({ category, claim }) =>
         <section className="driver-card" key={category} aria-label={financeCategoryLabels[category]}>
         <h2>{financeCategoryLabels[category]}{trip.historical ? " · 历史訂単" : ""}</h2>
+        <p className="driver-muted">{category === "company" ? "此费用无需向发单方请求" : "此费用需要向发单方额外请求"}</p>
         {claim && <p className="driver-muted">{labels[claim.status]} {claim.reviewNote}</p>}
-        <fieldset disabled={busy || readOnly} className="finance-fields">
+        {claim && <p className="driver-muted">可修改后重新保存；清空本分类明細可撤销该分类已申報金額。</p>}
+        <fieldset disabled={busy} className="finance-fields">
           <button className="driver-link" type="button" onClick={() => setExpenses(items => [...items,
             { id: createDriverRequestId(), type: category, detail: "", amount: 0, receipts: [] }])}
-            disabled={expenses.filter(item => item.type === category).length >= 50 || busy || readOnly}>＋添加{financeCategoryLabels[category]}明細</button>
+            disabled={expenses.filter(item => item.type === category).length >= 50 || busy}>＋添加{financeCategoryLabels[category]}明細</button>
           {expenses.filter(item => item.type === category).map((item, index) => <div className="finance-expense" key={item.id}>
             <h3>{index + 1}. {item.type === "company" ? "社報" : "旅報"}</h3>
             <div className="finance-expense-row">
@@ -298,52 +319,53 @@ export default function DriverFinance() {
               onWheel={event => event.currentTarget.blur()}
               value={item.amount || ""} onChange={event => edit(item.id, { amount: Number(event.target.value) })} /></label>
             </div>
-            <label className="driver-field">上传票据（可选，最多5张）<input type="file" accept="image/jpeg,image/png,image/webp" multiple
+            <label className="driver-field">上传票据（可选，最多5张）<span className="finance-file-picker">
+              <span aria-hidden="true">ファイルを選択</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple
               onClick={() => { pickingReceipt.current = true; }}
-              onChange={event => { pickingReceipt.current = false; void upload(item.id, event.target.files); event.target.value = ""; }} /></label>
+              onChange={event => { pickingReceipt.current = false; void upload(item.id, event.target.files); event.target.value = ""; }} /></span></label>
             <p className="driver-muted">已上传 {item.receipts.length} 张</p>
-            {!readOnly && item.receipts.map((path, receiptIndex) => <button className="driver-link" type="button" key={path}
+            {item.receipts.map((path, receiptIndex) => <button className="driver-link" type="button" key={path}
               onClick={() => { edit(item.id, { receipts: item.receipts.filter(value => value !== path) }); setReceipt(""); }}>
               移除票据 {receiptIndex + 1}　
             </button>)}
-            {!readOnly && <button className="driver-link" type="button" onClick={() => setExpenses(items => items.filter(value => value.id !== item.id))}>删除此明細</button>}
+            <button className="driver-link" type="button" onClick={() => setExpenses(items => items.filter(value => value.id !== item.id))}>削除此明細</button>
           </div>)}
         </fieldset>
         {expenses.filter(item => item.type === category).flatMap(item => item.receipts).map((path, index) =>
           <button key={`${path}-${index}`} className="driver-link" value={path} onClick={handleAdvanceReceipt}>查看票据 {index + 1}　</button>)}
-        {!readOnly && <button className="driver-button" disabled={busy} value={category} onClick={handleAdvanceSubmit}>{busy ? "正在处理…" : `保存${financeCategoryLabels[category]}并提交`}</button>}
+        <button className="driver-button" disabled={busy} value={category} onClick={handleAdvanceSubmit}>{busy ? "正在处理…" : `保存${financeCategoryLabels[category]}并提交`}</button>
       </section>)}
       {trip && <section className="driver-card">
         <h2>超時申報{trip.historical ? " · 历史訂単" : ""}</h2>
         {overtimeClaim && <p className="driver-muted">{labels[overtimeClaim.status]} {overtimeClaim.reviewNote}</p>}
           <label className="driver-field">超時小時数<input type="number" min="0" max="999" step="0.01" inputMode="decimal"
-            disabled={busy || overtimeReadOnly}
+            disabled={busy}
             onWheel={event => event.currentTarget.blur()}
             placeholder="例：1.5" value={hours} onChange={event => setHours(event.target.value)} /></label>
-        {!overtimeReadOnly && <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超時并提交</button>}
+        <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超時并提交</button>
       </section>}
       <section className="driver-card"><h2>当日燃油費</h2>
-        <p className="driver-muted">公司支付／油卡。每天统一申報一次，指定当天一张訂単；审核后追加到该訂単当天燃油費，不计運転士立替及应発金額。請勿重复手工录入。</p>
         {fuelClaim && <p className="driver-muted">{labels[fuelClaim.status]} {fuelClaim.reviewNote}</p>}
-        <fieldset className="finance-fields" disabled={busy || fuelReadOnly || !fuelTrips.length}>
+        <fieldset className="finance-fields" disabled={busy || !fuelTrips.length}>
           <label className="driver-field">燃油費关联訂単<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
             <option value="">請選択当天一张訂単</option>
             {fuelClaim && !dayTrips.some(item => item.assignmentId === fuelClaim.assignmentId) &&
               <option value={fuelClaim.assignmentId}>原关联訂単（当前不可选）</option>}
             {fuelTrips.map(item => <option value={item.assignmentId} key={item.assignmentId}>{item.pickup} → {item.destination}</option>)}
           </select></label>
-          <label className="driver-field">燃油費（JPY）<input type="number" min="1" max="99999999999999" step="1" inputMode="numeric"
+          <label className="driver-field">燃油費（JPY）<input type="number" min={fuelClaim ? "0" : "1"} max="99999999999999" step="1" inputMode="numeric"
             value={fuelAmount} onChange={event => setFuelAmount(event.target.value)} onWheel={event => event.currentTarget.blur()} /></label>
-          <label className="driver-field">油票上传（可选，最多5张）<input type="file" accept="image/jpeg,image/png,image/webp" multiple
+          <label className="driver-field">油票上传（可选，最多5张）<span className="finance-file-picker">
+            <span aria-hidden="true">ファイルを選択</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple
             onClick={() => { pickingReceipt.current = true; }}
-            onChange={event => { pickingReceipt.current = false; void upload("fuel", event.target.files); event.target.value = ""; }} /></label>
+            onChange={event => { pickingReceipt.current = false; void upload("fuel", event.target.files); event.target.value = ""; }} /></span></label>
           <p className="driver-muted">已上传 {fuelReceipts.length} 张</p>
           {fuelReceipts.map((path, index) => <button className="driver-link" type="button" key={path}
             onClick={() => { setFuelReceipts(items => items.filter(item => item !== path)); setReceipt(""); }}>移除油票 {index + 1}　</button>)}
         </fieldset>
         {fuelReceipts.map((path, index) => <button className="driver-link" type="button" key={path}
           onClick={() => void viewReceipt(path, "driver-fuel-receipts")}>查看油票 {index + 1}　</button>)}
-        {!fuelReadOnly && <button className="driver-button" disabled={busy || !fuelTrips.length} onClick={() => void submitFuel()}>保存燃油費并提交</button>}
+        <button className="driver-button" disabled={busy || !fuelTrips.length} onClick={() => void submitFuel()}>保存燃油費并提交</button>
       </section>
       <section className="driver-card"><h2>運転士立替汇総</h2>
         <div className="driver-row"><span>社報立替</span><strong>{yen(dayTotals.company)}</strong></div>
@@ -353,8 +375,6 @@ export default function DriverFinance() {
       </section>
       </>}
     </>}
-    {receipt && <section className="driver-card"><button className="driver-link" onClick={() => setReceipt("")}>关闭票据</button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={receipt} alt="運転士财务票据" className="finance-receipt" /></section>}
+    {receipt && <ReceiptDialog receipt={{ url: receipt, detail: "運転士财务票据" }} close={() => setReceipt("")} />}
   </main>;
 }

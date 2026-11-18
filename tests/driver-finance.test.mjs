@@ -18,6 +18,10 @@ function load(relative, mocks = {}, globals = {}) {
   const compiled = { exports: {} };
   vm.runInNewContext(output, { module: compiled, exports: compiled.exports,
     require: name => Object.hasOwn(mocks, name) ? mocks[name] :
+      name === "@/components/order-receipts" ? { ReceiptDialog: ({ receipt, close }) =>
+        React.createElement("dialog", { "aria-label": "小票大图" },
+          React.createElement("button", { type: "button", onClick: close }, "关闭"),
+          React.createElement("img", { src: receipt.url, alt: receipt.detail })) } :
       name === "@/app/driver/navigation" ? load("app/driver/navigation.tsx", mocks, globals) :
       name.endsWith(".css") ? {} : require(name),
     Request, Response, Headers, URL, Date, Intl, process, console: { error() {} }, ...globals,
@@ -44,6 +48,16 @@ const fuelClaim = { id, assignmentId: id, date: "2026-10-27", version: 1, status
   amount: 6000, receipts: [], reviewNote: "" };
 const fuelCommand = { assignmentId: id, date: "2026-10-27", expectedVersion: 0, requestId: id,
   amount: 6000, receipts: [] };
+
+test("driver and staff receipt links use the shared popup instead of bottom-of-page image cards", () => {
+  for (const relative of ["app/driver/finance/finance.tsx", "app/driver-finance-review/review.tsx"]) {
+    const source = readFileSync(new URL(`../${relative}`, import.meta.url), "utf8");
+    assert.match(source, /import \{ ReceiptDialog \} from "@\/components\/order-receipts"/);
+    assert.match(source, /receipt && <ReceiptDialog receipt=\{\{ url: receipt,/);
+    assert.match(source, /close=\{\(\) => setReceipt\(""\)\}/);
+    assert.doesNotMatch(source, /receipt && <section|<img[^>]*src=\{receipt\}/);
+  }
+});
 function handler({ admin = false, dailyFuel = false, denied = 0, testMode = true, role = "admin",
   result = data, historical = { trips: [] }, error = null } = {}) {
   const calls = [];
@@ -213,7 +227,8 @@ test("review forwards strict decision and version, requires reason on rejection"
   }
   assert.equal((await handler({ admin: true, error: { code: "40001" } }).POST(request(decision))).status, 409);
 });
-function renderFinance({ status = null, withEffects = false, fetch: fetchMock, view = "claims", confirm = () => true } = {}) {
+function renderFinance({ status = null, withEffects = false, fetch: fetchMock, view = "claims", confirm = () => true,
+  refresh = () => Response.json(data) } = {}) {
   const selectedClaim = status ? { ...claim, status } : null;
   const states = ["2026-10", "2026-10-27", { ...data, trips: [
     { ...data.trips[0], claims: selectedClaim ? [selectedClaim] : [] },
@@ -245,7 +260,7 @@ function renderFinance({ status = null, withEffects = false, fetch: fetchMock, v
     }, storage: { from: bucket => ({ upload: async (path, file, options) => {
       uploads.push({ bucket, path, file, options }); return { error: null };
     } }) } }) },
-  }, { fetch: fetchMock, AbortController,
+  }, { fetch: (url, init) => init?.method === "POST" || withEffects ? fetchMock(url, init) : refresh(url, init), AbortController,
     document,
     window: { confirm }, location: { replace() {} } }).default;
   function render() {
@@ -255,10 +270,42 @@ function renderFinance({ status = null, withEffects = false, fetch: fetchMock, v
   const html = render();
   return { html, states, effects, events, buttons, inputs, document, uploads, render };
 }
+test("driver receipt URL opens a popup without adding a bottom card or discarding unsaved drafts", () => {
+  const h = renderFinance();
+  h.states[11] = "https://receipts.example/private-signed.jpg";
+  const html = h.render();
+  assert.match(html, /<dialog aria-label="小票大图">/);
+  assert.match(html, /src="https:\/\/receipts.example\/private-signed.jpg"/);
+  assert.doesNotMatch(html, /class="finance-receipt"/);
+  assert.equal(h.states[4][0].amount, 1500);
+  assert.equal(h.states[5], "1.5");
+});
+
+test("receipt uploads show a single Japanese picker label while keeping native multi-file inputs", () => {
+  const h = renderFinance();
+  const pickers = h.html.match(/<span class="finance-file-picker">[\s\S]*?<\/span><\/label>/g) ?? [];
+  assert.equal(pickers.length, 2);
+  for (const picker of pickers) {
+    assert.equal((picker.match(/ファイルを選択/g) ?? []).length, 1);
+    assert.match(picker, /type="file"/);
+    assert.match(picker, /multiple=""/);
+    assert.doesNotMatch(picker, /ファイル未選択/);
+  }
+  const css = readFileSync(new URL("../app/driver/finance/finance.css", import.meta.url), "utf8");
+  assert.match(css, /\.finance-file-picker input\[type=file\]\{[^}]*opacity:0/);
+  assert.match(css, /\.finance-file-picker:focus-within/);
+});
+
 test("mobile finance renders both categories, all-order daily totals and complete monthly wages", () => {
   const { html } = renderFinance();
   for (const text of ["社報", "旅報", "¥1,500", "¥2,000", "最多5张", 'multiple=""', "刷新财务"])
     assert.ok(html.includes(text), text);
+  const companyCard = html.split('aria-label="社報立替"')[1].split("</section>")[0];
+  const tripCard = html.split('aria-label="旅報立替"')[1].split("</section>")[0];
+  assert.match(companyCard, /<\/h2><p class="driver-muted">此费用无需向发单方请求<\/p>/);
+  assert.match(tripCard, /<\/h2><p class="driver-muted">此费用需要向发单方额外请求<\/p>/);
+  assert.doesNotMatch(companyCard, /此费用需要向发单方额外请求/);
+  assert.doesNotMatch(tripCard, /此费用无需向发单方请求/);
   const wages = renderFinance({ view: "wages" }).html;
   for (const text of ["¥14,500", "Synthetic adjustment", "本月工資"]) assert.ok(wages.includes(text), text);
   if (process.env.DRIVER_FINANCE_LAYOUT_FILE) {
@@ -267,6 +314,57 @@ test("mobile finance renders both categories, all-order daily totals and complet
     writeFileSync(process.env.DRIVER_FINANCE_LAYOUT_FILE,
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${css}</style><div class="driver-app">${html}</div>`);
   }
+});
+
+test("driver fuel and advance submissions immediately expose approved posting", async () => {
+  const fuelResponse = handler({ dailyFuel: true, result: { ...fuelClaim, status: "approved", version: 2 } });
+  const response = await fuelResponse.POST(request(fuelCommand));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).claim.status, "approved");
+  const advanceResponse = handler({ result: { ...claim, status: "approved", version: 2 } });
+  const advance = await advanceResponse.POST(request());
+  assert.equal(advance.status, 200);
+  assert.equal((await advance.json()).claim.status, "approved");
+  const h = renderFinance({ fetch: async () => Response.json({
+    claim: { ...claim, status: "approved", version: 2 },
+  }) });
+  h.render();
+  const submit = h.buttons.find(button => button.children === "保存社報立替并提交");
+  assert.ok(submit);
+  submit.onClick({ currentTarget: { value: "company" } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(h.render(), /已保存并更新訂単当天财务/);
+  assert.match(h.html, /提交后直接入账，仍可修改金额、明細及票据/);
+});
+
+test("daily fuel card omits explanation and overtime submission remains editable after direct posting", async () => {
+  const h = renderFinance({ fetch: async (_url, init) => {
+    const body = JSON.parse(init.body);
+    assert.equal(body.category, "overtime");
+    return Response.json({ claim: { ...claim, category: "overtime", expenses: [],
+      overtimeHours: body.overtimeHours, status: "approved", version: 2 } });
+  } });
+  const card = h.html.split("<h2>当日燃油費</h2>")[1].split("</section>")[0];
+  assert.ok(card.startsWith('<fieldset'));
+  assert.doesNotMatch(card, /公司支付／油卡|更换訂単会|請勿重复手工录入/);
+  h.buttons.find(button => button.children === "保存超時并提交").onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.states[2].trips[0].claims[0].overtimeHours, 1.5);
+  assert.match(h.render(), /超時申報已保存并更新訂単当天财务/);
+  assert.ok(h.buttons.some(button => button.children === "保存超時并提交"));
+});
+
+test("direct-posting migration keeps original submission idempotency and applies only advances and fuel", () => {
+  const sql = readFileSync(new URL("../supabase/migrations/20261129000000_driver_expenses_direct_posting.sql", import.meta.url), "utf8");
+  assert.match(sql, /target_category in \(''company'',''trip''\)/);
+  assert.match(sql, /post_driver_advance_claim\(c\.claim_id\)/);
+  assert.match(sql, /post_driver_fuel_claim\(f\.id\)/);
+  assert.match(sql, /for share of ord','for update of ord/);
+  assert.match(sql, /replace\(pg_get_functiondef\(signature::regprocedure\),chr\(13\),''\)/);
+  assert.match(sql, /amount:=coalesce\(\(f->>'fuelCost'\)::numeric,0\)\+c\.amount/);
+  assert.match(sql, /driverAdvanceCompanyReport' else 'driverAdvanceTripReport/);
+  assert.match(sql, /from public,anon,authenticated/);
+  assert.doesNotMatch(sql, /drop function|create trigger|update public\.driver_finance_claims set status='approved'[^;]*where status='pending'/);
 });
 test("historical claims show their source, submit with the history flag and exclude daily fuel", async () => {
   const calls = [];
@@ -360,7 +458,7 @@ test("fuel remains daily when changing orders and does not enter advance/payable
   h.states[3] = id.replace(/1$/, "2");
   h.render();
   assert.equal(h.states[15], id);
-  assert.equal(h.buttons.some(button => button.children === "保存燃油費并提交"), false);
+  assert.equal(h.buttons.some(button => button.children === "保存燃油費并提交"), true);
   h.buttons.find(button => button.children === "月工資").onClick();
   assert.match(h.render(), /<span>应発金額<\/span><strong>¥14,500<\/strong>/);
 });
@@ -414,9 +512,9 @@ test("each advance category saves its own payload without locking or losing the 
   assert.ok(tripHtml.includes('value="Trip draft"'));
   const companyCard = tripHtml.split('aria-label="社報立替"')[1].split("</section>")[0];
   const tripCard = tripHtml.split('aria-label="旅報立替"')[1].split("</section>")[0];
-  assert.ok(companyCard.includes('<fieldset disabled=""'));
+  assert.equal(companyCard.includes('<fieldset disabled=""'), false);
   assert.equal(tripCard.includes('<fieldset disabled=""'), false);
-  assert.equal(h.buttons.some(button => button.children === "保存社報立替并提交"), false);
+  assert.equal(h.buttons.some(button => button.children === "保存社報立替并提交"), true);
   h.buttons.find(button => button.children === "保存旅報立替并提交").onClick({ currentTarget: { value: "trip" } });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls[1].category, "trip");
@@ -462,11 +560,57 @@ test("admin review separates notes, requests, and state updates by category on t
   assert.equal(states[1][0].claim.status, "approved");
   assert.equal(states[1][1].claim.status, "pending");
 });
-test("pending and approved claims cannot be edited or submitted; rejected claims can", () => {
+test("pending, approved and rejected claims remain editable with save and receipt controls", () => {
   for (const status of ["pending", "approved", "rejected"]) {
     const { html } = renderFinance({ status });
-    assert.equal(html.includes('<fieldset disabled=""'), status !== "rejected");
-    assert.equal(html.includes("保存社報立替并提交"), status === "rejected");
+    assert.equal(html.includes('<fieldset disabled=""'), false);
+    for (const label of ["保存社報立替并提交", "保存旅報立替并提交", "保存超時并提交", "保存燃油費并提交", "削除此明細"]) {
+      assert.ok(html.includes(label), `${status}: ${label}`);
+    }
+  }
+});
+
+test("correction schemas permit clearing existing advances/fuel but not empty initial submissions", () => {
+  assert.equal(finance.financeSubmissionSchema.safeParse({ ...command, expectedVersion: 2, expenses: [] }).success, true);
+  assert.equal(finance.financeSubmissionSchema.safeParse({ ...command, expenses: [] }).success, false);
+  assert.equal(fuel.fuelSubmissionSchema.safeParse({ ...fuelCommand, expectedVersion: 2, amount: 0 }).success, true);
+  assert.equal(fuel.fuelSubmissionSchema.safeParse({ ...fuelCommand, amount: 0 }).success, false);
+  assert.equal(fuel.fuelClaimSchema.safeParse({ ...fuelClaim, amount: 0 }).success, true);
+});
+
+test("approved finance corrections send the latest version and preserve the other category's draft", async () => {
+  const calls = [];
+  const h = renderFinance({ status: "approved", fetch: async (_url, init) => {
+    const body = JSON.parse(init.body); calls.push(body);
+    return Response.json({ claim: { ...claim, expenses: body.expenses, status: "approved", version: 4 } });
+  } });
+  const tripDraft = { ...expense, id: id.replace(/1$/, "3"), type: "trip", amount: 800 };
+  h.states[4] = [tripDraft];
+  h.render();
+  h.buttons.find(button => button.children === "保存社報立替并提交").onClick({ currentTarget: { value: "company" } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls[0].expectedVersion, 1);
+  assert.deepEqual(calls[0].expenses, []);
+  assert.equal(h.states[2].trips[0].claims.find(item => item.category === "company").version, 4);
+  assert.equal(h.states[4][0], tripDraft);
+  assert.match(h.render(), /已保存并更新訂単当天财务/);
+});
+
+test("saved corrections refresh server-calculated wages without losing other drafts or offering duplicate approval on refresh failure", async () => {
+  for (const fail of [false, true]) {
+    const h = renderFinance({ status: "approved", fetch: async () => Response.json({
+      claim: { ...claim, status: "approved", version: 3 },
+    }), refresh: () => fail ? Response.json({ error: "Read failed" }, { status: 503 })
+      : Response.json({ ...data, wages: [{ ...data.wages[0], advances: 500 }] }) });
+    const draft = { ...expense, id: id.replace(/1$/, "4"), type: "trip", amount: 200 };
+    h.states[4].push(draft);
+    h.render();
+    h.buttons.find(button => button.children === "保存社報立替并提交").onClick({ currentTarget: { value: "company" } });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.states[2].trips[0].claims[0].version, 3);
+    assert.equal(h.states[4].at(-1), draft);
+    if (fail) assert.match(h.render(), /费用已保存，但月工資汇总刷新失败/);
+    else assert.equal(h.states[2].wages[0].advances, 500);
   }
 });
 test("wheel scrolling monetary and overtime inputs blurs without changing values", () => {

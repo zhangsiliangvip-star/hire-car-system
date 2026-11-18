@@ -200,7 +200,7 @@ export async function PUT(request: Request) {
         { status: 500 },
       );
     }
-    if (!target) return jsonResponse({ error: "该账号不存在或已删除。" }, { status: 404 });
+    if (!target) return jsonResponse({ error: "该账号不存在或已削除。" }, { status: 404 });
     const { error } = await admin.auth.admin.updateUserById(parsed.data.userId, {
       password: parsed.data.password,
       email_confirm: true,
@@ -210,7 +210,7 @@ export async function PUT(request: Request) {
       return jsonResponse(
         { error: error.code === "weak_password"
           ? "密码不符合认证服务的强度要求，請使用更强的密码。"
-          : "设置密码失败，請检查认证服务日志；如用户已被删除，請刷新账号列表。" },
+          : "设置密码失败，請检查认证服务日志；如用户已被削除，請刷新账号列表。" },
         { status: error.status && error.status >= 500 ? 502 : 400 },
       );
     }
@@ -258,7 +258,7 @@ export async function PATCH(request: Request) {
       .maybeSingle();
     if (error) throw error;
     if (!data) {
-      return jsonResponse({ error: "该账号不存在或已删除。" }, { status: 404 });
+      return jsonResponse({ error: "该账号不存在或已削除。" }, { status: 404 });
     }
 
     return jsonResponse({ ok: true });
@@ -288,13 +288,13 @@ export async function DELETE(request: Request) {
     }
     const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);
     if (!passwordCheck.configured) {
-      return jsonResponse({ error: "服务器尚未配置删除专用密码。" }, { status: 503 });
+      return jsonResponse({ error: "服务器尚未配置削除专用密码。" }, { status: 503 });
     }
     if (!passwordCheck.valid) {
-      return jsonResponse({ error: "删除专用密码错误，請检查后重试。" }, { status: 403 });
+      return jsonResponse({ error: "削除专用密码错误，請检查后重试。" }, { status: 403 });
     }
     if (parsed.data.userId === identity.profile.id) {
-      return jsonResponse({ error: "不能删除当前登录的管理员账号。" }, { status: 400 });
+      return jsonResponse({ error: "不能削除当前登录的管理员账号。" }, { status: 400 });
     }
 
     const admin = createAdminClient();
@@ -305,7 +305,7 @@ export async function DELETE(request: Request) {
       .maybeSingle();
     if (targetError) throw targetError;
     if (!target) {
-      return jsonResponse({ error: "该账号不存在或已删除。" }, { status: 404 });
+      return jsonResponse({ error: "该账号不存在或已削除。" }, { status: 404 });
     }
 
     if (target.role === "admin") {
@@ -315,7 +315,7 @@ export async function DELETE(request: Request) {
         .eq("role", "admin");
       if (countError) throw countError;
       if ((count ?? 0) <= 1) {
-        return jsonResponse({ error: "不能删除系统中的最后一个管理员。" }, { status: 400 });
+        return jsonResponse({ error: "不能削除系统中的最后一个管理员。" }, { status: 400 });
       }
     }
 
@@ -324,6 +324,6 @@ export async function DELETE(request: Request) {
     return jsonResponse({ ok: true });
   } catch (error) {
     console.error("Failed to delete user account.", error);
-    return jsonResponse({ error: "删除账号失败。" }, { status: 500 });
+    return jsonResponse({ error: "削除账号失败。" }, { status: 500 });
   }
 }

@@ -8,6 +8,48 @@ import { createClient } from "@/lib/supabase/browser";
 import { assignmentIdSchema, createDriverRequestId, japanDate, tripActions, tripNavigationUrl, tripPreviousStates, tripStatusLabels, type DriverTrip, type DriverTripItem, type TripState } from "@/lib/driver/orders";
 
 type Identity = { name: string; globalSlogan?: string; personalSlogan?: string };
+type FlightTrackingInfo = {
+  flightNumber: string;
+  status: "tracking_pending" | "scheduled" | "delayed" | "en_route" | "landed" | "cancelled" | "diverted" | "unknown" | "not_found";
+  terminal: string | null;
+  arrivalTime: string | null;
+  updatedAt: string;
+};
+type FlightTrackingState = FlightTrackingInfo | { error: string };
+const flightStatusLabels: Record<FlightTrackingInfo["status"], string> = {
+  tracking_pending: "该日期超出可查询的未来航班范围，请联系调度确认",
+  scheduled: "计划中",
+  delayed: "延误",
+  en_route: "飞行中",
+  landed: "已落地",
+  cancelled: "已取消",
+  diverted: "已备降",
+  unknown: "状态未知",
+  not_found: "暂未找到航班记录",
+};
+
+function FlightInfo({ flightNumber, state, inDailyOverview = false }: {
+  flightNumber: string;
+  state?: FlightTrackingState;
+  inDailyOverview?: boolean;
+}) {
+  return <section className={inDailyOverview
+    ? "driver-daily-flight"
+    : "rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm"}>
+    <div className="driver-row"><span>航班信息</span><strong>{flightNumber}</strong></div>
+    {!state ? <p className="driver-muted">正在查询航班状态…</p> :
+      "error" in state ? <p className="driver-error" role="status">{state.error}</p> :
+        <>
+          <div className="driver-row"><span>飞行状态</span><strong>{flightStatusLabels[state.status]}</strong></div>
+          <div className="driver-row"><span>到达航站楼</span><strong>{state.terminal || "航班数据暂未提供"}</strong></div>
+          {state.arrivalTime && <div className="driver-row"><span>预计／实际到达</span>
+            <strong>{new Intl.DateTimeFormat("zh-CN", {
+              timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit",
+            }).format(new Date(state.arrivalTime))}</strong></div>}
+        </>}
+  </section>;
+}
+
 function TripLocation({ label, address }: { label: string; address: string }) {
   const href = tripNavigationUrl(address);
   return <div className="min-w-0 break-words"><span className="driver-muted">{label}</span>
@@ -25,9 +67,15 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
   const [revision, setRevision] = useState(0);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [flightTracking, setFlightTracking] = useState<Record<string, FlightTrackingState>>({});
   const pendingRequest = useRef<{ assignmentId: string; version: number; requestId: string; state: TripState } | null>(null);
   const savingRef = useRef(false);
   const detail = orderId !== undefined;
+  const flightTrackingKey = JSON.stringify(trips.flatMap((trip) =>
+    !("historical" in trip) && trip.details?.flightNumber.trim()
+      ? [{ assignmentId: trip.assignmentId, flightNumber: trip.details.flightNumber, serviceDate: trip.date }]
+      : [],
+  ));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,7 +119,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
     function onPageShow(event: PageTransitionEvent) { if (event.persisted) revalidate(); }
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageShow);
-    const { data: subscription } = createClient().auth.onAuthStateChange((event) => {
+    const { data: subscription } = createClient("driver").auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") { setTrips([]); setIdentity(null); location.replace("/driver/login"); }
     });
     void load();
@@ -84,6 +132,56 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
       window.removeEventListener("pageshow", onPageShow);
     };
   }, [date, assignmentId, orderId, detail, revision]);
+
+  useEffect(() => {
+    const assignments = JSON.parse(flightTrackingKey) as {
+      assignmentId: string;
+      flightNumber: string;
+      serviceDate: string;
+    }[];
+    let active = true;
+    const controller = new AbortController();
+    async function refreshFlights() {
+      await Promise.all(assignments.map(async ({ assignmentId }) => {
+        try {
+          const response = await fetch(
+            `/api/driver/flights?assignmentId=${encodeURIComponent(assignmentId)}`,
+            { cache: "no-store", signal: controller.signal },
+          );
+          const result = await response.json() as { flight?: FlightTrackingInfo; error?: string };
+          if (!response.ok || !result.flight) {
+            throw new Error(typeof result.error === "string" ? result.error : "航班状态暂时不可用。");
+          }
+          if (active) setFlightTracking((current) => ({ ...current, [assignmentId]: result.flight! }));
+        } catch (cause) {
+          if (controller.signal.aborted) return;
+          console.error("Driver flight status load failed.", cause);
+          if (active) setFlightTracking((current) => ({
+            ...current,
+            [assignmentId]: { error: cause instanceof Error ? cause.message : "航班状态暂时不可用。" },
+          }));
+        }
+      }));
+    }
+    if (assignments.length) {
+      setFlightTracking((current) => Object.fromEntries(
+        Object.entries(current).filter(([assignmentId]) =>
+          assignments.some((assignment) => assignment.assignmentId === assignmentId),
+        ),
+      ));
+      void refreshFlights();
+    } else {
+      setFlightTracking({});
+    }
+    const timer = assignments.length ? setInterval(() => {
+      if (document.visibilityState === "visible") void refreshFlights();
+    }, 5 * 60_000) : null;
+    return () => {
+      active = false;
+      controller.abort();
+      if (timer) clearInterval(timer);
+    };
+  }, [flightTrackingKey]);
 
   // Keeps current cards visible while reloading; actions stay locked until fresh versions arrive.
   function refresh() { setRefreshing(true); setError(""); setRevision((value) => value + 1); }
@@ -149,6 +247,11 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
             <p className="driver-daily-summary">{trip.details?.tripSummary || "行程簡概未填写"}</p>
           </div>
           <p className="driver-muted driver-daily-plate">車両番号：{trip.vehicleNumber || "未填写"}</p>
+          {!("historical" in trip) && trip.details?.flightNumber && <FlightInfo
+            flightNumber={trip.details.flightNumber}
+            state={flightTracking[trip.assignmentId]}
+            inDailyOverview
+          />}
         </div>)}</div>
       </section>}
       {!trips.length && !error && <div className="driver-card driver-empty">暂无获派行程，請等待调度安排。</div>}
@@ -178,6 +281,10 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
           <div className="driver-row"><span>訂単名称</span><strong>{trip.details.orderName || "未填写"}</strong></div>
           <div><p className="driver-muted">行程簡概</p><p className="whitespace-pre-wrap">{trip.details.tripSummary || "未填写"}</p></div>
         </div>}
+        {detail && !("historical" in trip) && trip.details?.flightNumber && <FlightInfo
+          flightNumber={trip.details.flightNumber}
+          state={flightTracking[trip.assignmentId]}
+        />}
         {detail ? <>
           {!("historical" in trip) && tripActions[trip.status] && <button className="driver-button" disabled={saving || refreshing} onClick={() => advance(trip)}>{saving ? "正在記録…" : refreshing ? "正在更新…" : tripActions[trip.status]?.label}</button>}
           {!("historical" in trip) && tripPreviousStates[trip.status] && <button className="driver-button driver-secondary" disabled={saving || refreshing}

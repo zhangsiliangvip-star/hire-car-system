@@ -1,4 +1,5 @@
 import { printA4Html } from "@/lib/print-a4";
+import { companyExportHtml } from "@/lib/company-export";
 import { isCompanySealDataUrl } from "@/lib/company-seal";
 
 type InvoiceDay = {
@@ -115,10 +116,10 @@ export function buildInvoicePrintHtml(data: InvoiceData) {
   footer { margin-top: 18px; font-size: 12px; line-height: 1.8; }
   </style></head><body><div class="sheet"><article class="content">
   <h1>請求書</h1><div class="document-meta">請求書番号：${escapeHtml(data.number)}<br>発行日：${escapeHtml(data.issuedDate)}</div>
-  <div class="parties"><div><div class="recipient">${escapeHtml(data.recipient)} 御中</div>
+  <div class="parties"><div><div class="recipient">${companyExportHtml(data.recipient, escapeHtml, " 御中")}</div>
   <p class="lines">${escapeHtml(data.recipientAddress)}${data.contact ? `\nご担当：${escapeHtml(data.contact)} 様` : ""}</p>
   <p>下記のとおりご請求申し上げます。</p></div>
-  <div class="lines"><div class="issuer-heading"><h2>${escapeHtml(data.company)}</h2>${data.sealImage ? `<img class="seal" src="${escapeHtml(data.sealImage)}" alt="会社印">` : ""}</div>${escapeHtml(data.address)}<br>TEL：${escapeHtml(data.phone)}
+  <div class="lines"><div class="issuer-heading"><h2>${companyExportHtml(data.company, escapeHtml)}</h2>${data.sealImage ? `<img class="seal" src="${escapeHtml(data.sealImage)}" alt="会社印">` : ""}</div>${escapeHtml(data.address)}<br>TEL：${escapeHtml(data.phone)}
   <br>登録番号：${escapeHtml(data.taxRegistrationNumber)}</div></div>
   <div class="total"><span>ご請求金額（税込）</span><strong>${yen(total)}</strong></div>
   <p class="period">取引年月日（運行期間）：${escapeHtml(data.startDate)} ～ ${escapeHtml(data.endDate)}</p>

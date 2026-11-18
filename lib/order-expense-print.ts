@@ -13,6 +13,7 @@ export type OrderExpensePrintRow = {
   driverAdvanceTrip: number;
   companyAdvanceCompany: number;
   companyAdvanceTrip: number;
+  externalDriverFee: number;
   overtime: number;
   wages: number;
 };
@@ -38,6 +39,15 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
   const unitPrice = (cost: number, liters: number) => liters > 0 ? number(cost / liters) : "—";
   const detail = (label: string, value: string, span = 1) =>
     `<td colspan="${span}"><small>${label}</small><strong>${value}</strong></td>`;
+  const expenseCategories = [
+    { label: "ETC 総额", amount: sum("etcCompany") + sum("etcTrip") },
+    { label: "燃油費合计", amount: sum("fuelCost") },
+    { label: "運転士立替合计", amount: sum("driverAdvanceCompany") + sum("driverAdvanceTrip") },
+    { label: "会社立替合计", amount: sum("companyAdvanceCompany") + sum("companyAdvanceTrip") },
+    { label: "外注運転士費用合计", amount: sum("externalDriverFee") },
+    { label: "運転士工資合计", amount: sum("wages") },
+  ];
+  const totalExpenses = expenseCategories.reduce((total, category) => total + category.amount, 0);
   const dailyRows = [...data.rows].sort((first, second) => first.date.localeCompare(second.date))
     .map((row) => `<section class="day">
     <div class="day-heading"><strong>${escapeHtml(row.date)}${row.offDate ? "（休运）" : ""}</strong>
@@ -49,6 +59,7 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     </tr><tr>${detail("運転士立替（社報）", number(row.driverAdvanceCompany))}${detail("運転士立替（旅報）", number(row.driverAdvanceTrip))}
     ${detail("会社立替（社報）", number(row.companyAdvanceCompany))}${detail("会社立替（旅報）", number(row.companyAdvanceTrip))}
     ${detail("運転士工資（含超時及奖励）", number(row.wages), 2)}
+    </tr><tr>${detail("外注運転士費用", number(row.externalDriverFee), 6)}
     </tr></tbody></table></section>`).join("");
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
     <title>团务費用明細</title><style>
@@ -69,9 +80,10 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     .day { margin-top: 8px; break-inside: avoid; }
     .day-heading { display: flex; flex-wrap: wrap; gap: 6px 18px; background: #edf1f5; border: 1px solid #bac3cd; border-bottom: 0; padding: 5px; overflow-wrap: anywhere; }
     small { display: block; color: #555; font-size: 12px; }
-    .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
     .card { border: 1px solid #bac3cd; padding: 9px; }
     .card strong { display: block; font-size: 18px; margin-top: 5px; }
+    .card--total { margin-top: 14px; border: 2px solid #263b53; background: #edf1f5; break-inside: avoid; text-align: right; }
     .note { border: 1px solid #bac3cd; padding: 8px; min-height: 50px; white-space: pre-wrap; overflow-wrap: anywhere; }
     footer { margin-top: 12px; font-size: 12px; color: #555; }
     </style></head><body><div class="sheet"><article class="content">
@@ -85,15 +97,14 @@ export function buildOrderExpensePrintHtml(data: ExpensePrintData) {
     ${detail("平均油价（JPY/L）", unitPrice(sum("fuelCost"), sum("fuelLiters")))}${detail("超時工資合计（工資内数）", number(sum("overtime")))}
     </tr><tr>${detail("運転士立替（社報）合计", number(sum("driverAdvanceCompany")))}${detail("運転士立替（旅報）合计", number(sum("driverAdvanceTrip")))}
     ${detail("会社立替（社報）合计", number(sum("companyAdvanceCompany")))}${detail("会社立替（旅報）合计", number(sum("companyAdvanceTrip")))}
-    ${detail("運転士工資合计（含超時及奖励）", number(sum("wages")), 2)}</tr></tbody></table>
+    ${detail("運転士工資合计（含超時及奖励）", number(sum("wages")), 2)}</tr>
+    <tr>${detail("外注運転士費用合计", number(sum("externalDriverFee")), 6)}</tr></tbody></table>
     <div class="cards">
-    <div class="card">ETC 総额<strong>${number(sum("etcCompany") + sum("etcTrip"))}</strong></div>
-    <div class="card">燃油費合计<strong>${number(sum("fuelCost"))}</strong></div>
-    <div class="card">運転士立替合计<strong>${number(sum("driverAdvanceCompany") + sum("driverAdvanceTrip"))}</strong></div>
-    <div class="card">会社立替合计<strong>${number(sum("companyAdvanceCompany") + sum("companyAdvanceTrip"))}</strong></div>
-    <div class="card">運転士工資合计<strong>${number(sum("wages"))}</strong></div></div>
+    ${expenseCategories.map(({ label, amount }) =>
+      `<div class="card">${label}<strong>${number(amount)}</strong></div>`).join("")}</div>
+    <div class="card card--total">支出总和（JPY）<strong>${number(totalExpenses)}</strong></div>
+    <footer>按当前财务编辑内容生成（未自動保存）。支出总和 = ETC ＋ 燃油費 ＋ 運転士立替 ＋ 会社立替 ＋ 外注運転士費用 ＋ 運転士工資。燃油消耗与油价不计入支出总和。油价合计按総燃油費 ÷ 総消耗计算。超時工資已包含在運転士工資中，請勿重复计入。</footer>
     <h2>备注</h2><div class="note">${escapeHtml(data.note)}</div>
-    <footer>按当前财务编辑内容生成（未自動保存）。油价合计按総燃油費 ÷ 総消耗计算。超時工資已包含在運転士工資中，請勿重复计入。</footer>
     </article></div></body></html>`;
 }
 

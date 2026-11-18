@@ -16,3 +16,7 @@
 .driver-finance .finance-date-row{display:flex;align-items:flex-end;gap:12px}
 .driver-finance .finance-date-row .driver-field{flex:1;min-width:0}
 .driver-finance .finance-date-row button{margin-bottom:12px;min-height:42px}
+.driver-finance .finance-file-picker{position:relative;display:inline-flex;align-items:center;min-height:42px;margin-top:9px;padding:10px 14px;border:1px solid #dbe5dd;border-radius:10px;background:white;cursor:pointer}
+.driver-finance .finance-file-picker input[type=file]{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:pointer}
+.driver-finance .finance-file-picker:focus-within{outline:2px solid #416c55;outline-offset:2px}
+.driver-finance fieldset:disabled .finance-file-picker{opacity:.5;cursor:not-allowed}

@@ -21,19 +21,28 @@
 .report :global(.driver-stop-table) tbody th{font-weight:500;text-align:center;height:40px;font-size:10px;white-space:nowrap}
 .report :global(.driver-sheet-location){background:#edf3ef;height:40px}
 .report :global(.driver-sheet-location) > th,.report :global(.driver-sheet-location) > td{height:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
+.report :global(.driver-sheet-location) > th:global(.driver-location-label){white-space:normal;line-height:1.15;overflow:visible}
 .report :global(.driver-sheet-location) :global(.driver-check){height:34px;max-height:34px;overflow:hidden;white-space:nowrap}
 .report :global(.driver-sheet) input:not([type=checkbox]){box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;height:34px;min-height:34px;max-height:34px;margin:0;padding:2px 3px;line-height:28px;background:white;color:inherit;border:1px solid #dbe5dd;border-radius:2px;font-size:16px}
-.report :global(.driver-sheet) input[type=time]{-webkit-appearance:none;appearance:none;padding:2px 0;text-align:center}
+.report :global(.driver-sheet) input[data-manual-time]{padding:2px 0;text-align:center}
 .report :global(.driver-sheet) input[type=time]::-webkit-calendar-picker-indicator{display:none}
 .report :global(.driver-sheet) input[type=time]::-webkit-date-and-time-value{text-align:center;min-width:0;height:28px;line-height:28px;margin:0;padding:0}
 .report :global(.driver-sheet) input[type=time]::-webkit-datetime-edit{display:block;text-align:center;height:28px;line-height:28px;margin:0;padding:0}
 .report :global(.driver-sheet) :global(.driver-time-cell){text-align:center}
 .report :global(.driver-sheet) :global(.driver-check) input{width:auto;min-height:0}
 .report :global(.driver-sheet) p:global(.driver-muted){margin:2px 0;font-size:11px;line-height:1.4}
-.report :global(.driver-stop-actions){display:flex;gap:6px;padding:0}
-.report :global(.driver-stop-actions) :global(.driver-button){flex:1;min-width:0;height:36px;min-height:36px;padding:4px;border-radius:4px;font-size:13px;margin:0}
-.report :global(.driver-stop-add){width:100%}
-.report :global(.driver-stop-add) > :global(.driver-stop-actions){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-.report :global(.driver-stop-add) > :global(.driver-stop-actions) > :global(.driver-button):only-child{grid-column:1/-1}
-.report :global(.driver-stop-row-controls){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;min-width:0}
-.report :global(.driver-stop-add) :global(.driver-button){box-sizing:border-box;flex:1;min-width:0;width:100%;height:36px;min-height:36px;padding:4px;border-radius:4px;font-size:13px}
+.report :global(.driver-stop-address){display:flex;align-items:center;gap:3px;min-width:0}
+.report :global(.driver-stop-address) form{flex:1;min-width:0}
+.report :global(.driver-stop-delete){flex:0 0 30px;width:30px;height:34px;padding:0;border:1px solid #d6b7b7;border-radius:4px;background:#fff;color:#a33;font-size:20px;line-height:1}
+.report :global(.driver-stop-delete):disabled{opacity:.45}
+.report :global(.driver-stop-add){display:flex;justify-content:center;width:100%;margin:8px 0}
+.report :global(.driver-stop-add) :global(.driver-button){box-sizing:border-box;min-width:160px;min-height:44px;margin:0;padding:6px 18px;border-radius:8px;font-size:15px}
+.floatingActions{position:fixed;z-index:40;right:24px;bottom:24px;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:8px;padding:10px;border:1px solid #d5e0d8;border-radius:14px;background:rgba(255,255,255,.97);box-shadow:0 4px 16px rgba(24,52,36,.16);backdrop-filter:blur(8px)}
+.floatingActions :global(.driver-button):only-child{grid-column:1/-1}
+.floatingActions :global(.driver-button){min-height:48px;margin:0;border-radius:12px;font-size:16px;font-weight:650}
+.floatingActions :global(.driver-button:disabled){opacity:.55}
+.report{padding-bottom:100px}
+@media(max-width:639px){
+  .report{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+  .floatingActions{right:0;bottom:0;left:0;grid-template-columns:1fr 1fr;gap:10px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));border:0;border-top:1px solid #d5e0d8;border-radius:0;box-shadow:0 -4px 16px rgba(24,52,36,.12)}
+}

@@ -21,8 +21,9 @@ function load(relative, mocks = {}, globals = {}) {
     require: name => Object.hasOwn(mocks, name) ? mocks[name] :
       name === "@/app/driver/navigation" ? load("app/driver/navigation.tsx", mocks, globals) :
       name === "@/components/report-duty-fields" ? load("components/report-duty-fields.tsx", { "@/lib/driver/reports": reports }) :
-      name === "./report.module.css" ? { default: { report: "driver-report" } } : require(name),
-    Request, Response, Headers, URL, Date, Intl, process, console: { error() {} }, ...globals,
+      name === "@/lib/driver/report-draft" ? load("lib/driver/report-draft.ts") :
+      name === "./report.module.css" ? { default: { report: "driver-report", floatingActions: "driver-report-actions" } } : require(name),
+    Request, Response, Headers, URL, Date, Intl, process, queueMicrotask, console: { error() {} }, ...globals,
   });
   return compiled.exports;
 }
@@ -39,12 +40,222 @@ const fixture = {
   ],
 };
 const checkout = { reportId: null, expectedVersion: 0, requestId: id, action: "checkout",
-  payload: { useDefault: false, address: "Synthetic depot", km: 100 } };
+  payload: { useDefault: false, address: "Synthetic depot", km: 100, departedAt: fixture.departedAt } };
 const defaultsFixture = { serviceDate: fixture.serviceDate, driverName: "Linked driver",
   orders: [{ assignmentId: id, time: "09:00", pickup: "Airport", destination: "Hotel",
     vehicleNumber: "Linked plate", depot: { name: "Vehicle owner", address: "Owner garage" } },
   { assignmentId: id.replace(/1$/, "2"), time: "14:00", pickup: "Hotel", destination: "Airport",
     vehicleNumber: "Second plate", depot: null }] };
+
+function memoryStorage() {
+  const values = new Map();
+  return {
+    get length() { return values.size; },
+    key: index => [...values.keys()][index] ?? null,
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: key => values.delete(key),
+  };
+}
+const walkElements = node => !React.isValidElement(node) ? [] :
+  [node, ...React.Children.toArray(node.props.children).flatMap(walkElements)];
+
+function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, status = 200 } = {}) {
+  const states = [], refs = [], effects = [], events = new Map();
+  const headerInputs = [], tableInputs = [];
+  let stateCursor = 0, refCursor = 0, authChange, cleanup;
+  const document = { visibilityState: "visible",
+    addEventListener: (name, callback) => events.set(name, callback),
+    removeEventListener: name => events.delete(name) };
+  const Component = load("app/driver/report/report.tsx", {
+    react: { ...React,
+      useState: initial => {
+        const index = stateCursor++;
+        if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+        return [states[index], value => { states[index] = typeof value === "function" ? value(states[index]) : value; }];
+      },
+      useRef: initial => {
+        const index = refCursor++;
+        return refs[index] ??= { current: initial };
+      },
+      useEffect: effect => effects.push(effect),
+    },
+    "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "@/lib/driver/orders": { createDriverRequestId: () => id }, "@/lib/driver/reports": reports,
+    "@/lib/supabase/browser": { createClient: () => ({ auth: {
+      getUser: async () => ({ data: { user: { id: user } }, error: null }),
+      onAuthStateChange: callback => {
+        authChange = callback;
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+    } }) },
+  }, {
+    document, sessionStorage: storage, AbortController,
+    window: { addEventListener: document.addEventListener, removeEventListener: document.removeEventListener,
+      confirm: () => { throw new Error("Navigation must not discard the draft."); } },
+    location: { replace() {} }, setInterval: () => 1, clearInterval() {},
+    FormData: class {
+      constructor(form) { this.get = name => form.querySelectorAll().find(input => input.name === name)?.value ?? ""; }
+    },
+    fetch: async (url, options) => options?.method === "POST"
+      ? Response.json(status === 200 ? { report: { ...saved, version: saved.version + 1 } } : { error: "Save failed." }, { status })
+      : Response.json(url.startsWith("/api/driver/report-defaults") ? defaultsFixture
+        : { reports: saved ? [saved] : [], depot: null }),
+  }).default;
+  function render() {
+    stateCursor = 0; refCursor = 0; effects.length = 0;
+    const tree = Component();
+    refs[0].current = { querySelectorAll: () => tableInputs };
+    refs[1].current = { querySelectorAll: () => headerInputs, reportValidity: () => true };
+    return tree;
+  }
+  async function loadPage() {
+    cleanup?.(); render(); cleanup = effects[0]();
+    await new Promise(done => setImmediate(done));
+    return render();
+  }
+  async function loadDefaults() {
+    render(); effects[2]();
+    await new Promise(done => setImmediate(done));
+    return render();
+  }
+  function field(formId, name, value) {
+    const inputs = formId === "report-header" ? headerInputs : tableInputs;
+    const input = inputs.find(item => item.form.id === formId && item.name === name);
+    if (input) input.value = value;
+    else inputs.push({ form: { id: formId }, name, value });
+  }
+  async function edit() {
+    const tree = render();
+    walkElements(tree).find(node => node.props["aria-label"] === "日報基本信息").props.onInput();
+    tree.props.onInput();
+    await new Promise(done => setImmediate(done));
+    return render();
+  }
+  return { states, refs, storage, field, edit, render, loadPage, loadDefaults,
+    signOut: () => authChange("SIGNED_OUT"),
+    visibility: value => { document.visibilityState = value; events.get("visibilitychange")(); },
+    pageHide: () => events.get("pagehide")(),
+  };
+}
+
+test("incomplete report fields survive app switches, navigation and reload without submitting", async () => {
+  const h = draftHarness();
+  await h.loadPage();
+  h.field("report-header", "serviceDate", fixture.serviceDate);
+  h.field("report-header", "vehicleNumber", "Draft plate");
+  h.field("report-header", "passengerCount", "");
+  h.field("report-header", "dutyStartTime", "2");
+  h.field("report-header", "dutyStartDate", "2026-10-27");
+  h.field("report-header", "dutyEndDate", "2026-10-28");
+  h.field("report-header", "dutyEndTime", "0215");
+  h.field("report-header", "dutyEndManual", "0");
+  h.field("report-edit-departure", "address", "Unsaved depot");
+  h.field("report-edit-departure", "km", "");
+  h.field("report-edit-return", "address", "Unsaved return");
+  const tree = await h.edit();
+  assert.equal(walkElements(tree).find(node => node.type?.name === "DriverNavigation").props.canLeave(), true);
+  h.visibility("hidden");
+  assert.notEqual(h.states[0], null, "hiding must not destroy the live form");
+  h.pageHide();
+  h.visibility("visible");
+  await h.loadPage();
+  assert.equal(h.states[9], true);
+  const restored = draftHarness({ storage: h.storage });
+  const html = renderToStaticMarkup(await restored.loadPage());
+  for (const value of ["Draft plate", "Unsaved depot", "Unsaved return", "0215"])
+    assert.ok(html.includes(`value="${value}"`), value);
+  assert.match(html, /name="dutyStartTime"[^>]*value="2"/);
+  assert.match(html, /name="dutyEndManual"[^>]*value="0"/);
+  assert.match(html, /name="passengerCount"[^>]*value=""/);
+  assert.match(html, /aria-label="出库公里表"[^>]*value=""/);
+  assert.match(html, /已恢复本机草稿/);
+});
+
+test("draft storage is account-isolated, rejects stale versions and is cleared on sign-out", async () => {
+  const h = draftHarness();
+  await h.loadPage();
+  h.field("report-header", "vehicleNumber", "Private draft");
+  await h.edit();
+  const other = draftHarness({ storage: h.storage, user: id.replace(/1$/, "2") });
+  assert.doesNotMatch(renderToStaticMarkup(await other.loadPage()), /Private draft/);
+  const changed = draftHarness({ storage: h.storage, saved: { ...fixture, version: 2 } });
+  const html = renderToStaticMarkup(await changed.loadPage());
+  assert.match(html, /服务器日報已有更新/);
+  assert.doesNotMatch(html, /value="Private draft"/);
+  assert.equal(h.storage.length, 1, "conflicting draft is not silently discarded");
+  h.signOut();
+  assert.equal(h.storage.length, 0);
+});
+
+test("new report draft restores its date, selected order and incomplete departure", async () => {
+  const h = draftHarness({ saved: null });
+  await h.loadPage();
+  h.states[10] = fixture.serviceDate;
+  h.states[12] = defaultsFixture.orders[1].assignmentId;
+  h.field("report-header", "serviceDate", fixture.serviceDate);
+  h.field("report-checkout", "address", "New draft depot");
+  h.field("report-checkout", "departedAt", "09");
+  await h.edit();
+  const restored = draftHarness({ storage: h.storage, saved: null });
+  const html = renderToStaticMarkup(await restored.loadPage());
+  assert.equal(restored.states[10], fixture.serviceDate);
+  assert.equal(restored.states[12], defaultsFixture.orders[1].assignmentId);
+  assert.equal(restored.states[8], true);
+  assert.match(html, /value="New draft depot"/);
+  assert.match(html, /name="departedAt"[^>]*value="09"/);
+  await restored.loadDefaults();
+  assert.equal(restored.states[12], defaultsFixture.orders[1].assignmentId, "loading defaults must not reset the restored order");
+});
+
+for (const status of [200, 409])
+test(`report save ${status === 200 ? "clears" : "retains"} the local draft`, async () => {
+  const h = draftHarness({ status });
+  await h.loadPage();
+  h.field("report-header", "vehicleNumber", "Draft");
+  const tree = await h.edit();
+  const save = walkElements(tree).find(node => node.type?.name === "AddStopForm").props.save;
+  await save("edit_stops", { stops: [], force: true });
+  assert.equal(h.storage.length, status === 200 ? 0 : 1);
+});
+
+test("stop mutations rebase the draft without losing other unfinished fields", async () => {
+  const h = draftHarness();
+  await h.loadPage();
+  h.field("report-header", "vehicleNumber", "Unfinished plate");
+  h.field(`report-stop-${id}`, "address", "Removed draft stop");
+  const tree = await h.edit();
+  const save = walkElements(tree).find(node => node.type?.name === "AddStopForm").props.save;
+  await save("remove_stop", { stopId: id });
+  const stored = JSON.parse(h.storage.getItem(`driver-report-draft:${id}`));
+  assert.equal(stored.version, 2);
+  assert.equal(stored.fields["report-header/vehicleNumber"], "Unfinished plate");
+  assert.equal(stored.fields[`report-stop-${id}/address`], undefined);
+});
+
+test("storage errors are visible and prevent navigation from discarding edits", async () => {
+  const storage = memoryStorage();
+  storage.setItem = () => { throw new Error("Storage blocked"); };
+  const h = draftHarness({ storage });
+  await h.loadPage();
+  h.field("report-header", "vehicleNumber", "Keep live");
+  const tree = await h.edit();
+  assert.equal(walkElements(tree).find(node => node.type?.name === "DriverNavigation").props.canLeave(), false);
+  assert.match(renderToStaticMarkup(h.render()), /无法保留本机草稿/);
+  assert.notEqual(h.states[0], null);
+});
+
+test("signing out from other driver sections clears only report draft keys", () => {
+  const { clearReportDrafts } = load("lib/driver/report-draft.ts");
+  const storage = memoryStorage();
+  storage.setItem(`driver-report-draft:${id}`, "{}");
+  storage.setItem("unrelated", "retain");
+  clearReportDrafts(storage);
+  assert.equal(storage.length, 1);
+  assert.equal(storage.getItem("unrelated"), "retain");
+  assert.match(readFileSync(new URL("../app/driver/driver-brand.tsx", import.meta.url), "utf8"),
+    /signOutError\) throw signOutError;[\s\S]*clearReportDrafts\(sessionStorage\)/);
+});
 
 test("saved reports poll latest plates but never overwrite dirty or saving forms, including late responses", async () => {
   for (const mode of ["clean", "dirty", "saving", "late-dirty"]) {
@@ -85,6 +296,26 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
     assert.match(html, /日報关联訂単/);
     assert.match(html, /修改并保存也会更新訂単/);
   }
+});
+
+test("report action buttons remain fixed above the viewport", () => {
+  const css = readFileSync(new URL("../app/driver/report/report.module.css", import.meta.url), "utf8");
+  assert.match(css, /\.floatingActions\{[^}]*position:fixed/);
+  assert.match(css, /@media\(max-width:639px\)\{[\s\S]*?\.floatingActions\{[^}]*left:0/);
+});
+
+test("new report shortcut stays visible while report data is loading", () => {
+  const states = [null, null, "", "", true, false, 0, Date.now(), false, false,
+    fixture.serviceDate, null, "", ""];
+  let cursor = 0;
+  const Component = load("app/driver/report/report.tsx", {
+    react: { ...React, useEffect() {}, useRef: value => ({ current: value }),
+      useState: () => [states[cursor++], () => {}] },
+    "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "@/lib/supabase/browser": {}, "@/lib/driver/orders": {}, "@/lib/driver/reports": reports,
+  }).default;
+  const html = renderToStaticMarkup(React.createElement(Component));
+  assert.match(html, /刷新日報<\/button><button class="driver-link" disabled="" title="日报加载完成后可新建" aria-label="新建日报（日报加载完成后可新建）">＋ 新建日报<\/button>/);
 });
 
 test("report defaults API validates date and identity and exposes only minimal no-store defaults", async () => {
@@ -155,14 +386,15 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.equal(checkoutProps.disabled, false);
   assert.match(html, /value="Linked plate"/);
   assert.match(html, /value="Linked driver"/);
-  assert.match(html, /value="Owner garage"/);
+  assert.doesNotMatch(html, /value="Owner garage"/);
   assert.doesNotMatch(html, /Wrong address|Wrong depot/);
   select.onChange({ target: { value: defaultsFixture.orders[1].assignmentId } });
   html = render();
   assert.match(html, /value="Second plate"/);
   assert.match(html, /請手動填写/);
   assert.doesNotMatch(html, /value="Owner garage"/);
-  assert.equal(await checkoutProps.save({ useDefault: false, address: "Manual garage", km: 100 }), true);
+  assert.equal(await checkoutProps.save({ useDefault: false, address: "Manual garage", km: 100,
+    departedAt: fixture.departedAt }), true);
   assert.equal(sent.payload.useDefault, false);
   assert.equal(sent.payload.address, "Manual garage");
   assert.equal(sent.payload.header.vehicleNumber, "Manual plate");
@@ -275,6 +507,7 @@ test("manual return is optional until filled, rolls past midnight and remains ed
   const command = { reportId: id, expectedVersion: 1, requestId: id, action: "edit_stops", payload: { stops: [], return: returned } };
   assert.equal(reports.reportCommandSchema.safeParse(command).success, true);
   assert.equal(reports.reportCommandSchema.safeParse({ ...command, payload: { stops: [], return: { ...returned, km: -1 } } }).success, false);
+  assert.equal(reports.reportCommandSchema.safeParse({ ...command, payload: { stops: [], return: returned, force: true } }).success, true);
 });
 test("departure editing keeps its original Japan date, preserves seconds and validates input", () => {
   const form = fields => ({ get: name => fields[name] ?? "" });
@@ -315,6 +548,32 @@ test("time-only stops roll forward in Japan across midnight, month and year boun
   assert.equal(second.arrivedAt, "2026-10-27T15:20:00.000Z");
   assert.equal(second.departedAt, "2026-10-27T15:40:00.000Z");
   assert.equal(reports.reportTotals({ ...fixture, stops: [first, second] }).restMs, 35 * 60000);
+});
+test("force save preserves invalid fields and out-of-order times without changing saved values", () => {
+  const previous = "2026-10-27T23:00:00+09:00";
+  assert.equal(reports.stopTime("09:00", previous), "2026-10-28T00:00:00.000Z");
+  assert.equal(reports.stopTime("09:00", previous, null, true), "2026-10-27T00:00:00.000Z");
+  assert.equal(reports.stopTime("bad", previous, previous, true), previous);
+  assert.equal(reports.stopTime("", previous, previous, true), previous);
+  const form = fields => ({ get: name => fields[name] ?? "" });
+  const departure = reports.departureFromForm(fixture, form({ address: "", km: "-1", departedAt: "25:61" }), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(departure)),
+    { address: fixture.departureAddress, km: fixture.departureKm, departedAt: fixture.departedAt });
+  const open = { ...fixture, returnedAt: null, returnAddress: null, returnKm: null };
+  assert.equal(reports.returnFromForm(open, form({ address: "Return", km: "-1", returnedAt: "bad" }),
+    fixture.departedAt, true), undefined);
+  const keptReturn = reports.returnFromForm(fixture, form({ address: "", km: "99999999", returnedAt: "bad" }),
+    fixture.departedAt, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(keptReturn)),
+    { address: fixture.returnAddress, km: fixture.returnKm, returnedAt: fixture.returnedAt });
+  const stop = { id, address: "Saved stop", arrivedAt: fixture.departedAt, arrivedKm: 100,
+    departedAt: fixture.returnedAt, departedKm: 110 };
+  const keptStop = reports.stopFromForm(stop, form({ address: "", km: "-1", arrivedAt: "bad", departedAt: "" }),
+    fixture.departedAt, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(keptStop)), stop);
+  const outOfOrderStop = reports.stopFromForm(stop, form({ address: "Saved stop", km: "110",
+    arrivedAt: "08:00", departedAt: "07:00" }), fixture.departedAt, true);
+  assert.ok(Date.parse(outOfOrderStop.departedAt) < Date.parse(outOfOrderStop.arrivedAt));
 });
 function handler({ deny, data = { reports: [], depot: null }, error = null } = {}) {
   const calls = [];
@@ -390,9 +649,25 @@ test("manual time input is unambiguously Japanese even across year boundary", ()
   assert.equal(reports.fromJapanInput("2027-01-01T00:00:00"), "2026-12-31T15:00:00.000Z");
   assert.equal(reports.fromJapanInput(""), null);
 });
+
+test("manual clock entry formats four digits as HH:mm", () => {
+  assert.equal(reports.formatManualClock("0900"), "09:00");
+  assert.equal(reports.formatManualClock("2359"), "23:59");
+  assert.equal(reports.formatManualClock("09:00"), "09:00");
+  assert.equal(reports.formatManualClock(""), "");
+});
 test("checkout commands require odometers and either a default depot or explicit location", () => {
   assert.equal(reports.reportCommandSchema.safeParse(checkout).success, true);
-  assert.equal(reports.reportCommandSchema.safeParse({ ...checkout, payload: { useDefault: true, address: "", km: 0 } }).success, true);
+  assert.equal(reports.reportCommandSchema.safeParse({ ...checkout,
+    payload: { useDefault: true, address: "", km: 0, departedAt: fixture.departedAt } }).success, true);
+  assert.equal(reports.reportCommandSchema.safeParse({ ...checkout,
+    payload: { useDefault: false, address: "x", km: 1 } }).success, false);
+  assert.equal(reports.reportCommandSchema.safeParse({ ...checkout,
+    payload: { ...checkout.payload, departedAt: "not-a-time" } }).success, false);
+  assert.equal(reports.reportCommandSchema.safeParse({ ...checkout,
+    payload: { ...checkout.payload, force: true } }).success, true);
+  assert.equal(reports.reportCommandSchema.safeParse({ ...checkout,
+    payload: { ...checkout.payload, force: "true" } }).success, false);
   for (const payload of [
     { useDefault: false, address: "", km: 10 },
     { useDefault: false, address: "x", km: -1 },
@@ -403,6 +678,36 @@ test("checkout commands require odometers and either a default depot or explicit
     { useDefault: false, address: "x".repeat(301), km: 1 },
   ]) assert.equal(reports.reportCommandSchema.safeParse({ ...checkout, payload }).success, false);
   assert.equal(reports.reportCommandSchema.safeParse({ ...checkout, reportId: id }).success, false);
+});
+test("force-save migration bypasses only report sequence validation", () => {
+  const migration = readFileSync(new URL("../supabase/migrations/20261120000000_driver_report_force_save.sql", import.meta.url), "utf8");
+  assert.match(migration, /set_config\(''app\.driver_report_force''/);
+  assert.match(migration, /not force_order and \(a<t or a>finish or n<k\)/);
+  assert.match(migration, /not force_order and \(b<t or b>finish or n<k\)/);
+  assert.match(migration, /return_shape_check/);
+  assert.match(migration, /return_km between 0 and 9999999/);
+  assert.match(migration, /Invalid force-save request/);
+});
+test("filled stop deletion migration removes only the empty-stop restriction", () => {
+  const migration = readFileSync(new URL("../supabase/migrations/20261121000000_driver_report_delete_filled_stops.sql", import.meta.url), "utf8");
+  assert.match(migration, /not force_order and n<k/);
+  assert.match(migration, /not force_order and \(pending or r\.returned_at<t or r\.return_km<k\)/);
+  assert.match(migration, /pending and not force_order and/);
+  assert.match(migration, /when ''remove_stop'' then array\[''stopId''\]/);
+  assert.match(migration, /Only empty stops can be removed/);
+  assert.match(migration, /Could not allow removal of filled stops/);
+});
+test("returned reports can append and delete stops", () => {
+  const migration = readFileSync(new URL("../supabase/migrations/20261122000000_driver_report_closed_stop_edits.sql", import.meta.url), "utf8");
+  assert.match(migration, /target_action not in \(''edit_stop'',''edit_stops'',''add_stop'',''remove_stop''\)/);
+  assert.match(migration, /elsif target_action=''add_stop'' then[\s\S]*app\.driver_report_force/);
+  assert.match(migration, /elsif target_action=''remove_stop'' then[\s\S]*app\.driver_report_force/);
+});
+test("manual checkout migration stores a supplied departure time and preserves legacy RPC callers", () => {
+  const migration = readFileSync(new URL("../supabase/migrations/20261119000000_driver_manual_checkout.sql", import.meta.url), "utf8");
+  assert.match(migration, /''departedAt'',''header''/);
+  assert.match(migration, /array_remove\(array_remove\(allowed,''header''\),''departedAt''\)/);
+  assert.match(migration, /coalesce\(\(payload->>''departedAt''\)::timestamptz,stamp\)/);
 });
 test("every report command has a strict payload and corrections need no reason but require time offsets", () => {
   const base = { reportId: id, expectedVersion: 1, requestId: id };
@@ -443,7 +748,7 @@ test("reports API denies anonymous, suspended or pending before touching RPC", a
     assert.equal(h.calls.length, 0);
   }
 });
-test("blank stop removal requires a strict ID and preserves nonempty fields including zero km", async () => {
+test("stop removal accepts a strict ID regardless of saved fields", async () => {
   const blank = { id, address: "", plannedKm: null, arrivedAt: null, arrivedKm: null, departedAt: null, departedKm: null };
   assert.equal(reports.isBlankReportStop(blank), true);
   for (const change of [{ address: "Filled" }, { plannedKm: 0 }, { arrivedKm: 0 }, { departedKm: 0 },
@@ -457,7 +762,7 @@ test("blank stop removal requires a strict ID and preserves nonempty fields incl
   assert.deepEqual(JSON.parse(JSON.stringify(h.calls[0].args.payload)), { stopId: id });
   const denied = await handler({ error: { code: "22023" } }).POST(request(command));
   assert.equal(denied.status, 422);
-  assert.match((await denied.json()).error, /只能删除全空/);
+  assert.match((await denied.json()).error, /无法削除该经由地/);
   for (const payload of [{}, { stopId: "bad" }, { stopId: id, driverId: id }, { stopId: id, force: true }]) {
     const invalid = handler();
     assert.equal((await invalid.POST(request({ ...command, payload }))).status, 400);
@@ -553,7 +858,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
       departedAt: closed ? "2026-10-28T00:15:00+09:00" : null, departedKm: closed ? 120 : null }],
       returnedAt: closed ? fixture.returnedAt : null,
       returnAddress: closed ? fixture.returnAddress : null, returnKm: closed ? fixture.returnKm : null };
-    const values = [{ reports: [r], depot: null }, null, "", "", false, false, 0, Date.parse(fixture.returnedAt), false];
+    const values = [{ reports: [r], depot: null }, null, "", "", false, false, 0, Date.parse(fixture.returnedAt), false, false];
     const runtime = require("react/jsx-runtime");
     const checkKeys = create => (type, props, ...rest) => {
       const children = [props?.children].flat(Infinity).filter(React.isValidElement);
@@ -576,12 +881,22 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('aria-label="退勤点呼時間"'));
     assert.ok(html.indexOf('aria-label="運転手"') < html.indexOf('aria-label="出勤点呼時間"'));
     assert.match(html, /<details[^>]*><summary>历史日報<\/summary>/);
+    const historyOptions = html.match(/<summary>历史日報<\/summary>[\s\S]*?<select[^>]*>([\s\S]*?)<\/select>/)?.[1];
+    assert.ok(historyOptions);
+    assert.match(historyOptions, new RegExp(`<option value="${fixture.id}"(?: selected="")?>${fixture.serviceDate}</option>`));
+    assert.doesNotMatch(historyOptions, /已归库|出库中|\d{2}:\d{2}/);
     assert.ok(html.indexOf('aria-label="日報基本信息"') < html.indexOf('<table'));
     assert.ok(html.indexOf('<summary>历史日報') > html.indexOf('</table>'));
     assert.ok(html.includes('class="driver-main driver-report"'));
-    assert.ok(html.includes("拘束時間"));
-    assert.ok(html.includes("累计休息"));
-    assert.ok(html.includes("当日公里数"));
+    assert.match(html, /aria-label="日報修改和保存"/);
+    assert.match(html, /class="driver-report-actions" role="group" aria-label="日報修改和保存"/);
+    assert.match(html, /<button[^>]*aria-pressed="true"[^>]*disabled=""[^>]*>修改中<\/button>/);
+    assert.match(html, /<button[^>]*disabled=""[^>]*>保存<\/button>/);
+    assert.doesNotMatch(html, />强制保存<\/button>/);
+    const reportSummary = html.match(/<section class="driver-card"><h2>本次汇総<\/h2>([\s\S]*?)<\/section>/)?.[1];
+    assert.ok(reportSummary);
+    assert.deepEqual([...reportSummary.matchAll(/<span>([^<]+)/g)].map(match => match[1].replace("（进行中）", "")),
+      ["当日公里数", "休憩時間", "拘束時間"]);
     assert.doesNotMatch(html, /出库至归库総時长|行驶公里数/);
     assert.doesNotMatch(html, /开始休息|结束休息|休息記録|停車或等候不会自動计为休息/);
     assert.doesNotMatch(html, /休息自動按各经由地到着至出発的時长累计/);
@@ -593,6 +908,19 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.equal((html.match(/<thead>/g) ?? []).length, 1);
     const routeSection = html.match(/<section[^>]*aria-label="出库经由地归库"[^>]*>([\s\S]*?)<\/section>/)?.[1];
     assert.ok(routeSection);
+    assert.doesNotMatch(routeSection, /保存修改/);
+    assert.doesNotMatch(routeSection, /开始新一次出库/);
+    assert.match(html, /class="driver-toolbar">[\s\S]*刷新日報<\/button>[\s\S]*＋ 新建日报<\/button>/);
+    if (closed) {
+      assert.match(html, /刷新日報<\/button><button class="driver-link"[^>]*aria-label="新建日报"[^>]*>＋ 新建日报<\/button>/);
+      assert.doesNotMatch(html, /新建日报（请先完成当前出库中的日报）/);
+    } else {
+      assert.match(html, /刷新日報<\/button><button class="driver-link" disabled="" title="请先完成当前出库中的日报" aria-label="新建日报（请先完成当前出库中的日报）">＋ 新建日报<\/button>/);
+    }
+    assert.match(routeSection, /aria-label="追加空白经由地">/);
+    assert.match(routeSection, /aria-label="削除经由地 1"[^>]*>×<\/button>/);
+    assert.doesNotMatch(routeSection, /disabled=""/);
+    assert.match(html, /日報默认处于修改状态/);
     assert.ok(routeSection.includes('aria-label="出库記録"'));
     assert.ok(routeSection.includes("Synthetic depot"));
     assert.ok(routeSection.includes('aria-label="经由地 1"'));
@@ -605,23 +933,27 @@ test("mobile report renders departure, stops, rest controls and completed totals
     const departureHtml = html.match(/<tbody aria-label="出库記録">([\s\S]*?)<\/tbody>/)[1];
     assert.equal((departureHtml.match(/<tr\b/g) ?? []).length, 1);
     assert.match(departureHtml, /data-departure/);
-    assert.match(departureHtml, /aria-label="出库地点地址"/);
+    assert.match(departureHtml, /scope="row" class="driver-location-label"><span>開始<br\/>地点<\/span><\/th>/);
+    assert.match(departureHtml, /aria-label="開始地点地址"/);
     assert.match(departureHtml, /aria-label="出库公里表"/);
     assert.match(departureHtml, /aria-label="出库時間"/);
-    assert.match(departureHtml, /type="time"[^>]*value="23:00"/);
+    assert.match(departureHtml, /data-manual-time[^>]*value="23:00"/);
     for (const label of ["归库"]) {
       const locationHtml = html.match(new RegExp(`<tbody aria-label="${label}記録">([\\s\\S]*?)</tbody>`))[1];
       assert.equal((locationHtml.match(/<tr\b/g) ?? []).length, 1);
       assert.equal((locationHtml.match(/<td\b/g) ?? []).length, 4);
-      assert.match(locationHtml, /aria-label="归库時間" type="time"/);
+      assert.match(locationHtml, /scope="row" class="driver-location-label"><span>終了<br\/>地点<\/span><\/th>/);
+      assert.match(locationHtml, /aria-label="終了地点地址"/);
+      assert.match(locationHtml, /aria-label="归库時間" type="text" inputMode="numeric"/);
       assert.match(locationHtml, /data-return/);
       assert.doesNotMatch(locationHtml, /scope="row">時間|>\d{4}-\d{2}-\d{2}/);
     }
     assert.match(html, /scope="col">地址<\/th><th scope="col">公里数<\/th><th scope="col">到着<\/th><th scope="col">出発/);
-    assert.match(html, /class="driver-sheet-location"><th scope="row">经由1<\/th><td><form[^>]*>[\s\S]*?name="address"[\s\S]*?<\/form><\/td><td class="driver-stop-km">/);
-    assert.match(html, /<input(?=[^>]*name="arrivedAt")(?=[^>]*type="time")(?=[^>]*step="60")[^>]*>/);
-    assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*type="time")(?=[^>]*step="60")[^>]*>/);
+    assert.match(html, /class="driver-sheet-location"><th scope="row">经由1<\/th><td><div class="driver-stop-address"><form[^>]*>[\s\S]*?name="address"[\s\S]*?<\/form>[\s\S]*?<\/div><\/td><td class="driver-stop-km">/);
+    assert.match(html, /<input(?=[^>]*name="arrivedAt")(?=[^>]*data-manual-time)(?=[^>]*inputMode="numeric")[^>]*>/);
+    assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*data-manual-time)(?=[^>]*inputMode="numeric")[^>]*>/);
     const stopHtml = html.match(/<tbody aria-label="经由地 1">([\s\S]*?)<\/tbody>/)[1];
+    assert.match(stopHtml, /aria-label="削除经由地 1"[^>]*>×<\/button>/);
     assert.equal((stopHtml.match(/type="number"/g) ?? []).length, 1);
     assert.match(stopHtml, /<input(?=[^>]*name="km")(?=[^>]*type="number")(?=[^>]*value="120")[^>]*>/);
     assert.doesNotMatch(stopHtml, /name="arrivedKm"|name="departedKm"|到着 km|出発 km/);
@@ -630,8 +962,8 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.doesNotMatch(html.replace(/<[^>]*>/g, ""), /(?:\s|T)\d{2}:\d{2}:\d{2}/);
     assert.doesNotMatch(html, /時間打卡|本次記録：/);
     assert.doesNotMatch(html, /一键到达打卡|一键出発打卡/);
-    assert.ok(html.includes("保存修改"));
-    assert.equal((html.match(/>保存修改<\/button>/g) ?? []).length, 1);
+    assert.doesNotMatch(html, /保存修改/);
+    assert.equal((html.match(/>保存<\/button>/g) ?? []).length, 1);
     assert.equal(html.includes('value="clock"'), false);
     assert.doesNotMatch(html, /填写原因|留痕|保留記録|name="reason"/);
     layouts.push(html);
@@ -645,7 +977,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
   }
 });
 
-for (const mode of ["edit_stops", "manual_return", "change_date", "add_stop", "remove_stop"]) for (const success of [true, false])
+for (const mode of ["edit_stops", "force_edit_stops", "manual_return", "change_date", "add_stop", "remove_stop"]) for (const success of [true, false])
 test(`${mode} ${success ? "updates report" : "retains failed edits"} without reload`, async () => {
   const action = ["add_stop", "remove_stop"].includes(mode) ? mode : "edit_stops";
   const runtime = require("react/jsx-runtime");
@@ -661,26 +993,37 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
   const dated = reports.reportOnDate(before, header.serviceDate);
   const updated = { ...dated, header: { vehicleNumber: header.vehicleNumber, driverName: header.driverName, passengerCount: header.passengerCount },
     ...(mode === "manual_return" ? { returnedAt: fixture.returnedAt, returnAddress: "Return depot", returnKm: 150 } : {}),
-    version: 2, stops: action === "remove_stop" ? stops.filter((_, i) => i !== 2) : action === "add_stop" ? [...stops, blank] :
+    version: 2, stops: action === "remove_stop" ? stops.filter((_, i) => i !== 0) : action === "add_stop" ? [...stops, blank] :
     dated.stops.map(s => ({ ...s, address: `${s.address} updated` })) };
   const states = [{ reports: [before], depot: null }, null, "", "", false, false, 0, Date.now(), false, true];
-  let cursor = 0; let refCursor = 0; let toolbar; let calls = 0;
-  const forms = stops.map((s, i) => ({ reportValidity: () => true, checkValidity: () => true, fields: {
-    address: i === 3 ? "Unsaved last row" : s.address ? `${s.address} updated` : "", km: s.arrivedKm === null ? "" : String(s.arrivedKm),
-    arrivedAt: reports.toJapanInput(s.arrivedAt).slice(11, 16), departedAt: reports.toJapanInput(s.departedAt).slice(11, 16),
+  let cursor = 0; let refCursor = 0; let toolbar; let bottomSave; let calls = 0;
+  const stopRows = new Map();
+  const forms = stops.map((s, i) => ({ reportValidity: () => mode !== "force_edit_stops", checkValidity: () => true, fields: {
+    address: i === 3 ? "Unsaved last row" : s.address ? `${s.address} updated` : "",
+    km: mode === "force_edit_stops" && i === 0 ? "-1" : s.arrivedKm === null ? "" : String(s.arrivedKm),
+    arrivedAt: mode === "force_edit_stops" && i === 0 ? "bad" : reports.toJapanInput(s.arrivedAt).slice(11, 16),
+    departedAt: mode === "force_edit_stops" && i === 0 ? "" : reports.toJapanInput(s.departedAt).slice(11, 16),
   } }));
-  const departureForm = { reportValidity: () => true, fields: {
-    address: "Updated depot", km: "99", departedAt: "22:30",
+  const departureForm = { reportValidity: () => mode !== "force_edit_stops", fields: {
+    address: mode === "force_edit_stops" ? "" : "Updated depot",
+    km: mode === "force_edit_stops" ? "-1" : "99",
+    departedAt: mode === "force_edit_stops" ? "bad" : "22:30",
   } };
-  const headerElement = { reportValidity: () => true, fields: {
+  const headerElement = { reportValidity: () => mode !== "force_edit_stops", fields: {
     ...header, passengerCount: "3",
   } };
+  headerElement.querySelectorAll = () => Object.entries(headerElement.fields)
+    .map(([name, value]) => ({ name, value: String(value ?? ""), form: { id: "report-header" } }));
   const table = { querySelector: selector => selector === "form[data-departure]" ? departureForm :
     selector === "form[data-return]" ? { reportValidity: () => true, fields: mode === "manual_return" ?
       { address: "Return depot", km: "150", returnedAt: "02:30" } : {} } :
-    forms[stops.findIndex(s => selector.includes(s.id))] };
+    forms[stops.findIndex(s => selector.includes(s.id))],
+    querySelectorAll: () => forms.flatMap((form, i) => Object.entries(form.fields)
+      .map(([name, value]) => ({ name, value, form: { id: `report-stop-${stops[i].id}` } }))) };
   const capture = create => (type, props, ...rest) => {
     if (typeof type === "function" && type.name === "AddStopForm") toolbar = props;
+    if (typeof type === "function" && type.name === "StopRow") stopRows.set(props.stop.id, props);
+    if (type === "button" && props.children === "保存") bottomSave = props;
     return create(type, props, ...rest);
   };
   const Component = load("app/driver/report/report.tsx", {
@@ -691,6 +1034,7 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
     "@/lib/supabase/browser": {}, "@/lib/driver/orders": { createDriverRequestId: () => id }, "@/lib/driver/reports": reports,
   }, {
     FormData: class { constructor(form) { this.get = name => form.fields[name] ?? ""; } },
+    window: { confirm: () => true },
     fetch: async (url, options) => {
       calls++;
       assert.equal(url, "/api/driver/reports");
@@ -699,8 +1043,16 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
       if (action === "edit_stops") {
         assert.equal(body.payload.stops.length, 2);
         assert.deepEqual(body.payload.header, header);
-        assert.deepEqual(body.payload.departure, { address: "Updated depot", km: 99,
-          departedAt: mode === "change_date" ? "2026-10-25T13:30:00.000Z" : "2026-10-27T13:30:00.000Z" });
+        assert.equal(body.payload.force, true);
+        assert.deepEqual(body.payload.departure, mode === "force_edit_stops"
+          ? { address: fixture.departureAddress, km: fixture.departureKm, departedAt: fixture.departedAt }
+          : { address: "Updated depot", km: 99,
+            departedAt: mode === "change_date" ? "2026-10-25T13:30:00.000Z" : "2026-10-27T13:30:00.000Z" });
+        if (mode === "force_edit_stops") {
+          assert.equal(body.payload.stops[0].address, "Stop 0 updated");
+          assert.equal(body.payload.stops[0].arrivedAt, stops[0].arrivedAt);
+          assert.equal(body.payload.stops[0].arrivedKm, stops[0].arrivedKm);
+        }
         if (mode === "change_date") {
           assert.equal(reports.toJapanInput(body.payload.stops[0].arrivedAt).slice(0, 10), "2026-10-25");
           assert.equal(reports.toJapanInput(body.payload.stops[1].departedAt).slice(0, 10), "2026-10-26");
@@ -710,7 +1062,7 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
           assert.equal(body.payload.return.km, 150);
           assert.equal(Date.parse(body.payload.return.returnedAt), Date.parse(fixture.returnedAt));
         } else assert.equal(Object.hasOwn(body.payload, "return"), false);
-      } else if (action === "remove_stop") assert.deepEqual(body.payload, { stopId: stops[2].id });
+      } else if (action === "remove_stop") assert.deepEqual(body.payload, { stopId: stops[0].id });
       else assert.deepEqual(body.payload, { address: "", arrivedAt: null, departedAt: null });
       assert.equal(body.expectedVersion, 1);
       return success ? Response.json({ report: updated }) : Response.json({ error: "Version conflict: refresh to verify." }, { status: 409 });
@@ -718,14 +1070,18 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
   }).default;
   renderToStaticMarkup(React.createElement(Component));
   assert.equal(toolbar.disabled, false);
-  if (action === "edit_stops") await toolbar.saveChanges();
-  else if (action === "remove_stop") await toolbar.removeStop();
+  if (action === "edit_stops") await bottomSave.onClick();
+  else if (action === "remove_stop") {
+    assert.equal(stopRows.get(stops[0].id).stop.address, "Stop 0");
+    await stopRows.get(stops[0].id).removeStop(stops[0].id);
+  }
   else await toolbar.save("add_stop", { address: "", arrivedAt: null, departedAt: null });
   assert.equal(calls, 1);
   assert.equal(states[0].reports[0].version, success ? 2 : 1);
   if (mode === "change_date") assert.equal(states[0].reports[0].serviceDate, success ? header.serviceDate : fixture.serviceDate);
   if (mode === "manual_return") assert.equal(states[0].reports[0].returnedAt, success ? fixture.returnedAt : null);
-  assert.equal(states[0].reports[0].stops[1].address, success && action === "edit_stops" ? "Stop 1 updated" : "Stop 1");
+  assert.equal(states[0].reports[0].stops[1].address, success && action === "edit_stops" ? "Stop 1 updated" :
+    success && action === "remove_stop" ? "" : "Stop 1");
   if (action === "add_stop") {
     assert.equal(states[0].reports[0].stops.length, success ? 3 : 2);
     assert.equal(forms[1].fields.address, "Stop 1 updated");
@@ -734,24 +1090,16 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
     assert.equal(states[0].reports[0].stops.length, success ? 3 : 4);
     assert.equal(forms[3].fields.address, "Unsaved last row");
     if (!success) assert.match(states[2], /Version conflict/);
-    forms[2].checkValidity = () => false;
-    await toolbar.removeStop();
-    assert.equal(calls, 1);
-    assert.match(states[2], /没有可删除/);
-    forms[2].checkValidity = () => true;
-    forms[2].fields.km = "0";
-    await toolbar.removeStop();
-    assert.equal(calls, 1);
-    assert.match(states[2], /没有可删除/);
   }
   assert.equal(states[4], false);
   assert.equal(states[6], 0);
   assert.equal(states[9], !success || ["add_stop", "remove_stop"].includes(action));
-  assert.equal(states[3], success ? action === "add_stop" ?
-    "空白经由地已保存，填写修改后請点“保存修改”。" : action === "remove_stop" ?
-      "已删除一条空白经由地，其他未保存的修改仍保留。" : "已保存。" : "");
+  assert.equal(states[3], success ? action === "edit_stops" ?
+    "已强制保存；无效或缺失字段沿用已保存内容，可之后修改。" : action === "add_stop" ?
+      "空白经由地已添加，填写完成后請点悬浮“保存”按钮。" : action === "remove_stop" ?
+        "经由地已削除，其他未保存的修改仍保留。" : "已保存。" : "");
   if (!success) {
-    assert.match(states[2], action === "remove_stop" ? /没有可删除/ : /Version conflict/);
+    assert.match(states[2], /Version conflict/);
     assert.equal(forms[1].fields.address, "Stop 1 updated");
   }
 });
@@ -772,14 +1120,19 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   assert.match(html, /aria-label="出库经由地归库"[\s\S]*<table[\s\S]*id="report-checkout"/);
   assert.equal((html.match(/<table\b/g) ?? []).length, 1);
   assert.match(html, /form="report-checkout"[^>]*name="km"|name="km"[^>]*form="report-checkout"/);
-  assert.ok(html.includes("Vehicle owner"));
-  assert.ok(html.includes("Owner garage"));
+  assert.doesNotMatch(html, /Vehicle owner|Owner garage/);
   assert.ok(html.includes('value="Linked driver"'));
   assert.ok(html.includes('value="Linked plate"'));
   assert.doesNotMatch(html, /Synthetic office|Synthetic default|type="checkbox"/);
-  assert.ok(html.includes(">出库打卡</button>"));
-  assert.ok(html.includes("出库后，在表格内继续添加经由地。"));
-  assert.doesNotMatch(html, /aria-label="出库記録"|新经由地地址/);
+  assert.match(html, /class="driver-report-actions" role="group" aria-label="開始地点保存"[\s\S]*form="report-checkout"[^>]*>保存開始地点<\/button>/);
+  assert.doesNotMatch(html, /强制保存|name="force"/);
+  const checkoutHtml = html.match(/<tbody aria-label="開始地点">[\s\S]*?<\/tbody>/)?.[0];
+  assert.ok(checkoutHtml);
+  assert.doesNotMatch(checkoutHtml, /<button/);
+  assert.ok(html.includes("保存开始地点后，可在表格内继续添加经由地。"));
+  assert.match(html, /aria-label="開始地点"[\s\S]*aria-label="開始地点地址"[\s\S]*aria-label="開始地点公里数"[\s\S]*aria-label="開始地点出発時間"/);
+  assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*data-manual-time)(?=[^>]*required="")[^>]*>/);
+  assert.doesNotMatch(html, /出库打卡|打卡|出库記録|新经由地地址/);
   if (history) assert.ok(html.includes("新日報 · 待出库"));
   if (!history && process.env.DRIVER_REPORT_DEFAULTS_LAYOUT_FILE) {
     const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8").replace('@import "tailwindcss";', "");
@@ -791,7 +1144,7 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   }
 });
 
-test("append stop stays immediately below the last time pair in the continuous table", () => {
+test("append stop is below the table and each open stop has its own delete control", () => {
   for (const count of [0, 1, 3]) {
     let cursor = 0;
     const stops = Array.from({ length: count }, (_, i) => ({ id: id.replace(/1$/, String(i + 2)),
@@ -808,23 +1161,56 @@ test("append stop stays immediately below the last time pair in the continuous t
     assert.equal((html.match(/class="driver-stop-add"/g) ?? []).length, 1);
     assert.doesNotMatch(html, /<dialog|aria-modal/);
     assert.ok(!html.includes('aria-label="新经由地公里数"'));
-    assert.match(html, /aria-label="追加空白经由地"[^>]*>＋<\/button>/);
-    assert.match(html, /aria-label="删除最后一条空白经由地"[^>]*>−<\/button>/);
-    assert.ok(html.indexOf('aria-label="追加空白经由地"') < html.indexOf(">保存修改</button>"));
+    assert.match(html, /aria-label="追加空白经由地"[^>]*>＋ 追加经由地<\/button>/);
+    assert.match(html, /<\/table><div class="driver-stop-add">/);
+    assert.doesNotMatch(html, /保存修改/);
     assert.equal((html.match(/<table\b/g) ?? []).length, 1);
     if (count) {
       const groups = [...html.matchAll(/<tbody aria-label="经由地 \d+">([\s\S]*?)<\/tbody>/g)];
       assert.equal(groups.length, count);
-      for (const group of groups.slice(0, -1)) assert.ok(!group[1].includes("driver-stop-add"));
+      for (const group of groups.slice(0, -1)) assert.doesNotMatch(group[1], /class="driver-stop-add"/);
       for (const group of groups) {
         assert.equal((group[1].match(/<tr\b/g) ?? []).length, 1);
         assert.equal((group[1].match(/<td\b/g) ?? []).length, 4);
         assert.match(group[1], /name="address"[\s\S]*name="km"[\s\S]*name="arrivedAt"[\s\S]*name="departedAt"/);
+        assert.match(group[1], /aria-label="削除经由地 \d+"/);
       }
-      assert.ok(html.indexOf("driver-stop-add") > html.indexOf(groups.at(-1)[0]));
+      assert.ok(html.indexOf('class="driver-stop-add"') > html.indexOf(groups.at(-1)[0]));
     }
-    assert.ok(html.indexOf("driver-stop-add") < html.indexOf('aria-label="归库記録"'));
   }
+});
+
+test("filled stop can be deleted after explicit confirmation", async () => {
+  const runtime = require("react/jsx-runtime");
+  let StopRow;
+  const captures = create => (type, props, ...rest) => {
+    if (typeof type === "function" && type.name === "StopRow") StopRow = type;
+    return create(type, props, ...rest);
+  };
+  const filled = { id, address: "Saved stop", arrivedAt: fixture.departedAt, arrivedKm: 100,
+    departedAt: fixture.returnedAt, departedKm: 110 };
+  const values = [{ reports: [{ ...fixture, returnedAt: null, stops: [filled] }], depot: null },
+    null, "", "", false, false, 0, Date.now(), false, false];
+  let cursor = 0;
+  const Component = load("app/driver/report/report.tsx", {
+    react: { ...React, useEffect() {}, useRef: value => ({ current: value }), useState: () => [values[cursor++], () => {}] },
+    "react/jsx-runtime": { ...runtime, jsx: captures(runtime.jsx), jsxs: captures(runtime.jsxs) },
+    "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "@/lib/supabase/browser": {}, "@/lib/driver/orders": {}, "@/lib/driver/reports": reports,
+  }, { window: { confirm: message => { assert.match(message, /已填写内容也会削除/); return true; } } }).default;
+  renderToStaticMarkup(React.createElement(Component));
+  const deleted = [];
+  const row = StopRow({ stop: filled, index: 0, disabled: false, saveChanges: async () => {},
+    removeStop: async stopId => deleted.push(stopId), allowDelete: true });
+  function find(node, predicate) {
+    if (!React.isValidElement(node)) return null;
+    if (predicate(node)) return node;
+    return React.Children.toArray(node.props.children).map(child => find(child, predicate)).find(Boolean);
+  }
+  const button = find(row, node => node.type === "button" && node.props["aria-label"] === "削除经由地 1");
+  assert.equal(button.props.disabled, false);
+  await button.props.onClick();
+  assert.deepEqual(deleted, [id]);
 });
 
 test("compact stop form uses shared save and preserves seconds and distinct odometers", async () => {
@@ -911,7 +1297,7 @@ test("compact stop form uses shared save and preserves seconds and distinct odom
   assert.equal(calls[4].payload.departedKm, null);
 });
 
-test("each append immediately saves an empty row without a second confirmation", async () => {
+test("append button immediately saves an empty row without a second confirmation", async () => {
   const runtime = require("react/jsx-runtime");
   let Add;
   let cursor = 0;
@@ -932,7 +1318,7 @@ test("each append immediately saves an empty row without a second confirmation",
   const calls = [];
   let accepted = false;
   const save = async (action, payload) => { calls.push({ action, payload }); return accepted; };
-  function render(error) { return Add({ disabled: false, save, error, saveChanges() {} }); }
+  function render(_error, disabled = false) { return Add({ disabled, save }); }
   function find(node, predicate) {
     if (!React.isValidElement(node)) return null;
     if (predicate(node)) return node;
@@ -940,14 +1326,9 @@ test("each append immediately saves an empty row without a second confirmation",
   }
   const element = render();
   const button = find(element, node => node.type === "button" && node.props["aria-label"] === "追加空白经由地");
-  assert.equal(button.props.children, "＋");
-  const minus = find(element, node => node.type === "button" && node.props["aria-label"] === "删除最后一条空白经由地");
-  assert.equal(minus.props.children, "−");
-  assert.equal(minus.props.disabled, true);
-  const availableMinus = find(Add({ disabled: true, save, canRemove: true, removeStop: async () => {}, saving: false }),
-    node => node.type === "button" && node.props["aria-label"] === "删除最后一条空白经由地");
-  assert.equal(availableMinus.props.disabled, false);
-  assert.equal(typeof availableMinus.props.onClick, "function");
+  assert.equal(button.props.children, "＋ 追加经由地");
+  const locked = render(undefined, true);
+  assert.equal(find(locked, node => node.type === "button" && node.props["aria-label"] === "追加空白经由地").props.disabled, true);
   await button.props.onClick();
   assert.equal(calls.length, 1);
   accepted = true;
@@ -956,9 +1337,7 @@ test("each append immediately saves an empty row without a second confirmation",
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), Array(3).fill({ action: "add_stop",
     payload: { address: "", arrivedAt: null, departedAt: null } }));
   const html = renderToStaticMarkup(render());
-  assert.doesNotMatch(html, /<form|<input|确认添加|确认追加|取消追加/);
-  assert.equal((html.match(/>保存修改<\/button>/g) ?? []).length, 1);
-  assert.ok(find(render(), node => node.type === "button" && node.props.children === "保存修改").props.onClick);
-  assert.ok(renderToStaticMarkup(render("Synthetic API failure"))
-    .includes('role="alert">Synthetic API failure'));
+  assert.doesNotMatch(html, /<form|<input|确认添加|确认追加|取消追加|削除最后一条空白经由地/);
+  assert.doesNotMatch(html, /保存修改/);
+  assert.doesNotMatch(renderToStaticMarkup(render("Synthetic API failure")), /Synthetic API failure/);
 });

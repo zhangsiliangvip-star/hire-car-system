@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { clearReportDrafts } from "@/lib/driver/report-draft";
 
 export default function DriverBrand() {
   const pathname = usePathname();
@@ -15,8 +16,9 @@ export default function DriverBrand() {
     setBusy(true);
     setError("");
     try {
-      const { error: signOutError } = await createClient().auth.signOut({ scope: "local" });
+      const { error: signOutError } = await createClient("driver").auth.signOut({ scope: "local" });
       if (signOutError) throw signOutError;
+      clearReportDrafts(sessionStorage);
       location.replace("/driver/login");
     } catch (cause) {
       console.error("Driver logout failed.", cause);

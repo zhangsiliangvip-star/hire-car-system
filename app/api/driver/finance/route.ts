@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     });
     if (links.error) {
       console.error("Driver historical finance links rejected.", { code: links.error.code });
-      return jsonResponse({ error: "历史訂単财务入口读取失败，請重试。" }, { status: 503 });
+      return jsonResponse({ error: "歴史訂単财务入口读取失败，請重试。" }, { status: 503 });
     }
     const { data, error } = await identity.supabase.rpc("driver_finance_data", { target_month: parsed.data.month });
     if (error) {
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     });
     if (historical.error) {
       console.error("Driver historical finance read rejected.", { code: historical.error.code });
-      return jsonResponse({ error: "历史訂単财务读取失败，請重试。" }, { status: 503 });
+      return jsonResponse({ error: "歴史訂単财务读取失败，請重试。" }, { status: 503 });
     }
     const historicalTrips = z.array(financeDataSchema.shape.trips.element).parse(
       z.object({ trips: z.array(financeDataSchema.shape.trips.element) }).strict().parse(historical.data).trips,
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver finance submission rejected.", { code: error.code });
-      return jsonResponse({ error: error.code === "40001" ? "此申報已提交或已变化，請刷新核对。" :
+      return jsonResponse({ error: error.code === "40001" ? "申報或已入账金額已变化，請刷新核对；若后台已调整金額，請联系管理员后再修改。" :
         "申報未获确认，請检查行程权限和票据后重试。" }, { status: error.code === "40001" ? 409 :
         error.code === "42501" ? 403 : ["22023", "22P02", "23514"].includes(error.code) ? 422 : 503 });
     }

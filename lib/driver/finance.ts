@@ -21,7 +21,8 @@ export const financeSubmissionSchema = z.object({
   new Set(value.expenses.map(item => item.id)).size === value.expenses.length &&
   value.expenses.reduce((total, item) => total + item.amount, 0) <= 99999999999999 &&
   (value.category === "overtime" ? value.expenses.length === 0 :
-    value.overtimeHours === 0 && value.expenses.length > 0 && value.expenses.every(item => item.type === value.category)));
+    value.overtimeHours === 0 && (value.expenses.length > 0 || value.expectedVersion > 0) &&
+      value.expenses.every(item => item.type === value.category)));
 export const financeClaimSchema = z.object({
   assignmentId: z.uuid(), version: z.number().int().positive(),
   historical: z.boolean().optional(),

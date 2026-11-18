@@ -1,4 +1,5 @@
 import type { AuditedRecord } from "@/lib/audit";
+import type { DriverBank } from "@/lib/driver-bank";
 
 export type OrderStatus =
   | "仮予約"
@@ -13,6 +14,7 @@ export type ActiveView =
   | "operations"
   | "orderFinance"
   | "driverFinance"
+  | "driverPayments"
   | "vehicleFinance"
   | "balance"
   | "login"
@@ -62,6 +64,7 @@ export type Order = AuditedRecord & {
   regionId?: string;
   importBatchId?: string | null;
   importBatchIndex?: number | null;
+  splitGroupId?: string | null;
   vehicle: string;
   vehiclePlate: string;
   date: string;
@@ -71,6 +74,7 @@ export type Order = AuditedRecord & {
   phone: string;
   pickup: string;
   destination: string;
+  flightNumber: string;
   time: string;
   status: OrderStatus;
   notes: string;
@@ -91,11 +95,16 @@ export type Order = AuditedRecord & {
 
 export type OrderDraft = Omit<Order, "id">;
 
-export type Driver = AuditedRecord & {
+export type Driver = AuditedRecord & Partial<DriverBank> & {
   id: string;
   regionId?: string;
   name: string;
   reading: string;
+  address?: string;
+  postalCode?: string;
+  employmentStatus?: "在職" | "休暇" | "離職";
+  employmentType?: "常勤" | "非常勤";
+  companyName?: string;
   phone: string;
   wechat: string;
   whatsapp: string;
@@ -124,6 +133,7 @@ export type Vehicle = AuditedRecord & {
   status: VehicleStatus;
   /** Shared manual calendar position; null means the default generation order. */
   calendarOrder?: number | null;
+  showInCalendar?: boolean;
 };
 
 export type VehicleDraft = Omit<Vehicle, "id">;

@@ -7,7 +7,7 @@ export async function requireDriver() {
   if (!isDriverPwaEnabled()) {
     return { response: jsonResponse({ error: "運転士功能尚未开放。" }, { status: 404 }) };
   }
-  const supabase = await createClient();
+  const supabase = await createClient("driver");
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError && authError.name !== "AuthSessionMissingError") {
     console.error("Driver session verification failed.", { code: authError.code });

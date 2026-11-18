@@ -99,7 +99,7 @@ function ReviewDialog({ rows, name, busy, blocked, error, notice, close, review 
         <h2 className="min-w-0 break-words font-semibold">{name} · 運転士申報审核</h2>
         <button type="button" disabled={busy} onClick={dismiss} className="rounded border px-3 py-1">关闭</button>
       </div>
-      <p className="mb-3 text-xs text-gray-600">仅审核待审核申報。批准才入账；驳回相当于从訂単待审核区删除，不计入金額，但保留記録并允许運転士重報。已批准申報不能在此撤销。</p>
+      <p className="mb-3 text-xs text-gray-600">仅审核待审核申報。批准才入账；驳回相当于从訂単待审核区削除，不计入金額，但保留記録并允许運転士重報。已批准申報不能在此撤销。</p>
       {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mb-3 text-sm text-emerald-800">{notice}</p>}
       {blocked && <p role="alert" className="mb-3 text-sm text-red-700">訂単有未完成保存或保存错误，請先处理后再审核。</p>}

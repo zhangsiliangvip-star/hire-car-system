@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver daily fuel rejected.", { code: error.code });
-      return jsonResponse({ error: "燃油費申報未确认：請核对当天行程、油票及申報状態，刷新后重试。" },
+      return jsonResponse({ error: error.code === "40001"
+        ? "燃油費申報或已入账金額已变化，請刷新核对；若后台已调整金額，請联系管理员后再修改。"
+        : "燃油費申報未确认：請核对当天行程、油票及申報状態，刷新后重试。" },
         { status: error.code === "40001" ? 409 : error.code === "42501" ? 403 : error.code === "22023" ? 422 : 503 });
     }
     return jsonResponse({ claim: fuelClaimSchema.parse(data) });

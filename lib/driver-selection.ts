@@ -7,6 +7,19 @@ const driverReadingCollator = new Intl.Collator("en", {
   numeric: true,
 });
 
+export function filterScheduleDrivers<
+  T extends Pick<Driver, "employmentType">
+>(drivers: readonly T[]): T[] {
+  return drivers.filter((driver) => driver.employmentType !== "非常勤");
+}
+
+export function filterDriversByEmploymentType<T extends Pick<Driver, "employmentType">>(
+  drivers: readonly T[],
+  employmentType: NonNullable<Driver["employmentType"]>,
+): T[] {
+  return drivers.filter((driver) => (driver.employmentType ?? "常勤") === employmentType);
+}
+
 export function sortDriversByReading<T extends Pick<Driver, "id" | "name"> & { reading?: string | null }>(
   drivers: T[],
 ) {

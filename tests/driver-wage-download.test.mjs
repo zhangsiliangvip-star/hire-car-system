@@ -4,8 +4,9 @@ import fs from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 
-function harness({ cancel = false, existing = false, overwrite = true, failAt = -1, supported = true } = {}) {
-  const writes = [], notices = [];
+function harness({ cancel = false, existing = false, overwrite = true, failAt = -1, supported = true, canvasHeight = 900 } = {}) {
+  const writes = [], notices = [], images = [];
+  let addedPages = 0;
   let removed = 0, pickers = 0, renders = 0;
   const content = {
     getBoundingClientRect: () => ({ width: 720, top: 0 }),
@@ -52,9 +53,11 @@ function harness({ cancel = false, existing = false, overwrite = true, failAt = 
     alert: (message) => notices.push(message), confirm: () => overwrite,
     require: (name) => {
       if (name === "@/lib/driver-wage-print") return { buildDriverWagePrintHtml: () => "daily" };
-      if (name === "html2canvas") return { default: async () => { renders++; return { width: 1440, height: 900 }; } };
+      if (name === "html2canvas") return { default: async () => { renders++; return { width: 1440, height: canvasHeight }; } };
       if (name === "jspdf") return { jsPDF: class {
-        addPage() {} addImage() {} output() { return new Blob(["%PDF-test"]); }
+        addPage() { addedPages++; }
+        addImage(_data, _format, x, y, width, height) { images.push({ x, y, width, height }); }
+        output() { return new Blob(["%PDF-test"]); }
       } };
       throw new Error(`Unexpected module ${name}`);
     },
@@ -63,7 +66,8 @@ function harness({ cancel = false, existing = false, overwrite = true, failAt = 
   vm.runInNewContext(ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
   }).outputText, context);
-  return { ...compiledModule.exports, writes, notices, metrics: () => ({ removed, pickers, renders }) };
+  return { ...compiledModule.exports, writes, notices, images, addedPages: () => addedPages,
+    metrics: () => ({ removed, pickers, renders }) };
 }
 
 const data = Array.from({ length: 10 }, (_, index) => ({
@@ -103,4 +107,17 @@ test("PDF pagination moves whole rows and preserves the full long document", () 
     { top: 950, bottom: 1050 }, { top: 1900, bottom: 2000 },
   ]));
   assert.deepEqual(breaks, [0, 950, 1900, 2900, 3100]);
+});
+
+test("long wage PDFs use multiple A4 pages at fixed readable width, not whole-month shrink-to-fit", async () => {
+  const h = harness({ canvasHeight: 6000 });
+  await h.renderDriverWagePdf(data[0]);
+  assert.equal(h.images.length, 3);
+  assert.equal(h.addedPages(), 2);
+  for (const image of h.images) {
+    assert.equal(image.x, 10); assert.equal(image.y, 10);
+    assert.equal(image.width, 190);
+    assert.ok(image.height <= 277);
+  }
+  assert.ok(Math.abs(h.images.reduce((sum, image) => sum + image.height, 0) - 6000 * 190 / 1440) < 0.001);
 });

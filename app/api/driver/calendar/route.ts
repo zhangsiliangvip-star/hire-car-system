@@ -15,11 +15,11 @@ export async function GET(request: Request) {
     const { data, error } = await identity.supabase.rpc("driver_calendar", { range_start: range.start, range_end: range.end });
     if (error || !data) {
       console.error("Driver calendar query failed.", { code: error?.code });
-      return jsonResponse({ error: "无法读取日历，請重试。" }, { status: 503 });
+      return jsonResponse({ error: "无法读取日歴，請重试。" }, { status: 503 });
     }
     return jsonResponse(driverCalendarSchema.parse({ month: query.data.month, entries: data.map(projectDriverCalendarRow) }));
   } catch (error) {
     console.error("Driver calendar request failed.", error);
-    return jsonResponse({ error: "无法读取日历。" }, { status: 500 });
+    return jsonResponse({ error: "无法读取日歴。" }, { status: 500 });
   }
 }

@@ -34,7 +34,7 @@ const id = "e6000000-0000-4000-8000-000000000001";
 const row = {
   assignment_id: id, order_id: "order-a", service_date: "2026-10-27",
   departure_time: "09:30", pickup: "Airport", destination: "Hotel", vehicle: "Test car",
-  status: "assigned", version: 1, finance_by_date: { secret: true },
+  status: "assigned", version: 1, flight_number: "NH123", finance_by_date: { secret: true },
 };
 
 function route(relative, { deny, data = [], error = null, historyData = [], historyError = null, defaults, defaultsError = null } = {}) {
@@ -125,6 +125,7 @@ test("historical driver projection is read-only and has a strict safe-field allo
   assert.equal(historical.historical, true);
   assert.equal(historical.status, "historical");
   assert.equal(historical.assignmentId, null);
+  assert.equal(historical.details.flightNumber, "");
   assert.deepEqual(Object.keys(historical).sort(), [
     "assignmentId","date","destination","details","historical","orderId","pickup",
     "status","time","vehicle","vehicleNumber","version",
@@ -150,7 +151,7 @@ test("execution actions allow one step forward or backward including completed t
   }
 });
 test("trip list date picker follows tomorrow and changes the shared date without retaining old trips", () => {
-  const states = ["2026-10-27", { name: "Synthetic Driver" }, [orders.projectDriverTrip(row)], false, "Old error", "Old notice", 0, false];
+  const states = ["2026-10-27", { name: "Synthetic Driver" }, [orders.projectDriverTrip(row)], false, "Old error", "Old notice", 0, false, false, {}];
   let cursor = 0;
   const Component = load("app/driver/trips.tsx", {
     react: { ...React, useEffect() {}, useRef: value => ({ current: value }),
@@ -177,7 +178,7 @@ test("phone detail renders only the current legal action and never financial fie
     let cursor = 0;
     const values = ["2026-10-27", { name: "Synthetic Driver" },
       [{ ...orders.projectDriverTripDetail({ ...row, status, order_name: "<Order>", trip_summary: "Airport\nHotel", notes: "<script>private notes</script>" }),
-        vehicleNumber: "足立300い4968" }], false, "", "", 0, false];
+        vehicleNumber: "足立300い4968" }], false, "", "", 0, false, false, {}];
     const Component = load("app/driver/trips.tsx", {
       react: { ...React, useEffect() {}, useRef: (value) => ({ current: value }),
         useState: () => [values[cursor++], () => {}] },
@@ -190,6 +191,7 @@ test("phone detail renders only the current legal action and never financial fie
     assert.ok(html.indexOf("車両</span>") < html.indexOf("車両番号</span>"));
     assert.ok(html.includes("足立300い4968"));
     assert.ok(html.includes("訂単名称")); assert.ok(html.includes("行程簡概")); assert.ok(html.includes("備考"));
+    assert.ok(html.includes("航班信息")); assert.ok(html.includes("NH123"));
     assert.ok(html.includes("&lt;Order&gt;")); assert.ok(html.includes("Airport\nHotel"));
     assert.ok(html.includes("&lt;script&gt;private notes&lt;/script&gt;"));
     assert.doesNotMatch(html, /<script>/);
@@ -216,7 +218,7 @@ test("home summarizes daily orders compactly with leading order numbers and bott
     order_id: "order-b", departure_time: "13:00", status: "completed", order_name: "Second order",
     trip_summary: "Station to hotel", notes: "" });
   second.vehicleNumber = "品川500あ1234";
-  const values = ["2026-10-27", { name: "Driver" }, [trip, second], false, "", "", 0, false];
+  const values = ["2026-10-27", { name: "Driver" }, [trip, second], false, "", "", 0, false, false, {}];
   const Component = load("app/driver/trips.tsx", {
     react: { ...React, useEffect() {}, useRef: value => ({ current: value }), useState: () => [values[cursor++], () => {}] },
     "next/link": { default: "a" }, "@/lib/supabase/browser": {}, "@/lib/driver/orders": orders,
@@ -231,6 +233,9 @@ test("home summarizes daily orders compactly with leading order numbers and bott
   assert.ok(html.indexOf("Daily route\nSecond line") < html.indexOf("車両番号：足立300い4968"));
   assert.match(html, /class="driver-daily-order"/);
   assert.match(html, /class="driver-muted driver-daily-plate"/);
+  assert.match(html, /class="driver-daily-order"[\s\S]*?class="driver-daily-flight"[\s\S]*?航班信息/);
+  assert.ok(html.indexOf('class="driver-daily-flight"') < html.indexOf('<article class="driver-card"'));
+  assert.equal((html.match(/航班信息/g) || []).length, 2);
   assert.match(html, /Second order/); assert.match(html, /Station to hotel/);
   assert.match(html, /車両番号：足立300い4968/); assert.match(html, /車両番号：品川500あ1234/);
   assert.match(html, /配車時間/); assert.match(html, /09:30/);
@@ -248,9 +253,9 @@ test("home summarizes daily orders compactly with leading order numbers and bott
 test("historical trip cards stay read-only without explanatory clutter", () => {
   for (const detail of [false, true]) {
     let cursor = 0;
-    const trip = { ...orders.projectDriverTripDetail({ ...row, order_name: "Historical order", trip_summary: "Airport to hotel", notes: "" }),
+    const trip = { ...orders.projectDriverTripDetail({ ...row, flight_number: "", order_name: "Historical order", trip_summary: "Airport to hotel", notes: "" }),
       historical: true, assignmentId: null, status: "historical" };
-    const values = ["2026-10-27", { name: "Driver" }, [trip], false, "", "", 0, false];
+    const values = ["2026-10-27", { name: "Driver" }, [trip], false, "", "", 0, false, false, {}];
     const Component = load("app/driver/trips.tsx", {
       react: { ...React, useEffect() {}, useRef: value => ({ current: value }), useState: () => [values[cursor++], () => {}] },
       "next/link": { default: "a" }, "@/lib/supabase/browser": {}, "@/lib/driver/orders": orders,
@@ -268,7 +273,7 @@ test("driver portal slogans replace the home banner and personalized name greeti
   let cursor = 0;
   const values = ["2026-10-27",
     { name: "Driver", globalSlogan: "一路平安", personalSlogan: "安全驾驶，准時抵达" },
-    [], false, "", "", 0, false];
+    [], false, "", "", 0, false, false, {}];
   const Component = load("app/driver/trips.tsx", {
     react: { ...React, useEffect() {}, useRef: value => ({ current: value }), useState: () => [values[cursor++], () => {}] },
     "next/link": { default: "a" }, "@/lib/supabase/browser": {}, "@/lib/driver/orders": orders,
@@ -283,7 +288,7 @@ test("phone rollback asks for confirmation, posts only the preceding state and l
   for (const status of orders.tripStates.slice(1)) {
     let cursor = 0; let confirmed = false; let resolve; const calls = [];
     const values = ["2026-10-27", { name: "Synthetic Driver" },
-      [orders.projectDriverTrip({ ...row, status, version: 6 })], false, "", "", 0, false];
+      [orders.projectDriverTrip({ ...row, status, version: 6 })], false, "", "", 0, false, false, {}];
     const Component = load("app/driver/trips.tsx", {
       react: { ...React, useEffect() {}, useRef: value => ({ current: value }),
         useState: () => { const i = cursor++; return [values[i], value => { values[i] = value; }]; } },
@@ -455,7 +460,9 @@ test("list and detail API use only dedicated RPC and minimal no-store DTO", asyn
     assert.equal(body.trips[0].vehicleNumber, "足立300い4968");
     assert.equal(handler.calls[0].name, detail ? "driver_trip_detail" : "driver_orders");
     assert.deepEqual(Object.keys(handler.calls[0].args), detail ? ["target_assignment"] : ["target_date"]);
-    assert.deepEqual(body.trips[0].details, { orderName: "Order", tripSummary: "Daily summary", notes: "Notes" });
+    assert.deepEqual(body.trips[0].details, {
+      orderName: "Order", tripSummary: "Daily summary", notes: "Notes", flightNumber: "NH123",
+    });
     if (!detail) assert.equal(handler.calls[1].name, "driver_trip_detail");
   }
   assert.equal((await route(getRoute).GET(get(`?assignmentId=${id}`))).status, 404);
@@ -579,7 +586,7 @@ test("execution endpoint sends exact target state and returns minimal uncached r
 });
 test("refresh keeps current trips visible and locks actions until fresh data arrives", () => {
   const trip = orders.projectDriverTrip(row);
-  const states = ["2026-10-27", { name: "Driver" }, [trip], false, "Old error", "", 0, false, false];
+  const states = ["2026-10-27", { name: "Driver" }, [trip], false, "Old error", "", 0, false, false, {}];
   let cursor = 0;
   const options = {
     react: { ...React, useEffect() {}, useRef: value => ({ current: value }),

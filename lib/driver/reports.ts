@@ -13,9 +13,10 @@ const headerFields = {
   driverName: z.string().trim().max(100),
   passengerCount: z.number().int().min(0).max(999).nullable(),
 };
-export const reportHeaderSchema = z.object({ serviceDate: z.iso.date(), ...headerFields,
+export const reportHeaderShapeSchema = z.object({ serviceDate: z.iso.date(), ...headerFields,
   vehicleBaseline: z.string().max(100).optional(),
-}).strict().superRefine((h, ctx) => {
+}).strict();
+export const reportHeaderSchema = reportHeaderShapeSchema.superRefine((h, ctx) => {
   if ((h.dutyStartDate && !h.dutyStartTime) || (h.dutyEndDate && !h.dutyEndTime) ||
     (h.dutyStartDate && h.dutyEndDate && h.dutyStartTime && h.dutyEndTime &&
       `${h.dutyEndDate}T${h.dutyEndTime}` < `${h.dutyStartDate}T${h.dutyStartTime}`)) {
@@ -48,6 +49,11 @@ export const reportTimeErrors: Record<string, string> = {
   PDT03: "退勤点呼時間不能早于归库時間，請检查日期和時間。",
   PDT04: "退勤点呼時間不能早于出勤点呼時間。",
 };
+
+export function formatManualClock(value: string): string {
+  const trimmed = value.trim();
+  return /^\d{4}$/.test(trimmed) ? `${trimmed.slice(0, 2)}:${trimmed.slice(2)}` : trimmed;
+}
 
 export function reportTimeOrderError(report: Pick<DailyReport, "header" | "departedAt" | "returnedAt">): string | null {
   const h = report.header;
@@ -85,7 +91,8 @@ export const reportCommandSchema = z.object({
 }).strict().superRefine((command, ctx) => {
   const stop = z.object({ stopId: z.uuid(), km: odometer }).strict();
   const schemas = {
-    checkout: z.object({ ...location, header: reportHeaderSchema.optional() }).strict().refine(v => v.useDefault || v.address.length > 0),
+    checkout: z.object({ ...location, departedAt: instant, header: reportHeaderShapeSchema.optional(),
+      force: z.boolean().optional() }).strict().refine(v => v.useDefault || v.address.length > 0),
     return: locationSchema,
     add_stop: z.object({ address: z.string().trim().max(300), km: odometer.optional(),
       arrivedAt: instant.nullable().optional(), departedAt: instant.nullable().optional(),
@@ -98,7 +105,7 @@ export const reportCommandSchema = z.object({
     edit_stops: z.object({ stops: z.array(reportStopSchema).max(100),
       departure: z.object({ address, km: odometer, departedAt: instant }).strict().optional(),
       return: z.object({ address, km: odometer, returnedAt: instant }).strict().optional(),
-      header: reportHeaderSchema.optional(),
+      header: reportHeaderShapeSchema.optional(), force: z.boolean().optional(),
     }).strict(),
   };
   if (!schemas[command.action].safeParse(command.payload).success ||
@@ -128,10 +135,16 @@ export function reportOnDate(report: DailyReport, serviceDate: string): DailyRep
     rests: report.rests.map(rest => ({ startedAt: shift(rest.startedAt)!, endedAt: shift(rest.endedAt) })) };
 }
 
-export function stopTime(value: string, previous: string, original: string | null = null): string | null {
-  if (!value) return null;
-  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) || !Number.isFinite(Date.parse(previous)))
+export function stopTime(value: string, previous: string, original: string | null = null, force = false): string | null {
+  if (!value) return force ? original : null;
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) || !Number.isFinite(Date.parse(previous))) {
+    if (force) return original;
     throw new Error("請填写有效時間（HH:mm）。");
+  }
+  if (force) {
+    if (original && value === toJapanInput(original).slice(11, 16)) return original;
+    return fromJapanInput(`${toJapanInput(previous).slice(0, 10)}T${value}`);
+  }
   if (original && value === toJapanInput(original).slice(11, 16) && Date.parse(original) >= Date.parse(previous))
     return original;
   let time = Date.parse(fromJapanInput(`${toJapanInput(previous).slice(0, 10)}T${value}`)!);
@@ -139,31 +152,66 @@ export function stopTime(value: string, previous: string, original: string | nul
   return new Date(Math.max(time, Date.parse(previous))).toISOString();
 }
 
-export function departureFromForm(report: DailyReport, data: Pick<FormData, "get">) {
+function formOdometer(value: FormDataEntryValue | null): number | null {
+  if (value === null || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return odometer.safeParse(parsed).success ? parsed : null;
+}
+
+function validManualClock(value: string): boolean {
+  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+export function departureFromForm(report: DailyReport, data: Pick<FormData, "get">, force = false) {
   const time = String(data.get("departedAt") ?? "");
-  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error("請填写有效出库時間（HH:mm）。");
-  return { address: String(data.get("address") ?? ""), km: data.get("km") === "" ? NaN : Number(data.get("km")),
+  const address = String(data.get("address") ?? "").trim();
+  const km = formOdometer(data.get("km"));
+  if (!validManualClock(time)) {
+    if (!force) throw new Error("請填写有效出库時間（HH:mm）。");
+    return { address: address || report.departureAddress, km: km ?? report.departureKm, departedAt: report.departedAt };
+  }
+  return { address: address || (force ? report.departureAddress : ""), km: km ?? (force ? report.departureKm : NaN),
     departedAt: time === toJapanInput(report.departedAt).slice(11, 16) ? report.departedAt :
       fromJapanInput(`${toJapanInput(report.departedAt).slice(0, 10)}T${time}`)! };
 }
 
-export function returnFromForm(report: DailyReport, data: Pick<FormData, "get">, previous: string) {
+export function returnFromForm(report: DailyReport, data: Pick<FormData, "get">, previous: string, force = false) {
   const address = String(data.get("address") ?? "").trim();
-  const km = String(data.get("km") ?? "");
+  const km = formOdometer(data.get("km"));
   const time = String(data.get("returnedAt") ?? "");
-  if (!time && !km && (!address || address === report.returnAddress)) {
+  if (force && (!address || address.length > 300 || km === null || !validManualClock(time))) {
+    return report.returnedAt ? {
+      address: report.returnAddress!, km: report.returnKm!, returnedAt: report.returnedAt,
+    } : undefined;
+  }
+  if (!time && km === null && (!address || address === report.returnAddress)) {
     if (report.returnedAt) throw new Error("已归库時間不能清空，請填写归库信息。");
     return undefined;
   }
-  if (!address || !km || !time) throw new Error("請同時填写归库地点、公里数和時間；尚未归库時可全部留空。");
-  return { address, km: Number(km), returnedAt: stopTime(time, previous, report.returnedAt)! };
+  if (!address || km === null || !time) throw new Error("請同時填写終了地点、公里数和時間；尚未归库時可全部留空。");
+  return { address, km, returnedAt: stopTime(time, previous, report.returnedAt, force)! };
 }
 
-export function stopFromForm(stop: DailyReport["stops"][number], data: Pick<FormData, "get">, previous: string) {
+export function stopFromForm(stop: DailyReport["stops"][number], data: Pick<FormData, "get">, previous: string, force = false) {
   const arrivedInput = String(data.get("arrivedAt") ?? "");
   const departedInput = String(data.get("departedAt") ?? "");
-  const arrivedAt = stopTime(arrivedInput, previous, stop.arrivedAt);
-  const departedAt = stopTime(departedInput, arrivedAt ?? previous, stop.departedAt);
+  const addressInput = String(data.get("address") ?? "").trim();
+  const kmInput = formOdometer(data.get("km"));
+  if (force) {
+    const address = addressInput && addressInput.length <= 300 ? addressInput : stop.address;
+    const arrivedValid = validManualClock(arrivedInput) && kmInput !== null && Boolean(address);
+    const arrivedAt = arrivedValid ? stopTime(arrivedInput, previous, stop.arrivedAt, true) : stop.arrivedAt;
+    const arrivedKm = arrivedValid ? kmInput : stop.arrivedKm;
+    const departedValid = validManualClock(departedInput) && kmInput !== null && Boolean(address) && Boolean(arrivedAt);
+    const departedAt = departedValid
+      ? stopTime(departedInput, previous, stop.departedAt, true) : stop.departedAt;
+    const departedKm = departedValid ? kmInput : stop.departedKm;
+    const plannedKm = !arrivedAt && kmInput !== null ? kmInput : stop.plannedKm ?? null;
+    return { id: stop.id, address, ...(stop.plannedKm !== undefined || !arrivedAt ? { plannedKm } : {}),
+      arrivedAt, departedAt, arrivedKm, departedKm };
+  }
+  const arrivedAt = stopTime(arrivedInput, previous, stop.arrivedAt, force);
+  const departedAt = stopTime(departedInput, force ? previous : arrivedAt ?? previous, stop.departedAt, force);
   const km = data.get("km") === "" ? null : Number(data.get("km"));
   const unchangedKm = km === (stop.departedKm ?? stop.arrivedKm ?? stop.plannedKm ?? null);
   return { id: stop.id, address: String(data.get("address")),

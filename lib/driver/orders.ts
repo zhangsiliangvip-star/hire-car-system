@@ -46,7 +46,7 @@ export type DriverTrip = {
   vehicleNumber?: string;
   status: TripState;
   version: number;
-  details?: { orderName: string; tripSummary: string; notes: string };
+  details?: { orderName: string; tripSummary: string; notes: string; flightNumber: string };
 };
 
 export const historicalDriverTripSchema = z.object({
@@ -89,15 +89,18 @@ export function projectHistoricalDriverTrip(row: unknown): HistoricalDriverTrip 
       orderName: parsed.order_name,
       tripSummary: parsed.trip_summary,
       notes: parsed.notes,
+      flightNumber: "",
     },
   };
 }
 
 export function projectDriverTripDetail(row: Parameters<typeof projectDriverTrip>[0] & {
-  order_name: string; trip_summary: string; notes: string;
+  order_name: string; trip_summary: string; notes: string; flight_number: string;
 }): DriverTrip {
-  const details = z.object({ orderName: z.string(), tripSummary: z.string(), notes: z.string() }).parse({
-    orderName: row.order_name, tripSummary: row.trip_summary, notes: row.notes,
+  const details = z.object({
+    orderName: z.string(), tripSummary: z.string(), notes: z.string(), flightNumber: z.string(),
+  }).parse({
+    orderName: row.order_name, tripSummary: row.trip_summary, notes: row.notes, flightNumber: row.flight_number,
   });
   return { ...projectDriverTrip(row), details };
 }

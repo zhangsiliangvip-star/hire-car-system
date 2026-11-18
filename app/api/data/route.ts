@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { driverBankSchema } from "@/lib/driver-bank";
+import { driverPostalCodeSchema, splitDriverAddress } from "@/lib/driver-address";
 import type { Database } from "@/lib/supabase/database.types";
 import { getAuthenticatedProfile } from "@/lib/supabase/authorization";
 import type {
@@ -86,6 +88,7 @@ const orderSchema = z.object({
   regionId: idSchema,
   importBatchId: idSchema.nullish(),
   importBatchIndex: z.number().int().min(0).max(499).nullish(),
+  splitGroupId: idSchema.nullish(),
   vehicle: z.string().max(200),
   vehiclePlate: z.string().max(100).default(""),
   date: dateSchema,
@@ -95,6 +98,8 @@ const orderSchema = z.object({
   phone: z.string().max(100),
   pickup: z.string().max(500),
   destination: z.string().max(500),
+  flightNumber: z.string().trim().max(10).regex(/^[A-Za-z0-9]*$/)
+    .transform((value) => value.toUpperCase()).default(""),
   time: z.string().max(20),
   status: z.enum(["仮予約", "予約確定", "運行中", "完了", "キャンセル"]),
   notes: z.string().max(5000),
@@ -120,11 +125,17 @@ const driverSchema = z.object({
   regionId: idSchema,
   name: z.string().min(1).max(200),
   reading: z.string().max(200).default(""),
+  address: z.string().trim().max(1000).default(""),
+  postalCode: driverPostalCodeSchema,
+  companyName: z.string().trim().max(200).default(""),
   phone: z.string().max(100),
   wechat: z.string().max(200),
   whatsapp: z.string().max(200),
   licenseExpiry: z.union([dateSchema, z.literal("")]),
+  employmentStatus: z.enum(["在職", "休暇", "離職"]).default("在職"),
+  employmentType: z.enum(["常勤", "非常勤"]).default("常勤"),
   personalSlogan: z.string().max(100).default(""),
+  ...driverBankSchema.shape,
 }).strict();
 const vehicleSchema = z.object({
   id: idSchema,
@@ -141,6 +152,7 @@ const vehicleSchema = z.object({
   notes: z.string().max(5000),
   status: z.enum(["运营中", "停运中"]),
   calendarOrder: z.number().int().min(0).max(1_000_000).nullable().default(null),
+  showInCalendar: z.boolean().default(true),
 }).strict();
 const vehicleMonthlyFinanceSchema = z.object({
   id: idSchema,
@@ -403,6 +415,7 @@ function toOrder(row: Database["public"]["Tables"]["orders"]["Row"]): Order {
     regionId: row.region_id,
     importBatchId: row.import_batch_id ?? null,
     importBatchIndex: row.import_batch_index ?? null,
+    splitGroupId: row.split_group_id ?? null,
     vehicle: row.vehicle,
     vehiclePlate: row.vehicle_plate ?? "",
     date: row.date,
@@ -412,6 +425,7 @@ function toOrder(row: Database["public"]["Tables"]["orders"]["Row"]): Order {
     phone: row.phone,
     pickup: row.pickup,
     destination: row.destination,
+    flightNumber: row.flight_number,
     time: row.time,
     status: row.status,
     notes: row.notes,
@@ -438,11 +452,20 @@ function toDriver(row: Database["public"]["Tables"]["drivers"]["Row"]): Driver {
     regionId: row.region_id,
     name: row.name,
     reading: row.reading ?? "",
+    ...splitDriverAddress(row.address ?? "", row.postal_code ?? ""),
+    companyName: row.company_name ?? "",
     phone: row.phone,
     wechat: row.wechat,
     whatsapp: row.whatsapp,
     licenseExpiry: row.license_expiry || "",
+    employmentStatus: row.employment_status ?? "在職",
+    employmentType: row.employment_type ?? "常勤",
     personalSlogan: row.personal_slogan ?? "",
+    bankName: row.bank_name,
+    bankBranch: row.bank_branch,
+    bankAccountType: row.bank_account_type,
+    bankAccountNumber: row.bank_account_number,
+    bankAccountHolder: row.bank_account_holder,
   };
 }
 
@@ -463,6 +486,7 @@ function toVehicle(row: Database["public"]["Tables"]["vehicles"]["Row"]): Vehicl
     notes: row.notes,
     status: row.status,
     calendarOrder: row.calendar_order ?? null,
+    showInCalendar: row.show_in_calendar ?? true,
   };
 }
 
@@ -558,6 +582,7 @@ function toOrderRow(order: Order): Database["public"]["Tables"]["orders"]["Inser
     region_id: order.regionId ?? "",
     import_batch_id: order.importBatchId ?? null,
     import_batch_index: order.importBatchIndex ?? null,
+    split_group_id: order.splitGroupId ?? null,
     vehicle: order.vehicle,
     vehicle_plate: order.vehiclePlate ?? "",
     date: order.date,
@@ -567,6 +592,7 @@ function toOrderRow(order: Order): Database["public"]["Tables"]["orders"]["Inser
     phone: order.phone,
     pickup: order.pickup,
     destination: order.destination,
+    flight_number: order.flightNumber,
     time: order.time,
     status: order.status,
     notes: order.notes,
@@ -587,16 +613,27 @@ function toOrderRow(order: Order): Database["public"]["Tables"]["orders"]["Inser
 }
 
 function toDriverRow(driver: Driver): Database["public"]["Tables"]["drivers"]["Insert"] {
+  const address = splitDriverAddress(driver.address, driver.postalCode);
   return {
     id: driver.id,
     region_id: driver.regionId ?? "",
     name: driver.name,
     reading: driver.reading,
+    address: address.address,
+    postal_code: address.postalCode,
+    company_name: driver.companyName ?? "",
     phone: driver.phone,
     wechat: driver.wechat,
     whatsapp: driver.whatsapp,
     license_expiry: driver.licenseExpiry || null,
+    employment_status: driver.employmentStatus ?? "在職",
+    employment_type: driver.employmentType ?? "常勤",
     personal_slogan: driver.personalSlogan,
+    bank_name: driver.bankName ?? "",
+    bank_branch: driver.bankBranch ?? "",
+    bank_account_type: driver.bankAccountType ?? "",
+    bank_account_number: driver.bankAccountNumber ?? "",
+    bank_account_holder: driver.bankAccountHolder ?? "",
   };
 }
 
@@ -616,6 +653,7 @@ function toVehicleRow(vehicle: Vehicle): Database["public"]["Tables"]["vehicles"
     notes: vehicle.notes,
     status: vehicle.status,
     calendar_order: vehicle.calendarOrder ?? null,
+    show_in_calendar: vehicle.showInCalendar ?? true,
   };
 }
 
@@ -738,7 +776,7 @@ async function applyMutation(
         const { error: storageError } = await admin.storage.from(bucket).remove(paths);
         if (storageError) {
           throw new OrderReceiptCleanupError(
-            `訂単已删除，但关联小票文件清理失败（${bucket}）。請联系管理员检查存储清理。`,
+            `訂単已削除，但关联小票文件清理失败（${bucket}）。請联系管理员检查存储清理。`,
           );
         }
       }
@@ -1039,10 +1077,10 @@ export async function POST(request: Request) {
     if (parsed.data.deleteIds.length > 0) {
       const passwordCheck = verifyDeletePassword(parsed.data.deletePassword);
       if (!passwordCheck.configured) {
-        return jsonResponse({ error: "服务器尚未配置删除专用密码。" }, { status: 503 });
+        return jsonResponse({ error: "服务器尚未配置削除专用密码。" }, { status: 503 });
       }
       if (!passwordCheck.valid) {
-        return jsonResponse({ error: "删除专用密码错误，請检查后重试。" }, { status: 403 });
+        return jsonResponse({ error: "削除专用密码错误，請检查后重试。" }, { status: 403 });
       }
     }
 
@@ -1062,6 +1100,39 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: true, saved });
   } catch (error) {
     console.error("Failed to persist dashboard data.", error);
+    if (
+      typeof error === "object" && error !== null &&
+      "code" in error && error.code === "PGRST204" &&
+      "message" in error && typeof error.message === "string" &&
+      error.message.includes("'split_group_id' column of 'orders'")
+    ) {
+      return jsonResponse(
+        { error: "数据库尚未添加订单拆分来源字段，請先执行 20261127000000_order_split_lineage.sql 迁移后再保存。" },
+        { status: 503 },
+      );
+    }
+    if (
+      typeof error === "object" && error !== null &&
+      "code" in error && error.code === "PGRST204" &&
+      "message" in error && typeof error.message === "string" &&
+      error.message.includes("'show_in_calendar' column of 'vehicles'")
+    ) {
+      return jsonResponse(
+        { error: "数据库尚未添加车辆日歴显示状态，請先执行 20261208000000_vehicle_calendar_visibility.sql 后再保存车辆。" },
+        { status: 503 },
+      );
+    }
+    if (
+      typeof error === "object" && error !== null &&
+      "code" in error && error.code === "PGRST204" &&
+      "message" in error && typeof error.message === "string" &&
+      /'(address|company_name|postal_code|employment_status|employment_type)' column of 'drivers'/.test(error.message)
+    ) {
+      return jsonResponse(
+        { error: "数据库尚未添加完整的運転士字段，請先执行住所、邮编、在職状态及雇用类别迁移（20261125000000、20261126000000、20261128000000、20261207000000）后再保存。" },
+        { status: 503 },
+      );
+    }
     if (error instanceof OrderReceiptCleanupError) {
       return jsonResponse({ error: error.message }, { status: 500 });
     }
@@ -1072,13 +1143,13 @@ export async function POST(request: Request) {
       error.message.includes("delete_orders_with_related_data")
     ) {
       return jsonResponse(
-        { error: "数据库尚未应用订单关联数据删除迁移，请先执行 20261118000000_order_cascade_delete.sql。" },
+        { error: "数据库尚未应用订单关联数据削除迁移，请先执行 20261118000000_order_cascade_delete.sql。" },
         { status: 503 },
       );
     }
     if (typeof error === "object" && error !== null && "code" in error && error.code === "PDR01") {
       return jsonResponse(
-        { error: "訂単已关联運転士派单或执行历史，不能永久删除；請改为取消訂単。历史記録和小票会保留。" },
+        { error: "訂単已关联運転士派单或执行歴史，不能永久削除；請改为取消訂単。歴史記録和小票会保留。" },
         { status: 409 },
       );
     }

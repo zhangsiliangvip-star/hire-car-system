@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     const { data: historyRows, error: historyError } = await supabase.rpc("driver_historical_orders", { target_date: date! });
     if (historyError || !historyRows) {
       console.error("Driver historical orders query failed.", { code: historyError?.code });
-      return jsonResponse({ error: "无法读取历史行程，請重试。" }, { status: 503 });
+      return jsonResponse({ error: "无法读取歴史行程，請重试。" }, { status: 503 });
     }
     const historicalTrips = historyRows.map(projectHistoricalDriverTrip);
     const orderIds = new Set(trips.map(trip => trip.orderId));
