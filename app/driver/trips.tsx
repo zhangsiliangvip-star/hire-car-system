@@ -17,7 +17,7 @@ type FlightTrackingInfo = {
 };
 type FlightTrackingState = FlightTrackingInfo | { error: string };
 const flightStatusLabels: Record<FlightTrackingInfo["status"], string> = {
-  tracking_pending: "该日期超出可查询的未来航班范围，请联系调度确认",
+  tracking_pending: "免费套餐不支持提前查询航班，请在航班当天查看",
   scheduled: "计划中",
   delayed: "延误",
   en_route: "飞行中",
