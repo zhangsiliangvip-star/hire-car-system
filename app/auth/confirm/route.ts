@@ -1,6 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isDriverPath } from "@/lib/driver/test-runtime";
 
 function redirectWithoutCaching(url: URL) {
   const response = NextResponse.redirect(url);
@@ -28,7 +29,9 @@ function getSafeNextPath(value: string | null, origin: string) {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const nextPath = getSafeNextPath(searchParams.get("next"), request.nextUrl.origin);
-  const supabase = await createClient();
+  const scope = isDriverPath(new URL(nextPath, request.url).pathname) ? "driver" : "staff";
+  const loginPath = scope === "driver" ? "/driver/login" : "/login";
+  const supabase = await createClient(scope);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
@@ -38,7 +41,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error("Failed to exchange Supabase auth code.", error);
       return redirectWithoutCaching(
-        new URL("/login?error=auth_callback_failed", request.url),
+        new URL(`${loginPath}?error=auth_callback_failed`, request.url),
       );
     }
   } else if (tokenHash && type && otpTypes.has(type as EmailOtpType)) {
@@ -49,12 +52,12 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error("Failed to verify Supabase email token.", error);
       return redirectWithoutCaching(
-        new URL("/login?error=auth_callback_failed", request.url),
+        new URL(`${loginPath}?error=auth_callback_failed`, request.url),
       );
     }
   } else {
     return redirectWithoutCaching(
-      new URL("/login?error=auth_callback_failed", request.url),
+      new URL(`${loginPath}?error=auth_callback_failed`, request.url),
     );
   }
 

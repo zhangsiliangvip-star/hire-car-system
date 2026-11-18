@@ -18,7 +18,7 @@ const pageSchema = z.object({
   hasNext: z.boolean(), page: z.number().int(),
 });
 
-const actionLabels = { INSERT: "新增", UPDATE: "修改", DELETE: "删除" } as const;
+const actionLabels = { INSERT: "新增", UPDATE: "修改", DELETE: "削除" } as const;
 
 function displayValue(value: AuditValue | undefined) {
   if (value === undefined) return "（不存在）";
@@ -80,8 +80,8 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
         </button>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        仅管理员可查看。記録启用后的業務新增、修改、删除及請求書编号分配；相同内容重复保存不产生記録。
-        時間均为日本時間。历史操作无法补查；印章只記録图片指纹，不保留图片副本。
+        仅管理员可查看。記録启用后的業務新增、修改、削除及請求書编号分配；相同内容重复保存不产生記録。
+        時間均为日本時間。歴史操作无法补查；印章只記録图片指纹，不保留图片副本。
       </p>
       <div className="mb-4 grid gap-3 rounded border bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
         <label className="text-sm">業務类型
@@ -128,7 +128,7 @@ export function AuditHistory({ regions, regionId }: { regions: Region[]; regionI
                   <span className="font-semibold">{log.actor_name}</span>
                   {" · "}{actionLabels[log.action]}{" · "}{auditTables[log.table_name]}{" · "}{log.record_label}
                   <span className="ml-3 text-gray-500">
-                    {formatAuditTime(log.occurred_at)}{" · "}{regions.find((region) => region.id === log.region_id)?.name ?? "历史／未知地域"}
+                    {formatAuditTime(log.occurred_at)}{" · "}{regions.find((region) => region.id === log.region_id)?.name ?? "歴史／未知地域"}
                   </span>
                 </summary>
                 <p className="my-3 break-all text-xs text-gray-500">

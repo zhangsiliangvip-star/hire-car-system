@@ -5,93 +5,112 @@ import { ReportDutyFields } from "@/components/report-duty-fields";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { createDriverRequestId } from "@/lib/driver/orders";
-import { departureFromForm, durationLabel, isBlankReportStop, reportCommandSchema, reportDataSchema, reportDefaultsSchema, reportTime,
-  reportHeaderSchema, reportOnDate, reportSchema, reportTimeOrderError, reportTotals, returnFromForm, stopFromForm, toJapanInput, type DailyReport } from "@/lib/driver/reports";
+import { captureReportFields, readReportDraft, writeReportDraft, type ReportDraft } from "@/lib/driver/report-draft";
+import { departureFromForm, durationLabel, formatManualClock, fromJapanInput, reportCommandSchema, reportDataSchema, reportDefaultsSchema, reportTime,
+  reportHeaderSchema, reportHeaderShapeSchema, reportOnDate, reportSchema, reportTimeOrderError, reportTotals, returnFromForm, stopFromForm, toJapanInput, type DailyReport } from "@/lib/driver/reports";
 import type { z } from "zod";
 import styles from "./report.module.css";
 
 type Action = z.infer<typeof reportCommandSchema>["action"];
-type Depot = { name: string; address: string } | null;
 type Save = (action: Action, payload: unknown) => Promise<boolean>;
 
-function LocationRows({ depot, locationKey, disabled, save }: {
-  depot: Depot; locationKey: string; disabled: boolean; save: (payload: { useDefault: boolean; address: string; km: number }) => Promise<boolean>;
+function validDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) &&
+    new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+}
+
+function formatManualTimeInput(input: HTMLInputElement) {
+  input.value = formatManualClock(input.value);
+}
+
+function formatManualTimes(root: ParentNode) {
+  if (typeof root.querySelectorAll !== "function") return;
+  root.querySelectorAll<HTMLInputElement>("[data-manual-time]").forEach(formatManualTimeInput);
+}
+
+function LocationRows({ locationKey, serviceDate, disabled, save, fields }: {
+  locationKey: string; serviceDate: string; disabled: boolean;
+  fields?: Record<string, string>;
+  save: (payload: { useDefault: false; address: string; km: number; departedAt: string; force?: boolean }) => Promise<boolean>;
 }) {
-  const label = "出库";
+  const label = "開始地点";
   const formId = "report-checkout";
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    formatManualTimes(form);
     const data = new FormData(form);
-    if (await save({ useDefault: false, address: String(data.get("address") ?? ""), km: Number(data.get("km")) })) form.reset();
+    const departedAt = fromJapanInput(`${serviceDate}T${String(data.get("departedAt") ?? "")}`);
+    if (!departedAt) {
+      form.reportValidity();
+      return;
+    }
+    if (await save({
+      useDefault: false, address: String(data.get("address") ?? ""),
+      km: Number(data.get("km")), departedAt, force: true,
+    })) form.reset();
   }
-  return <tbody aria-label={`${label}打卡`}>
-    <tr className="driver-sheet-location"><th scope="row">{label}</th><td>
+  return <tbody aria-label={label}>
+    <tr className="driver-sheet-location"><th scope="row" className="driver-location-label"><span>開始<br />地点</span></th><td>
       <form id={formId} onSubmit={submit}>
-        {depot && <span className="driver-muted">{depot.name}車库（可修改）</span>}
-        <input key={locationKey} name="address" aria-label={`${label}地点地址`} placeholder={`${label}地点地址`}
-          disabled={disabled} defaultValue={depot?.address ?? ""} required maxLength={300} autoComplete="off" />
+        <input key={locationKey} name="address" aria-label={`${label}地址`} placeholder={`${label}地址`}
+          disabled={disabled} required maxLength={300} autoComplete="off" defaultValue={fields?.[`${formId}/address`] ?? ""} />
       </form>
-    </td><td><input form={formId} name="km" aria-label={`${label}公里表`} placeholder="km" type="number" inputMode="decimal"
-        min="0" max="9999999" step="0.1" required /></td>
+    </td><td><input form={formId} name="km" aria-label={`${label}公里数`} placeholder="km" type="number" inputMode="decimal" disabled={disabled}
+        min="0" max="9999999" step="0.1" required defaultValue={fields?.[`${formId}/km`] ?? ""} /></td>
       <td className="driver-time-cell">—</td>
-      <td className="driver-time-cell" aria-label="出库時間：打卡自動生成">—</td></tr>
-    <tr><td colSpan={5}><div className="driver-stop-actions">
-      <button form={formId} className="driver-button" disabled={disabled}>{label}打卡</button>
-    </div></td></tr>
+      <td><input form={formId} name="departedAt" aria-label="開始地点出発時間" type="text" inputMode="numeric"
+        data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" maxLength={5} placeholder="0900"
+        onBlur={e => formatManualTimeInput(e.currentTarget)} disabled={disabled} required defaultValue={fields?.[`${formId}/departedAt`] ?? ""} /></td></tr>
   </tbody>;
 }
-function ReturnRow({ report, disabled, saveChanges }: {
+function ReturnRow({ report, disabled, saveChanges, fields }: {
   report: DailyReport; disabled: boolean; saveChanges: () => Promise<void>;
+  fields?: Record<string, string>;
 }) {
   const formId = "report-edit-return";
   return <tbody aria-label="归库記録"><tr className="driver-sheet-location">
-    <th scope="row">归库</th><td><form id={formId} data-return onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
-      <input key={report.returnAddress} name="address" aria-label="归库地点地址" maxLength={300}
-        disabled={disabled} defaultValue={report.returnAddress ?? ""} />
+    <th scope="row" className="driver-location-label"><span>終了<br />地点</span></th><td><form id={formId} data-return onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
+      <input key={report.returnAddress} name="address" aria-label="終了地点地址" maxLength={300}
+        disabled={disabled} defaultValue={fields?.[`${formId}/address`] ?? report.returnAddress ?? ""} />
     </form></td><td><input key={report.returnKm} form={formId} name="km" aria-label="归库公里表" type="number"
-      inputMode="decimal" min="0" max="9999999" step="0.1" disabled={disabled} defaultValue={report.returnKm ?? ""} /></td>
-    <td><input key={report.returnedAt} form={formId} name="returnedAt" aria-label="归库時間" type="time" step="60"
-      disabled={disabled} defaultValue={toJapanInput(report.returnedAt).slice(11, 16)} /></td><td className="driver-time-cell">—</td>
+      inputMode="decimal" min="0" max="9999999" step="0.1" disabled={disabled} defaultValue={fields?.[`${formId}/km`] ?? report.returnKm ?? ""} /></td>
+    <td><input key={report.returnedAt} form={formId} name="returnedAt" aria-label="归库時間" type="text" inputMode="numeric"
+      data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" maxLength={5} placeholder="0900"
+      onBlur={e => formatManualTimeInput(e.currentTarget)} disabled={disabled}
+      defaultValue={fields?.[`${formId}/returnedAt`] ?? toJapanInput(report.returnedAt).slice(11, 16)} /></td><td className="driver-time-cell">—</td>
   </tr></tbody>;
 }
-function DepartureRow({ report, disabled, saveChanges }: {
+function DepartureRow({ report, disabled, saveChanges, fields }: {
   report: DailyReport; disabled: boolean; saveChanges: () => Promise<void>;
+  fields?: Record<string, string>;
 }) {
   const formId = "report-edit-departure";
   return <tbody aria-label="出库記録"><tr className="driver-sheet-location">
-    <th scope="row">出库</th><td><form id={formId} data-departure onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
-      <input key={report.departureAddress} name="address" aria-label="出库地点地址" required maxLength={300}
-        disabled={disabled} defaultValue={report.departureAddress} />
+    <th scope="row" className="driver-location-label"><span>開始<br />地点</span></th><td><form id={formId} data-departure onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
+      <input key={report.departureAddress} name="address" aria-label="開始地点地址" required maxLength={300}
+        disabled={disabled} defaultValue={fields?.[`${formId}/address`] ?? report.departureAddress} />
     </form></td><td><input key={report.departureKm} form={formId} name="km" aria-label="出库公里表" type="number"
-      inputMode="decimal" min="0" max="9999999" step="0.1" required disabled={disabled} defaultValue={report.departureKm} /></td>
+      inputMode="decimal" min="0" max="9999999" step="0.1" required disabled={disabled} defaultValue={fields?.[`${formId}/km`] ?? report.departureKm} /></td>
     <td className="driver-time-cell">—</td><td><input key={report.departedAt} form={formId} name="departedAt"
-      aria-label="出库時間" type="time" step="60" required disabled={disabled} defaultValue={toJapanInput(report.departedAt).slice(11, 16)} /></td>
+      aria-label="出库時間" type="text" inputMode="numeric" data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]"
+      maxLength={5} placeholder="0900" onBlur={e => formatManualTimeInput(e.currentTarget)}
+      required disabled={disabled} defaultValue={fields?.[`${formId}/departedAt`] ?? toJapanInput(report.departedAt).slice(11, 16)} /></td>
   </tr></tbody>;
 }
-function AddStopForm({ disabled, save, error, saveChanges, saving, closed, removeStop, canRemove }: {
-  disabled: boolean; save: Save; error?: string; saveChanges?: () => Promise<void>; saving?: boolean; closed?: boolean;
-  removeStop?: () => Promise<void>; canRemove?: boolean;
+function AddStopForm({ disabled, save }: {
+  disabled: boolean; save: Save;
 }) {
-  return <>
-    <tr><td colSpan={5}><div className="driver-stop-add">
-      <div className="driver-stop-actions">
-        {!closed && <div className="driver-stop-row-controls">
-          <button type="button" className="driver-button" aria-label="追加空白经由地" disabled={disabled} onClick={async () => {
-            await save("add_stop", { address: "", arrivedAt: null, departedAt: null });
-          }}>＋</button>
-          <button type="button" className="driver-button driver-secondary" aria-label="删除最后一条空白经由地"
-            disabled={saving || !canRemove} onClick={removeStop}>−</button>
-        </div>}
-        {saveChanges && <button type="button" className="driver-button driver-secondary" disabled={saving} onClick={saveChanges}>保存修改</button>}
-      </div>
-      {error && <p className="driver-error" role="alert">{error}</p>}
-    </div></td></tr>
-  </>;
+  return <div className="driver-stop-add">
+    <button type="button" className="driver-button" aria-label="追加空白经由地" disabled={disabled} onClick={async () => {
+      await save("add_stop", { address: "", arrivedAt: null, departedAt: null });
+    }}>＋ 追加经由地</button>
+  </div>;
 }
-function StopRow({ stop, index, disabled, saveChanges }: {
+function StopRow({ stop, index, disabled, saveChanges, removeStop, allowDelete, fields }: {
   stop: DailyReport["stops"][number]; index: number; disabled: boolean;
-  saveChanges: () => Promise<void>;
+  saveChanges: () => Promise<void>; removeStop: (stopId: string) => Promise<void>; allowDelete: boolean;
+  fields?: Record<string, string>;
 }) {
   const formId = `report-stop-${stop.id}`;
   const recordedKm = stop.departedKm ?? stop.arrivedKm ?? stop.plannedKm ?? null;
@@ -101,20 +120,29 @@ function StopRow({ stop, index, disabled, saveChanges }: {
   }
   return <tbody aria-label={`经由地 ${index + 1}`}>
       <tr className="driver-sheet-location"><th scope="row">经由{index + 1}</th><td>
-        <form id={formId} data-stop-id={stop.id} onSubmit={correct}>
-          <input key={stop.address} name="address" aria-label={`经由地 ${index + 1} 地址`} disabled={disabled} maxLength={300} defaultValue={stop.address} />
-        </form>
+        <div className="driver-stop-address">
+          <form id={formId} data-stop-id={stop.id} onSubmit={correct}>
+            <input key={stop.address} name="address" aria-label={`经由地 ${index + 1} 地址`} disabled={disabled} maxLength={300} defaultValue={fields?.[`${formId}/address`] ?? stop.address} />
+          </form>
+          {allowDelete && <button type="button" className="driver-stop-delete" aria-label={`削除经由地 ${index + 1}`}
+            title="削除该经由地及其已填写内容" disabled={disabled}
+            onClick={() => {
+              if (window.confirm(`确定削除经由地 ${index + 1}？该行已填写内容也会削除。`)) void removeStop(stop.id);
+            }}>×</button>}
+        </div>
       </td><td className="driver-stop-km">
           <input key={recordedKm} form={formId} name="km" disabled={disabled} type="number" inputMode="decimal" min="0" max="9999999" step="0.1"
             aria-label={`经由地 ${index + 1} 公里数（公里表累计读数）`}
-            placeholder="km" defaultValue={recordedKm ?? ""} />
+            placeholder="km" defaultValue={fields?.[`${formId}/km`] ?? recordedKm ?? ""} />
       </td>
         {(["arrived", "departed"] as const).map(prefix => {
           const label = prefix === "arrived" ? "到着" : "出発";
           const time = toJapanInput(stop[`${prefix}At`]).slice(11, 16);
           return <td key={prefix}>
-            <input key={stop[`${prefix}At`]} form={formId} name={`${prefix}At`} disabled={disabled} type="time" step="60"
-              aria-label={`经由地 ${index + 1} ${label}時間`} defaultValue={time} />
+            <input key={stop[`${prefix}At`]} form={formId} name={`${prefix}At`} disabled={disabled} type="text" inputMode="numeric"
+              data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" maxLength={5} placeholder="0900"
+              onBlur={e => formatManualTimeInput(e.currentTarget)} aria-label={`经由地 ${index + 1} ${label}時間`}
+              defaultValue={fields?.[`${formId}/${prefix}At`] ?? time} />
           </td>;
         })}
       </tr>
@@ -136,44 +164,86 @@ export default function DriverReport() {
   const [defaults, setDefaults] = useState<z.infer<typeof reportDefaultsSchema> | null>(null);
   const [assignment, setAssignment] = useState("");
   const [defaultsError, setDefaultsError] = useState("");
+  const [draft, setDraft] = useState<ReportDraft | null>(null);
   const table = useRef<HTMLTableElement>(null);
   const headerForm = useRef<HTMLFormElement>(null);
   const lock = useRef(false);
   const pending = useRef<{ key: string; requestId: string } | null>(null);
   const dirtyRef = useRef(dirty);
+  const draftOwner = useRef<string | null>(null);
+  const persistRef = useRef<() => boolean>(() => true);
+  const defaultsDraft = useRef<{ serviceDate: string; assignment: string } | null>(null);
   function setDirty(value: boolean) { dirtyRef.current = value; setDirtyState(value); }
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
     async function load() {
       try {
-        const response = await fetch("/api/driver/reports", { cache: "no-store", signal: controller.signal });
+        const [response, identity] = await Promise.all([
+          fetch("/api/driver/reports", { cache: "no-store", signal: controller.signal }),
+          createClient("driver").auth.getUser(),
+        ]);
         if (response.status === 401) { location.replace("/driver/login"); return; }
+        if (identity.error || !identity.data.user) throw new Error("无法确认登录账号，請重新登录后重试。");
         if (!response.ok) throw new Error("无法读取日報，請重试或联系管理员。");
         const result = reportDataSchema.parse(await response.json());
-        if (active && document.visibilityState === "visible") { setData(result); setDirty(false); setBusy(false); }
+        if (active && document.visibilityState === "visible") {
+          draftOwner.current = identity.data.user.id;
+          let restored: ReportDraft | null = null;
+          try {
+            const stored = readReportDraft(sessionStorage, draftOwner.current);
+            const saved = result.reports.find(item => item.id === stored?.reportId);
+            if (stored && (stored.reportId ? saved?.version !== stored.version : result.reports.some(item => !item.returnedAt))) {
+              setError("服务器日報已有更新，未自动套用本机草稿。請核对最新内容后继续填写。");
+            } else restored = stored;
+          } catch (cause) {
+            console.error("Driver report draft restore failed.", cause);
+            setError("无法读取本机草稿，請检查浏览器存储设置；现有草稿未清除。");
+          }
+          setDraft(restored);
+          defaultsDraft.current = restored?.reportId === null ? restored : null;
+          if (restored) {
+            setSelected(restored.reportId); setStarting(restored.starting);
+            setNewDate(restored.serviceDate); setAssignment(restored.assignment);
+            setNotice("已恢复本机草稿，請继续填写并点“保存”提交。");
+          }
+          setData(result); setDirty(Boolean(restored)); setBusy(false);
+        }
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Report load failed.", cause);
         if (active) { setError("无法读取日報，請刷新重试。"); setBusy(false); }
       }
     }
-    function revalidate() { setData(null); setDefaults(null); setAssignment(""); setDefaultsError(""); setBusy(true); setError(""); setRevision(v => v + 1); }
+    function revalidate() {
+      if (!persistRef.current()) return;
+      setData(null); setDefaults(null); setAssignment(""); setDefaultsError(""); setBusy(true); setError(""); setRevision(v => v + 1);
+    }
     function visibility() {
-      if (document.visibilityState === "hidden") { controller.abort(); setData(null); setDefaults(null); setAssignment(""); setBusy(true); }
-      else revalidate();
+      if (document.visibilityState === "hidden") { persistRef.current(); controller.abort(); }
+      else if (!lock.current) revalidate();
     }
     function pageShow(event: PageTransitionEvent) { if (event.persisted) revalidate(); }
+    function pageHide() { persistRef.current(); }
+    function beforeUnload(event: BeforeUnloadEvent) {
+      if (!persistRef.current()) { event.preventDefault(); event.returnValue = ""; }
+    }
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("pageshow", pageShow);
-    const { data: subscription } = createClient().auth.onAuthStateChange(event => {
-      if (event === "SIGNED_OUT") { setData(null); location.replace("/driver/login"); }
+    window.addEventListener("pagehide", pageHide);
+    window.addEventListener("beforeunload", beforeUnload);
+    const { data: subscription } = createClient("driver").auth.onAuthStateChange(event => {
+      if (event === "SIGNED_OUT") {
+        discardDraft(); draftOwner.current = null; setDirty(false); setData(null); location.replace("/driver/login");
+      }
     });
     const timer = setInterval(() => setNow(Date.now()), 1000);
     void load();
     return () => {
       active = false; controller.abort(); clearInterval(timer); subscription.subscription.unsubscribe();
       document.removeEventListener("visibilitychange", visibility); window.removeEventListener("pageshow", pageShow);
+      window.removeEventListener("pagehide", pageHide);
+      window.removeEventListener("beforeunload", beforeUnload);
     };
   }, [revision]);
   const open = data?.reports.find(r => !r.returnedAt);
@@ -183,6 +253,48 @@ export default function DriverReport() {
   const selectedOrder = currentDefaults?.orders.find(order => order.assignmentId === assignment);
   const needsOrder = Boolean(currentDefaults?.orders.length && !selectedOrder);
   const canLoadDefaults = Boolean(data && !report && !busy);
+  const draftFields = draft?.reportId === (report?.id ?? null) ? draft.fields : undefined;
+  function discardDraft() {
+    try {
+      if (draftOwner.current) writeReportDraft(sessionStorage, draftOwner.current, null);
+      setDraft(null);
+      defaultsDraft.current = null;
+      return true;
+    } catch (cause) {
+      console.error("Driver report draft removal failed.", cause);
+      setError("无法清除本机草稿，請检查浏览器存储设置后重试。");
+      return false;
+    }
+  }
+  function captureDraft(): ReportDraft {
+    return {
+      reportId: report?.id ?? null, version: report?.version ?? 0,
+      serviceDate: validDate(serviceDate) ? serviceDate : reportTime(new Date().toISOString()).slice(0, 10),
+      starting: !report, assignment,
+      fields: captureReportFields(headerForm.current, table.current),
+    };
+  }
+  function persistDraft() {
+    if (!dirtyRef.current || !data || busy || !headerForm.current || !table.current) return true;
+    try {
+      if (!draftOwner.current) throw new Error("Draft account is unavailable.");
+      writeReportDraft(sessionStorage, draftOwner.current, captureDraft());
+      return true;
+    } catch (cause) {
+      console.error("Driver report draft save failed.", cause);
+      setError("无法保留本机草稿，請先点“保存”提交，勿离开页面。");
+      return false;
+    }
+  }
+  persistRef.current = persistDraft;
+  function queueDraft() { queueMicrotask(() => persistRef.current()); }
+  function startNewReport() {
+    if (open || saving) return;
+    if (dirty && !window.confirm("开始新日報会放弃尚未保存的修改，是否继续？")) return;
+    if (!discardDraft()) return;
+    setDirty(false); setSelected(null); setStarting(true); setNewDate(reportTime(new Date().toISOString()).slice(0, 10));
+    setDefaults(null); setAssignment(""); setDefaultsError(""); setError(""); setNotice("");
+  }
   useEffect(() => {
     if (busy || saving || dirty || starting) return;
     const controller = new AbortController();
@@ -222,7 +334,10 @@ export default function DriverReport() {
         if (result.serviceDate !== serviceDate) throw new Error("日報默认信息日期不匹配。");
         if (active && document.visibilityState === "visible") {
           setDefaults(result);
-          setAssignment(result.orders.length === 1 ? result.orders[0].assignmentId : "");
+          const restored = defaultsDraft.current;
+          setAssignment(restored?.serviceDate === serviceDate
+            ? restored.assignment : result.orders.length === 1 ? result.orders[0].assignmentId : "");
+          defaultsDraft.current = null;
         }
       } catch (cause) {
         if (controller.signal.aborted) return;
@@ -233,20 +348,40 @@ export default function DriverReport() {
     void loadDefaults();
     return () => { active = false; controller.abort(); };
   }, [canLoadDefaults, serviceDate, revision]);
-  function readHeader() {
-    if (!headerForm.current || !headerForm.current.reportValidity()) throw new Error("請检查日期、点呼時間、車両番号、運転手和客数。");
+  function readHeader(force = false) {
+    if (!headerForm.current || (!force && !headerForm.current.reportValidity())) throw new Error("請检查日期、点呼時間、車両番号、運転手和客数。");
     const fields = new FormData(headerForm.current);
-    return reportHeaderSchema.parse({ serviceDate: String(fields.get("serviceDate") ?? ""),
-      dutyStartTime: String(fields.get("dutyStartTime") ?? "") || null,
-      dutyEndTime: String(fields.get("dutyEndTime") ?? "") || null,
-      dutyStartDate: fields.get("dutyStartTime") ? String(fields.get("dutyStartDate") ?? "") : null,
-      dutyEndDate: fields.get("dutyEndTime") ? String(fields.get("dutyEndDate") ?? "") : null,
+    const previous = report?.header;
+    const dateValue = String(fields.get("serviceDate") ?? "");
+    const headerServiceDate = validDate(dateValue) ? dateValue : report?.serviceDate ?? serviceDate;
+    const clock = (name: string, previousValue?: string | null) => {
+      const value = formatManualClock(String(fields.get(name) ?? ""));
+      return !value ? null : /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : force ? previousValue ?? null : value;
+    };
+    const dutyStartTime = clock("dutyStartTime", previous?.dutyStartTime);
+    const dutyEndTime = clock("dutyEndTime", previous?.dutyEndTime);
+    const date = (name: string, enabled: boolean, previousValue?: string | null) => {
+      if (!enabled) return null;
+      const value = String(fields.get(name) ?? "");
+      return validDate(value) ? value : force ? previousValue ?? report?.serviceDate ?? headerServiceDate : value;
+    };
+    const passengerValue = fields.get("passengerCount");
+    const passengerCount = passengerValue === "" ? null : Number(passengerValue);
+    const vehicleValue = String(fields.get("vehicleNumber") ?? "");
+    const driverValue = String(fields.get("driverName") ?? "");
+    const header = { serviceDate: headerServiceDate,
+      dutyStartTime, dutyEndTime,
+      dutyStartDate: date("dutyStartDate", Boolean(dutyStartTime), previous?.dutyStartDate),
+      dutyEndDate: date("dutyEndDate", Boolean(dutyEndTime), previous?.dutyEndDate),
       ...(data?.vehicleLinking ? {
         assignmentId: report ? String(fields.get("assignmentId") ?? "") || null : selectedOrder?.assignmentId ?? null,
         vehicleBaseline: report ? String(fields.get("vehicleBaseline") ?? "") : selectedOrder?.vehicleNumber ?? "",
       } : {}),
-      vehicleNumber: String(fields.get("vehicleNumber") ?? ""), driverName: String(fields.get("driverName") ?? ""),
-      passengerCount: fields.get("passengerCount") === "" ? null : Number(fields.get("passengerCount")) });
+      vehicleNumber: vehicleValue.length <= 100 ? vehicleValue : force ? previous?.vehicleNumber ?? "" : vehicleValue,
+      driverName: driverValue.length <= 100 ? driverValue : force ? previous?.driverName ?? "" : driverValue,
+      passengerCount: passengerCount === null || (Number.isInteger(passengerCount) && passengerCount >= 0 && passengerCount <= 999)
+        ? passengerCount : force ? previous?.passengerCount ?? null : passengerCount };
+    return force ? reportHeaderShapeSchema.parse(header) : reportHeaderSchema.parse(header);
   }
   async function save(action: Action, payload: unknown): Promise<boolean> {
     if (lock.current) return false;
@@ -269,13 +404,35 @@ export default function DriverReport() {
       }
       pending.current = null;
       const updated = reportSchema.parse(result.report);
+      if (action === "add_stop" || action === "remove_stop") {
+        if (dirtyRef.current) {
+          const retained = { ...captureDraft(), reportId: updated.id, version: updated.version };
+          if (action === "remove_stop" && typeof payload === "object" && payload && "stopId" in payload) {
+            for (const key of Object.keys(retained.fields)) {
+              if (key.startsWith(`report-stop-${payload.stopId}/`)) delete retained.fields[key];
+            }
+          }
+          setDraft(retained);
+          try {
+            if (draftOwner.current) writeReportDraft(sessionStorage, draftOwner.current, retained);
+          } catch (cause) {
+            console.error("Driver report draft update failed.", cause);
+            setError("经由地已更新，但本机草稿保留失败，請勿离开页面并立即保存。");
+          }
+        }
+      } else {
+        setDirty(false); discardDraft();
+      }
       setSelected(updated.id);
       setStarting(false);
       setData(current => current ? { ...current, reports: [updated,
         ...current.reports.filter(r => r.id !== updated.id)].sort((a, b) => b.departedAt.localeCompare(a.departedAt)).slice(0, 31) } : current);
       if (action !== "add_stop" && action !== "remove_stop") setDirty(false);
-      setNotice(action === "add_stop" ? "空白经由地已保存，填写修改后請点“保存修改”。" :
-        action === "remove_stop" ? "已删除一条空白经由地，其他未保存的修改仍保留。" : "已保存。");
+      const forced = action === "edit_stops" && typeof payload === "object" && payload !== null &&
+        "force" in payload && payload.force === true;
+      setNotice(action === "add_stop" ? "空白经由地已添加，填写完成后請点悬浮“保存”按钮。" :
+        action === "remove_stop" ? "经由地已削除，其他未保存的修改仍保留。" :
+          forced ? "已强制保存；无效或缺失字段沿用已保存内容，可之后修改。" : "已保存。");
       return true;
     } catch (cause) {
       console.error("Driver report save failed.", cause);
@@ -284,71 +441,70 @@ export default function DriverReport() {
     } finally { lock.current = false; setSaving(false); }
   }
   const totals = report ? reportTotals(report, now) : null;
-  async function removeBlankStop() {
+  async function removeStop(stopId: string) {
     if (!report || !table.current || lock.current) return;
     try {
-      for (const stop of [...report.stops].reverse()) {
-        if (!isBlankReportStop(stop)) continue;
-        const form = table.current.querySelector<HTMLFormElement>(`form[data-stop-id="${stop.id}"]`);
-        if (!form) throw new Error("表格内容不完整，請刷新后核对。");
-        if (!form.checkValidity()) continue;
-        const fields = new FormData(form);
-        if (["address", "km", "arrivedAt", "departedAt"].some(name => String(fields.get(name) ?? "").trim())) continue;
-        await save("remove_stop", { stopId: stop.id });
-        return;
-      }
-      throw new Error("没有可删除的全空经由地，已填写的内容不会删除。");
+      const stop = report.stops.find(item => item.id === stopId);
+      if (!stop) throw new Error("经由地不存在，請刷新后核对。");
+      await save("remove_stop", { stopId: stop.id });
     } catch (cause) {
-      console.error("Blank report stop removal failed.", cause);
-      setError(cause instanceof Error ? cause.message : "无法删除空白经由地。");
+      console.error("Driver report stop removal failed.", cause);
+      setError(cause instanceof Error ? cause.message : "无法削除经由地。");
     }
   }
-  async function saveChanges() {
+  async function saveChanges(force = true) {
     if (!report || !table.current || lock.current) return;
     try {
+      formatManualTimes(table.current);
       const departureForm = table.current.querySelector<HTMLFormElement>("form[data-departure]");
-      if (!departureForm || !departureForm.reportValidity()) throw new Error("請检查出库地点、公里数和時間。");
-      const header = readHeader();
+      if (!departureForm || (!force && !departureForm.reportValidity())) throw new Error("請检查開始地点、公里数和時間。");
+      const header = readHeader(force);
       const dated = reportOnDate(report, header.serviceDate);
-      const departure = departureFromForm(dated, new FormData(departureForm));
+      const departure = departureFromForm(dated, new FormData(departureForm), force);
       let previous = departure.departedAt;
       const stops = dated.stops.map(stop => {
         const form = table.current?.querySelector<HTMLFormElement>(`form[data-stop-id="${stop.id}"]`);
         if (!form) throw new Error("表格内容不完整，請刷新后核对。");
-        if (!form.reportValidity()) throw new Error("請检查表格中的地点、公里数和日期時間。");
-        const updated = stopFromForm(stop, new FormData(form), previous);
+        if (!force && !form.reportValidity()) throw new Error("請检查表格中的地点、公里数和日期時間。");
+        const updated = stopFromForm(stop, new FormData(form), previous, force);
         previous = updated.departedAt ?? updated.arrivedAt ?? previous;
         return updated;
       });
       const returnForm = table.current.querySelector<HTMLFormElement>("form[data-return]");
-      if (!returnForm || !returnForm.reportValidity()) throw new Error("請检查归库地点、公里数和時間。");
-      const returned = returnFromForm(dated, new FormData(returnForm), stops.length ? previous : departure.departedAt);
-      if (returned && stops.some(stop => !stop.departedAt)) throw new Error("請先补完所有经由地的到着、出発時間及公里数，再保存归库。");
+      if (!returnForm || (!force && !returnForm.reportValidity())) throw new Error("請检查終了地点、公里数和時間。");
+      const returned = returnFromForm(dated, new FormData(returnForm), stops.length ? previous : departure.departedAt, force);
+      if (returned && stops.some(stop => !stop.departedAt) && !force) throw new Error("請先补完所有经由地的到着、出発時間及公里数，再保存归库。");
       const timeError = reportTimeOrderError({
         header, departedAt: departure.departedAt, returnedAt: returned?.returnedAt ?? dated.returnedAt,
       });
-      if (timeError) throw new Error(timeError);
-      await save("edit_stops", { stops, departure, header, ...(returned ? { return: returned } : {}) });
+      if (timeError && !force) throw new Error(timeError);
+      await save("edit_stops", { stops, departure, header, ...(returned ? { return: returned } : {}),
+        ...(force ? { force: true } : {}) });
     } catch (cause) {
       console.error("Report table validation failed.", cause);
       setError(cause instanceof Error ? cause.message : "表格内容无效，請检查日期時間。");
     }
   }
   const addStop = report ? <AddStopForm key={report.id}
-    disabled={saving || report.stops.length >= 100} saving={saving}
-    closed={Boolean(report.returnedAt)} saveChanges={saveChanges} save={save} error={error}
-    removeStop={removeBlankStop} canRemove={report.stops.some(isBlankReportStop)} /> : null;
-  return <main className={`driver-main ${styles.report}`}>
+    disabled={saving || report.stops.length >= 100} save={save} /> : null;
+  return <main className={`driver-main ${styles.report}`} onInput={queueDraft} onChange={queueDraft} onBlur={queueDraft}>
     <DriverNavigation active="report" busy={saving}
-      canLeave={() => !dirty || window.confirm("切换会放弃尚未保存的日報修改，是否继续？")} />
+      canLeave={persistDraft} />
     <div className="driver-toolbar">
       <button className="driver-link" disabled={saving} onClick={() => {
         if (dirty && !window.confirm("刷新会放弃尚未保存的修改，是否继续？")) return;
+        if (!discardDraft()) return;
+        setDirty(false);
         setData(null); setDefaults(null); setAssignment(""); setDefaultsError(""); setBusy(true); setError(""); setRevision(v => v + 1);
-      }}>刷新日報</button></div>
+      }}>刷新日報</button>
+      <button className="driver-link" disabled={saving || busy || !data || Boolean(open)}
+        title={busy || !data ? "日报加载完成后可新建" : open ? "请先完成当前出库中的日报" : undefined}
+        aria-label={busy || !data ? "新建日报（日报加载完成后可新建）" :
+          open ? "新建日报（请先完成当前出库中的日报）" : "新建日报"}
+        onClick={startNewReport}>＋ 新建日报</button>
+    </div>
     {error && <p className="driver-error" role="alert">{error}</p>}
-    {dirty && <p className="driver-muted">{report ? "有未保存的修改，請点表格末尾“保存修改”；＋和−仅保存空白行的增减。" :
-      "有未保存的日報信息，請点“出库打卡”保存。"}</p>}
+    {dirty && <p className="driver-muted">输入内容作为本机草稿保留，切换回来可继续填写；請点“保存”正式提交。</p>}
     {busy ? <p className="driver-empty">正在读取日報…</p> : data && <>
       {!report && <div className="driver-card">
         {!currentDefaults && !defaultsError && <p role="status">正在读取当天訂単和車库…</p>}
@@ -356,7 +512,7 @@ export default function DriverReport() {
         {currentDefaults && (currentDefaults.orders.length ? <label className="driver-field">关联当天訂単
           <select aria-label="关联当天訂単" value={assignment} disabled={saving} onChange={e => {
             if (dirty && !window.confirm("更换訂単会重新带入車両番号及車库地址，是否继续？")) return;
-            setAssignment(e.target.value); setDirty(true);
+            setDraft(null); setAssignment(e.target.value); setDirty(true);
           }}>
             <option value="">請選択当天訂単</option>
             {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
@@ -365,11 +521,11 @@ export default function DriverReport() {
           </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和車库地址請手動填写。</p>)}
         {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，請手動填写。</p>}
       </div>}
-      <form ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
+      <form id="report-header" ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
         aria-label="日報基本信息" onInput={() => setDirty(true)} onSubmit={e => { e.preventDefault(); if (report) void saveChanges(); }}>
         {report && data.vehicleLinking && <label className="driver-report-order-link">关联当天訂単
           <select name="assignmentId" aria-label="日報关联訂単" disabled={saving}
-            defaultValue={report.header?.assignmentId ?? ""} onChange={event => {
+            defaultValue={draftFields?.["report-header/assignmentId"] ?? report.header?.assignmentId ?? ""} onChange={event => {
               const option = report.orderOptions?.find(item => item.assignmentId === event.target.value);
               const plate = headerForm.current?.elements.namedItem("vehicleNumber");
               const baseline = headerForm.current?.elements.namedItem("vehicleBaseline");
@@ -380,7 +536,7 @@ export default function DriverReport() {
             }}>
             <option value="">未关联（保留手填車牌，不同步訂単）</option>
             {report.header?.assignmentId && !report.orderOptions?.some(item => item.assignmentId === report.header?.assignmentId) &&
-              <option value={report.header.assignmentId}>原关联訂単（历史派单）</option>}
+              <option value={report.header.assignmentId}>原关联訂単（歴史派单）</option>}
             {report.orderOptions?.map(item => <option key={item.assignmentId} value={item.assignmentId}>
               {item.label} · {item.vehicleNumber || "未填写"}
             </option>)}
@@ -388,29 +544,30 @@ export default function DriverReport() {
           <span className="driver-muted">{report.header?.assignmentId
             ? "車両番号与关联訂単按服务日同步；修改并保存也会更新訂単。"
             : "尚未确认訂単关联，保留原車牌；請人工選択后保存以开启同步。"}</span>
-          <input name="vehicleBaseline" type="hidden" defaultValue={report.header?.vehicleNumber ?? ""} />
+          <input name="vehicleBaseline" type="hidden" defaultValue={draftFields?.["report-header/vehicleBaseline"] ?? report.header?.vehicleNumber ?? ""} />
         </label>}
         <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
-          disabled={saving} defaultValue={report?.serviceDate ?? serviceDate} onChange={e => {
-            if (!report) { setNewDate(e.target.value); setDefaults(null); setAssignment(""); setDefaultsError(""); }
+          disabled={saving} defaultValue={draftFields?.["report-header/serviceDate"] ?? report?.serviceDate ?? serviceDate} onChange={e => {
+            if (!report) { setDraft(null); setNewDate(e.target.value); setDefaults(null); setAssignment(""); setDefaultsError(""); }
             else {
               const link = headerForm.current?.elements.namedItem("assignmentId");
               if (link instanceof HTMLSelectElement) link.value = "";
             }
           }} /></label>
         <label>客数<input key={report?.header?.passengerCount ?? ""} name="passengerCount" aria-label="客数" type="number"
-          inputMode="numeric" min="0" max="999" step="1" disabled={saving} defaultValue={report?.header?.passengerCount ?? ""} /></label>
+          inputMode="numeric" min="0" max="999" step="1" disabled={saving} defaultValue={draftFields?.["report-header/passengerCount"] ?? report?.header?.passengerCount ?? ""} /></label>
         <label>車両番号<input key={report ? report.header?.vehicleNumber ?? "" : `${serviceDate}-${assignment}`} name="vehicleNumber" aria-label="車両番号"
           maxLength={100} disabled={saving || (!report && (!currentDefaults || needsOrder))}
-          defaultValue={report?.header?.vehicleNumber ?? selectedOrder?.vehicleNumber ?? ""} /></label>
+          defaultValue={draftFields?.["report-header/vehicleNumber"] ?? report?.header?.vehicleNumber ?? selectedOrder?.vehicleNumber ?? ""} /></label>
         <label>運転手<input key={report ? report.header?.driverName ?? "" : `${serviceDate}-${currentDefaults?.driverName ?? ""}`} name="driverName" aria-label="運転手"
           maxLength={100} disabled={saving || (!report && !currentDefaults)}
-          defaultValue={report?.header?.driverName ?? currentDefaults?.driverName ?? ""} /></label>
+          defaultValue={draftFields?.["report-header/driverName"] ?? report?.header?.driverName ?? currentDefaults?.driverName ?? ""} /></label>
         <ReportDutyFields key={`duty-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
-          header={report?.header} serviceDate={report?.serviceDate ?? serviceDate} disabled={saving} />
+          header={report?.header} serviceDate={report?.serviceDate ?? serviceDate} disabled={saving}
+          manualTimeInput draft={draftFields} />
       </form>
       <section className="driver-card driver-stops" aria-label="出库经由地归库"><h2>出库 · 经由地 · 归库</h2>
-        <p className="driver-muted">经由地時間手動填写后统一保存，早于上一项自動顺延至次日。</p>
+        <p className="driver-muted">日報默认处于修改状态；经由地時間手動填写后统一保存，早于上一项自動顺延至次日。已归库日報也可修改和追加、削除经由地。</p>
         <table ref={table} className="driver-stop-table driver-sheet" onInput={e => {
           if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-checkout" || e.target.form?.dataset.stopId || e.target.form?.hasAttribute("data-departure") || e.target.form?.hasAttribute("data-return"))) setDirty(true);
         }}>
@@ -419,46 +576,65 @@ export default function DriverReport() {
             <col className="driver-col-time" /><col className="driver-col-time" /></colgroup>
           <thead><tr><th scope="col">项目</th><th scope="col">地址</th><th scope="col">公里数</th>
             <th scope="col">到着</th><th scope="col">出発</th></tr></thead>
-          {!report && <LocationRows key={serviceDate} locationKey={assignment} depot={selectedOrder?.depot ?? null}
+          {!report && <LocationRows key={serviceDate} locationKey={assignment} serviceDate={serviceDate} fields={draftFields}
             disabled={saving || !currentDefaults || needsOrder} save={async p => {
             if (!currentDefaults || needsOrder) { setError("請先读取当天訂単并選択訂単。"); return false; }
-            try { return await save("checkout", { ...p, header: readHeader() }); }
-            catch (cause) { console.error("Invalid report header.", cause); setError("請检查日期、点呼時間、車両番号、運転手和客数。"); return false; }
+            try {
+              const header = readHeader(Boolean(p.force));
+              const timeError = reportTimeOrderError({ header, departedAt: p.departedAt, returnedAt: null });
+              if (timeError && !p.force) throw new Error(timeError);
+              return await save("checkout", { ...p, header });
+            }
+            catch (cause) {
+              console.error("Invalid manual report checkout.", cause);
+              setError(cause instanceof Error ? cause.message : "請检查开始地点、公里数、時間和日報基本信息。");
+              return false;
+            }
           }} />}
           {report && <>
-          <DepartureRow key={`departure-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} />
+          <DepartureRow key={`departure-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} fields={draftFields} />
           {report.stops.map((stop, i) => <StopRow key={`${report.id}-${stop.id}`} stop={stop} index={i}
-            disabled={saving} saveChanges={saveChanges} />)}
-          {addStop && <tbody>{addStop}</tbody>}
-          <ReturnRow key={`return-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} />
+            disabled={saving} saveChanges={saveChanges} removeStop={removeStop}
+           allowDelete fields={draftFields} />)}
+          <ReturnRow key={`return-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} fields={draftFields} />
           </>}
         </table>
-        {!report && <p className="driver-muted">出库后，在表格内继续添加经由地。</p>}
-        {report?.returnedAt && !open && <button className="driver-link" disabled={saving}
-          onClick={() => {
-            if (dirty && !window.confirm("开始新日報会放弃尚未保存的修改，是否继续？")) return;
-            setDirty(false); setSelected(null); setStarting(true); setNewDate(reportTime(new Date().toISOString()).slice(0, 10));
-            setDefaults(null); setAssignment(""); setDefaultsError(""); setError(""); setNotice("");
-          }}>开始新一次出库</button>}
+        {addStop}
+        {!report && <p className="driver-muted">保存开始地点后，可在表格内继续添加经由地。</p>}
       </section>
       {notice && <p className="driver-muted" role="status">{notice}</p>}
       {report && <>
         <section className="driver-card">
           <h2>本次汇総</h2>
-          <div className="driver-row"><span>拘束時間{!report.returnedAt && "（进行中）"}</span><strong>{durationLabel(totals!.elapsedMs)}</strong></div>
-          <div className="driver-row"><span>累计休息</span><strong>{durationLabel(totals!.restMs)}</strong></div>
           <div className="driver-row"><span>当日公里数</span><strong>{totals!.distance === null ? "归库后计算" : `${totals!.distance} km`}</strong></div>
+          <div className="driver-row"><span>休憩時間</span><strong>{durationLabel(totals!.restMs)}</strong></div>
+          <div className="driver-row"><span>拘束時間{!report.returnedAt && "（进行中）"}</span><strong>{durationLabel(totals!.elapsedMs)}</strong></div>
         </section>
       </>}
       {data.reports.length > 0 && <details className="driver-card"><summary>历史日報</summary><label className="driver-field">最近31份日報
         <select value={report?.id ?? ""} disabled={saving} onChange={e => {
           if (dirty && !window.confirm("切换日報会放弃尚未保存的修改，是否继续？")) return;
+          if (!discardDraft()) return;
           setDirty(false); setStarting(false); setSelected(e.target.value); setError(""); setNotice("");
         }}>
           {!report && <option value="">新日報 · 待出库</option>}
-          {data.reports.map(r => <option key={r.id} value={r.id}>{r.serviceDate} {reportTime(r.departedAt).slice(11, 16)} {r.returnedAt ? "已归库" : "出库中"}</option>)}
+          {data.reports.map(r => <option key={r.id} value={r.id}>{r.serviceDate}</option>)}
         </select></label></details>}
+        {data && !busy && !report && <div className={styles.floatingActions} role="group" aria-label="開始地点保存">
+          <button type="submit" form="report-checkout" className="driver-button"
+            disabled={saving || !currentDefaults || needsOrder}>
+            {saving ? "保存中…" : "保存開始地点"}
+          </button>
+        </div>}
+        {report && <div className={styles.floatingActions} role="group" aria-label="日報修改和保存">
+          <button type="button" className="driver-button driver-secondary" aria-pressed="true" disabled>
+            修改中
+          </button>
+          <button type="button" className="driver-button" disabled={saving || !dirty} onClick={() => saveChanges()}>
+            {saving ? "保存中…" : "保存"}
+          </button>
+        </div>}
     </>}
-    <p className="driver-muted">請在安全停車后操作。新日報按所选当天訂単带入車両番号、本人姓名及車両所属会社車库地址，均可手動修改；已保存日報不自動覆盖。不采集定位。</p>
+    <p className="driver-muted">請在安全停車后操作。新日報按所选当天訂単带入車両番号和本人姓名；開始地点、公里数和出発時間均手動填写。已保存日報不自動覆盖，不采集定位。</p>
   </main>;
 }

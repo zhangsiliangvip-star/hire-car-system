@@ -50,7 +50,7 @@ export default function DriverShifts() {
       if (document.visibilityState === "hidden") clear();
       else setRevision(value => value + 1);
     }
-    const { data: subscription } = createClient().auth.onAuthStateChange(event => {
+    const { data: subscription } = createClient("driver").auth.onAuthStateChange(event => {
       if (event === "SIGNED_OUT") { clear(); location.replace("/driver/login"); }
     });
     document.addEventListener("visibilitychange", visibility);

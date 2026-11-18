@@ -23,5 +23,8 @@
 .driver-daily-overview .driver-daily-content h2{margin:0 0 3px;font-size:16px;line-height:24px;font-weight:600}
 .driver-daily-overview .driver-daily-summary{margin:0;font-size:13px;line-height:1.6;white-space:pre-wrap}
 .driver-daily-overview .driver-daily-plate{grid-column:1 / -1;justify-self:end;max-width:100%;margin:0;font-size:11px;line-height:1.5;text-align:right;overflow-wrap:anywhere}
+.driver-daily-flight{grid-column:1 / -1;margin-top:5px;padding:8px 10px;border:1px solid #ffffff3a;border-radius:10px;background:#ffffff12;font-size:12px}
+.driver-daily-flight .driver-row{padding:5px 0;border-color:#ffffff26;font-size:12px}
+.driver-daily-flight .driver-row span{color:#c3d9cd}
 .driver-trip-notes textarea{display:block;width:100%;min-width:0;margin:4px 0 8px;padding:10px;border:1px solid #dbe5dd;border-radius:10px;background:#fff;color:inherit;font:inherit;font-size:16px;line-height:1.5;resize:vertical}
 .driver-calendar-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border:1px solid var(--driver-green);border-radius:9px;background:var(--driver-green);color:#fff;font-size:13px;font-weight:700;text-decoration:none}

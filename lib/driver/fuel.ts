@@ -3,13 +3,13 @@ import { z } from "zod";
 export const fuelReceiptPath = z.string().regex(/^[0-9a-f-]{36}\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.(jpg|png|webp)$/);
 export const fuelSubmissionSchema = z.object({
   date: z.iso.date(), assignmentId: z.uuid(), expectedVersion: z.number().int().nonnegative(), requestId: z.uuid(),
-  amount: z.number().int().positive().max(99999999999999),
+  amount: z.number().int().nonnegative().max(99999999999999),
   receipts: z.array(fuelReceiptPath).max(5),
-}).strict();
+}).strict().refine(value => value.amount > 0 || value.expectedVersion > 0);
 export const fuelClaimSchema = z.object({
   id: z.uuid(), date: z.iso.date(), assignmentId: z.uuid(), version: z.number().int().positive(),
   status: z.enum(["pending", "approved", "rejected"]),
-  amount: z.number().int().positive().max(99999999999999),
+  amount: z.number().int().nonnegative().max(99999999999999),
   receipts: z.array(fuelReceiptPath).max(5), reviewNote: z.string(),
 }).strict();
 export const fuelReviewSchema = z.object({

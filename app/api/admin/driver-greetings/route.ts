@@ -23,7 +23,7 @@ export async function GET() {
     return jsonResponse({ slogan: data.globalSlogan });
   } catch (error) {
     console.error("Driver global slogan read failed.", { name: error instanceof Error ? error.name : "DatabaseError" });
-    return jsonResponse({ error: "无法读取全体标语，請刷新重试。" }, { status: 503 });
+    return jsonResponse({ error: "无法读取全体提示，請刷新重试。" }, { status: 503 });
   }
 }
 
@@ -31,26 +31,24 @@ export async function POST(request: Request) {
   try {
     const identity = await authorize();
     if (identity.response) return identity.response;
-    if (identity.profile.role !== "admin")
-      return jsonResponse({ error: "仅管理员可以修改全体标语。" }, { status: 403 });
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
       return jsonResponse({ error: "請使用JSON提交。" }, { status: 415 });
     let body: unknown;
     try { body = await request.json(); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = sloganSchema.safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "全体标语最多100字。" }, { status: 400 });
+    if (!parsed.success) return jsonResponse({ error: "全体提示最多100字。" }, { status: 400 });
     const { data, error } = await identity.supabase.rpc("admin_update_driver_global_slogan", {
       target_slogan: parsed.data.slogan.trim(),
     });
     if (error) {
       console.error("Driver global slogan update rejected.", { code: error.code });
-      return jsonResponse({ error: error.code === "42501" ? "仅管理员可以修改全体标语。" : "全体标语保存失败，請重试。" },
+      return jsonResponse({ error: error.code === "42501" ? "仅后台工作人员可以修改全体提示。" : "全体提示保存失败，請重试。" },
         { status: error.code === "42501" ? 403 : 503 });
     }
     if (typeof data !== "string") throw new Error("Driver slogan update response is invalid.");
     return jsonResponse({ slogan: data });
   } catch (error) {
     console.error("Driver global slogan update failed.", { name: error instanceof Error ? error.name : "UnknownError" });
-    return jsonResponse({ error: "全体标语保存未获确认，請检查后重试。" }, { status: 503 });
+    return jsonResponse({ error: "全体提示保存未获确认，請检查后重试。" }, { status: 503 });
   }
 }

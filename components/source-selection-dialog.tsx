@@ -38,6 +38,10 @@ export function SourceSelectionDialog({
   const matches = sources.filter((source) =>
     source.companyName.toLocaleLowerCase().includes(keyword) ||
     (source.shortName || "").toLocaleLowerCase().includes(keyword));
+  const selectSource = (name: string) => {
+    onSelect(name);
+    onClose();
+  };
   return (
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
@@ -72,7 +76,7 @@ export function SourceSelectionDialog({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {matches.map((source) => (
             <button key={source.id} type="button" aria-pressed={selected === source.companyName}
-              onClick={() => onSelect(source.companyName)}
+              onClick={() => selectSource(source.companyName)}
               className={`min-h-20 break-words rounded-lg border p-3 text-left hover:border-blue-500 hover:bg-blue-50 ${selected === source.companyName ? "border-blue-600 bg-blue-50" : "border-gray-200"}`}>
               <span className="flex items-center gap-2 font-semibold">
                 {source.color && (
@@ -88,19 +92,19 @@ export function SourceSelectionDialog({
         <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
           <input aria-label="手動输入来源" placeholder="手動输入新来源" maxLength={200} value={manualName}
             onChange={(event) => setManualName(event.target.value)} className="min-w-0 flex-1 rounded border p-2" />
-          <button type="button" disabled={!manualName.trim()} onClick={() => onSelect(manualName.trim())}
+          <button type="button" disabled={!manualName.trim()} onClick={() => selectSource(manualName.trim())}
             className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">選択</button>
         </div>
         <div className="mt-5 flex justify-between gap-3">
           {allLabel ? (
             <div className="flex gap-2">
-              <button type="button" onClick={() => onSelect("")} className="rounded border px-4 py-2">{allLabel}</button>
+              <button type="button" onClick={() => selectSource("")} className="rounded border px-4 py-2">{allLabel}</button>
               {unassignedLabel && unassignedValue && (
-                <button type="button" onClick={() => onSelect(unassignedValue)} className="rounded border px-4 py-2">{unassignedLabel}</button>
+                <button type="button" onClick={() => selectSource(unassignedValue)} className="rounded border px-4 py-2">{unassignedLabel}</button>
               )}
             </div>
           ) : (
-            <button type="button" onClick={() => onSelect("")} className="rounded border px-4 py-2">不填写来源</button>
+            <button type="button" onClick={() => selectSource("")} className="rounded border px-4 py-2">不填写来源</button>
           )}
         </div>
       </section>

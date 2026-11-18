@@ -4,7 +4,7 @@ import { getAuthenticatedProfile } from "@/lib/supabase/authorization";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDriverPwaEnabled, isDriverPwaTestMode } from "@/lib/driver/test-runtime";
 import { isDriverActionOrigin } from "@/lib/driver/assignment-action";
-import { driverAccountCreateSchema, driverLoginDataSchema, driverPasswordSchema } from "@/lib/driver/profile";
+import { driverAccountCreateSchema, driverEmailChangeSchema, driverLoginDataSchema, driverPasswordSchema } from "@/lib/driver/profile";
 
 const targetSchema = z.object({
   driverId: z.uuid(), name: z.string(), regionId: z.uuid(),
@@ -48,8 +48,12 @@ async function write(request: Request, creating: boolean) {
     if (text.length > 4096) return jsonResponse({ error: "請求过大。" }, { status: 413 });
     let body: unknown;
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
-    const parsed = (creating ? driverAccountCreateSchema : driverPasswordSchema).safeParse(body);
-    if (!parsed.success) return jsonResponse({ error: "請检查運転士、邮箱及密码（8至128字符）。" }, { status: 400 });
+    const changingEmail = !creating && typeof body === "object" && body !== null && "email" in body && !("password" in body);
+    const parsed = (creating ? driverAccountCreateSchema : changingEmail ? driverEmailChangeSchema : driverPasswordSchema).safeParse(body);
+    if (!parsed.success) return jsonResponse({ error: creating
+      ? "請检查運転士、邮箱及密码（6至128字符）。"
+      : changingEmail ? "請检查運転士及邮箱格式。"
+      : "請检查運転士、邮箱及密码（8至128字符）。" }, { status: 400 });
     const item = parsed.data;
     const target = await identity.supabase.rpc("admin_driver_login_target", { target_driver: item.driverId });
     if (target.error) {
@@ -63,6 +67,16 @@ async function write(request: Request, creating: boolean) {
     if (!creating && "userId" in item) {
       if (driver.userId !== item.userId || driver.version !== item.expectedVersion || driver.status === "revoked")
         return jsonResponse({ error: "運転士绑定已变化或已撤销，請刷新核对。" }, { status: 409 });
+      if (!("password" in item)) {
+        const { error } = await admin.auth.admin.updateUserById(item.userId, { email: item.email, email_confirm: true });
+        if (error) {
+          console.error("Driver email change failed.", { code: error.code, status: error.status });
+          const exists = ["email_exists", "user_already_exists"].includes(error.code || "");
+          return jsonResponse({ error: exists ? "该邮箱已被其他账号使用。" : "邮箱修改未获确认，請检查认证服务后重试。" },
+            { status: exists ? 409 : error.status === 429 ? 429 : 503 });
+        }
+        return jsonResponse({ ok: true });
+      }
       const { error } = await admin.auth.admin.updateUserById(item.userId, { password: item.password });
       if (error) {
         console.error("Driver password reset failed.", { code: error.code, status: error.status });
@@ -70,7 +84,7 @@ async function write(request: Request, creating: boolean) {
       }
       return jsonResponse({ ok: true });
     }
-    if (!("email" in item)) return jsonResponse({ error: "创建内容无效。" }, { status: 400 });
+    if (!("email" in item) || !("password" in item) || "userId" in item) return jsonResponse({ error: "创建内容无效。" }, { status: 400 });
     if (driver.userId) return jsonResponse({ error: "该運転士已有登录账号，請刷新后使用重置密码。" }, { status: 409 });
     const { data, error } = await admin.auth.admin.createUser({
       email: item.email, password: item.password, email_confirm: true,

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ReceiptDialog } from "@/components/order-receipts";
 import { z } from "zod";
 import { financeClaimSchema, expenseTotals, financeCategoryLabels } from "@/lib/driver/finance";
 import { japanDate } from "@/lib/driver/orders";
@@ -126,7 +127,7 @@ export default function Review() {
       setBusy(true); setRows([]); setError(""); setReceipt(""); setNotes({}); setRevision(value => value + 1);
       setFuelRows([]);
     }}>刷新</button>
-    <p className="driver-muted">立替金額作为新增費用追加；超時小時数替换当日原值，单价仍由后台设定。确认前請核对重复票据。運転士月工資只读，包含后台手動加减项目。</p>
+    <p className="driver-muted">燃油費、社報／旅報立替和超時提交后直接更新关联訂単，无需重复确认。费用修改按新旧差额更新，超時小時数替换当天原值，保留記録。旧待确认申報仍可审核或由司机修改后重新提交。后台更改已入账金額后，請与司机核对再修改。運転士月工資只读，包含后台手動加减项目。</p>
     {error && <p role="alert" className="driver-error">{error}</p>}
     {notice && <p role="status" className="driver-notice">{notice}</p>}
     {busy && <p className="driver-muted">正在处理…</p>}
@@ -135,7 +136,7 @@ export default function Review() {
       const totals = expenseTotals(row.claim.expenses);
       const key = `${row.claim.assignmentId}-${row.claim.category}`;
       return <section className="driver-card" key={key}>
-        <h2>{row.date} · {row.driverName}{row.claim.historical ? " · 历史訂単" : ""}</h2><p>{row.pickup} → {row.destination}</p>
+        <h2>{row.date} · {row.driverName}{row.claim.historical ? " · 歴史訂単" : ""}</h2><p>{row.pickup} → {row.destination}</p>
         <h3>{financeCategoryLabels[row.claim.category]}</h3>
         <p>{row.claim.category === "overtime" ? `超時 ${row.claim.overtimeHours} 小時` :
           `¥${(totals.company + totals.trip).toLocaleString()}`} · {row.claim.status === "pending" ? "待确认" : row.claim.status === "approved" ? "已入账" : "已退回"}</p>
@@ -166,8 +167,6 @@ export default function Review() {
         <button className="driver-button driver-secondary" disabled={busy} onClick={() => void reviewFuel(row, "rejected")}>退回燃油費</button>
       </> : <p className="driver-muted">{row.claim.reviewNote}</p>}
     </section>)}
-    {receipt && <section className="driver-card"><button className="driver-link" onClick={() => setReceipt("")}>关闭票据</button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="finance-receipt" src={receipt} alt="運転士立替票据" /></section>}
+    {receipt && <ReceiptDialog receipt={{ url: receipt, detail: "運転士立替票据" }} close={() => setReceipt("")} />}
   </main>;
 }

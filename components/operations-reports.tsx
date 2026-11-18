@@ -3,16 +3,30 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { createDriverRequestId, japanDate } from "@/lib/driver/orders";
-import { durationLabel, dutyDuration, reportHeaderSchema, reportSchema, reportTimeOrderError, toJapanInput, type DailyReport } from "@/lib/driver/reports";
-import { filterOperationRows, operationCommandSchema, operationDataSchema, operationDateLabel, operationInstant, operationResultSchema, operationTimeLabel, type OperationRow } from "@/lib/operations-reports";
+import { durationLabel, dutyDuration, reportHeaderSchema, reportOnDate, reportSchema, reportTimeOrderError, reportTotals, stopTime, toJapanInput, type DailyReport } from "@/lib/driver/reports";
+import { filterOperationRows, operationCommandSchema, operationDataSchema, operationDateLabel, operationResultSchema, operationTimeLabel, type OperationRow } from "@/lib/operations-reports";
 import { printOperationsReports } from "@/lib/operations-report-print";
 import { ReportDutyFields } from "@/components/report-duty-fields";
+import styles from "@/components/operations-report-editor.module.css";
 
 const fieldClass = "rounded border border-gray-300 bg-white px-2 py-1.5 text-sm disabled:bg-gray-100";
 const buttonClass = "rounded border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50";
-const operationReportColumns = ["日期", "車両番号", "運転手", "出勤点呼時間", "出库地点", "出発時間",
-  "接客地点", "下客地点", "归库地点", "到着時間", "退勤点呼時間", "工作総時长", "操作"] as const;
+const operationReportColumns = ["日期", "車両番号", "運転手", "出勤点呼時間", "開始地点", "出発時間",
+  "接客地点", "下客地点", "終了地点", "到着時間", "退勤点呼時間", "工作総時长", "操作"] as const;
 type Command = ReturnType<typeof operationCommandSchema.parse>;
+
+function validServiceDate(value: string) {
+  if (!/^[1-9]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function formatOperationClockInput(value: string) {
+  const compact = value.trim();
+  if (/^\d{4}$/.test(compact)) return `${compact.slice(0, 2)}:${compact.slice(2)}`;
+  const clock = compact.match(/^(\d{1,2}):([0-5]\d)$/);
+  return clock ? `${clock[1].padStart(2, "0")}:${clock[2]}` : value;
+}
 
 async function submitCommand(command: Command, signal: AbortSignal) {
   const response = await fetch("/api/operations-reports", { method: "POST", cache: "no-store",
@@ -38,11 +52,13 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
   const pending = useRef<{ key: string; id: string } | null>(null);
   const unsaved = useRef(false);
   const [stops, setStops] = useState(row.report.stops);
-  const [rests, setRests] = useState(() => row.report.rests.map(rest => ({ ...rest, key: createDriverRequestId() })));
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const r = row.report;
+  const totals = reportTotals(r);
+  const restMs = totals.restMs;
+  const restraintMs = dutyDuration(r);
   useEffect(() => {
     const node = dialog.current;
     node?.showModal();
@@ -62,32 +78,43 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
     try {
       const data = new FormData(form);
       const text = (name: string) => String(data.get(name) ?? "");
+      const clock = (name: string) => formatOperationClockInput(text(name));
       const number = (name: string) => text(name) === "" ? null : Number(text(name));
-      const instant = (name: string, original: string | null = null) => operationInstant(text(name), original);
       const header = reportHeaderSchema.parse({
         serviceDate: text("serviceDate"), vehicleNumber: text("vehicleNumber"), driverName: text("driverName"),
         passengerCount: number("passengerCount"),
-        dutyStartTime: text("dutyStartTime") || null, dutyEndTime: text("dutyEndTime") || null,
+        dutyStartTime: clock("dutyStartTime") || null, dutyEndTime: clock("dutyEndTime") || null,
         dutyStartDate: text("dutyStartTime") ? text("dutyStartDate") : null,
         dutyEndDate: text("dutyEndTime") ? text("dutyEndDate") : null,
       });
-      const report = reportSchema.parse({ ...r, serviceDate: header.serviceDate,
+      const dated = reportOnDate({ ...r, stops }, header.serviceDate);
+      const departedAt = stopTime(clock("departedAt"), `${header.serviceDate}T00:00:00+09:00`, dated.departedAt);
+      if (!departedAt) throw new Error("請填写有效出库時間（HH:mm）。");
+      let previousAt = departedAt;
+      const updatedStops = dated.stops.map(stop => {
+        const arrivedAt = stopTime(clock(`${stop.id}.arrivedAt`), previousAt, stop.arrivedAt);
+        const departedAt = stopTime(clock(`${stop.id}.departedAt`), arrivedAt ?? previousAt, stop.departedAt);
+        const km = number(`${stop.id}.km`);
+        previousAt = departedAt ?? arrivedAt ?? previousAt;
+        return { ...stop, arrivedAt, arrivedKm: arrivedAt ? km : null,
+          departedAt, departedKm: departedAt ? km : null, plannedKm: stop.plannedKm ?? null };
+      });
+      const returnedAt = stopTime(clock("returnedAt"), previousAt, dated.returnedAt);
+      const report = reportSchema.parse({ ...dated,
         header: { ...(r.orderOptions ? { assignmentId: text("assignmentId") || null } : {}),
           vehicleNumber: header.vehicleNumber, driverName: header.driverName, passengerCount: header.passengerCount,
           dutyStartDate: header.dutyStartDate, dutyEndDate: header.dutyEndDate,
           dutyStartTime: header.dutyStartTime, dutyEndTime: header.dutyEndTime },
-        departedAt: instant("departedAt", r.departedAt), departureAddress: text("departureAddress"), departureKm: number("departureKm"),
-        returnedAt: instant("returnedAt", r.returnedAt), returnAddress: text("returnAddress").trim() || null, returnKm: number("returnKm"),
-        stops: stops.map(stop => ({ id: stop.id, address: text(`${stop.id}.address`),
-          arrivedAt: instant(`${stop.id}.arrivedAt`, stop.arrivedAt), arrivedKm: number(`${stop.id}.arrivedKm`),
-          departedAt: instant(`${stop.id}.departedAt`, stop.departedAt), departedKm: number(`${stop.id}.departedKm`),
-          plannedKm: number(`${stop.id}.plannedKm`) })),
-        rests: rests.map(rest => ({ startedAt: instant(`${rest.key}.startedAt`, rest.startedAt), endedAt: instant(`${rest.key}.endedAt`, rest.endedAt) })),
+        departedAt, departureAddress: text("departureAddress"), departureKm: number("departureKm"),
+        returnedAt, returnAddress: text("returnAddress").trim() || null, returnKm: number("returnKm"),
+        stops: updatedStops.map(stop => ({ ...stop, address: text(`${stop.id}.address`) })),
+        rests: dated.rests,
       });
       const timeError = reportTimeOrderError(report);
       if (timeError) throw new Error(timeError);
       const draft = { action: "edit" as const, report: { ...report,
-        header: { ...report.header, ...(r.orderOptions ? { vehicleBaseline: text("vehicleBaseline") } : {}) } }, reason: text("reason") };
+        header: { ...report.header, ...(r.orderOptions ? { vehicleBaseline: text("vehicleBaseline") } : {}) } },
+        reason: "电脑端编辑乘务日报" };
       const key = JSON.stringify(draft);
       if (pending.current?.key !== key) pending.current = { key, id: createDriverRequestId() };
       const command = operationCommandSchema.parse({ ...draft, requestId: pending.current.id });
@@ -99,29 +126,42 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
       if (controller.current?.signal.aborted) return;
       console.error("Operations report edit failed.", cause instanceof Error ? cause.name : "UnknownError");
       setError(cause instanceof Error && cause.name !== "ZodError" ? cause.message :
-        "請检查日期時間、点呼先后、公里数、每个经由地的配对字段和修改原因。");
+        "請检查日期時間、点呼先后、公里数和每个经由地的配对字段。");
     } finally { lock.current = false; setBusy(false); }
   }
   const input = (name: string, label: string, value: string | number | null | undefined,
-    type: "text" | "number" | "datetime-local" | "date" = "text", required = false, maxLength = 300) =>
+    type: "text" | "number" | "date" | "time" = "text", required = false, maxLength = 300) =>
     <label className="flex min-w-0 flex-col gap-1 text-sm">{label}<input className={fieldClass} name={name} aria-label={label}
       type={type} required={required} disabled={busy} defaultValue={value ?? ""}
       {...(type === "number" ? { min: 0, max: name === "passengerCount" ? 999 : 9999999, step: name === "passengerCount" ? 1 : 0.1 } :
-        type === "datetime-local" ? { step: 1 } : type === "text" ? { maxLength } : {})} /></label>;
-  return <dialog ref={dialog} aria-labelledby="operation-editor-title"
-    className="m-auto max-h-[92dvh] w-[min(1100px,96vw)] overflow-y-auto rounded-lg p-4 shadow-xl backdrop:bg-black/40"
+        type === "time" ? { step: 60 } : type === "text" ? { maxLength } : {})} /></label>;
+  const timeValue = (value: string | null) => value ? toJapanInput(value).slice(11, 16) : "";
+  const cellInput = (name: string, label: string, value: string | number | null | undefined,
+    type: "text" | "number" | "time", required = false) =>
+    <input className={styles.cellInput} name={name} aria-label={label}
+      type={type === "number" || type === "time" ? "text" : type}
+      inputMode={type === "time" ? "numeric" : type === "number" ? "decimal" : undefined}
+      maxLength={type === "time" ? 5 : type === "text" ? 300 : type === "number" ? 16 : undefined}
+      placeholder={type === "time" ? "0800" : undefined}
+      onBlur={type === "time" ? event => {
+        event.currentTarget.value = formatOperationClockInput(event.currentTarget.value);
+      } : undefined}
+      required={required}
+      disabled={busy} defaultValue={value ?? ""}
+      />;
+  return <dialog ref={dialog} aria-labelledby="operation-editor-title" className={styles.dialog}
     onCancel={event => { event.preventDefault(); close(); }}>
-    <h2 id="operation-editor-title" className="mb-2 text-lg font-bold">编辑運行日報 · {row.driverName}</h2>
-    <p className="mb-3 text-sm text-gray-600">全部日期時間为日本時間。修改不改变運転士归属；出库日期须与日報日期一致。归库后经由地须填写完整。
-      旧日報点呼日期会预填，請核对后保存。切换到其他应用／标签页会清除未保存的编辑。</p>
-    <form onSubmit={save} onInput={markDirty} className="space-y-4" onChange={event => {
+    <div className={styles.content}>
+    <h2 id="operation-editor-title" className={styles.title}>乘務日報 · {row.driverName}</h2>
+    <p className={styles.intro}>全部时间为日本时间。修改不改变司机归属；归库后需填写完整的经由地信息。</p>
+    <form onSubmit={save} onInput={markDirty} className={styles.form} onChange={event => {
       if (event.target instanceof HTMLInputElement && event.target.name === "serviceDate") {
         const link = event.currentTarget.elements.namedItem("assignmentId");
         if (link instanceof HTMLSelectElement) link.value = "";
       }
     }}>
-      {r.orderOptions && <label className="block text-sm">关联当天訂単
-        <select name="assignmentId" aria-label="日報关联訂単" className={`${fieldClass} ml-2 max-w-full`} disabled={busy}
+      {r.orderOptions && <label className={styles.association}>关联当天订单
+        <select name="assignmentId" aria-label="日報关联訂単" disabled={busy}
           defaultValue={r.header?.assignmentId ?? ""} onChange={event => {
             const option = r.orderOptions?.find(item => item.assignmentId === event.target.value);
             const form = event.currentTarget.form;
@@ -134,84 +174,98 @@ export function OperationReportEditor({ row, onClose, onSaved }: {
           }}>
           <option value="">未关联（保留原車牌，請人工确认）</option>
           {r.header?.assignmentId && !r.orderOptions?.some(item => item.assignmentId === r.header?.assignmentId) &&
-            <option value={r.header.assignmentId}>原关联訂単（历史派单）</option>}
+            <option value={r.header.assignmentId}>原关联訂単（歴史派单）</option>}
           {r.orderOptions?.map(item => <option key={item.assignmentId} value={item.assignmentId}>
             {item.label} · {item.vehicleNumber || "未填写"}
           </option>)}
         </select>
         <input type="hidden" name="vehicleBaseline" defaultValue={r.header?.vehicleNumber ?? ""} />
-        <span className="mt-1 block text-amber-800">{r.header?.assignmentId
+        <span className={styles.associationNote}>{r.header?.assignmentId
           ? "关联車牌跟随訂単最新選択；在此修改并保存，也会同步该日訂単及其他页面。"
           : "尚未确认訂単关联，原車牌保持不变；選択并保存后开启同步。"}</span>
-        <span className="mt-1 block text-gray-600">修改日報日期会清除关联；先保存日期，再重新選択该日訂単。</span>
+        <span className={styles.associationNote}>修改日報日期会清除关联；先保存日期，再重新選択该日订单。</span>
       </label>}
-      <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <legend className="mb-2 font-semibold">基本信息与点呼</legend>
+      <section className={styles.header} aria-label="基本信息与点呼">
+        <h3 className={styles.sectionTitle}>基本信息与点呼</h3>
+        <div className={styles.headerGrid}>
         {input("serviceDate", "日期", r.serviceDate, "date", true)}
+        {input("passengerCount", "客数", r.header?.passengerCount, "number")}
         {input("vehicleNumber", "車両番号", r.header?.vehicleNumber, "text", false, 100)}
         {input("driverName", "運転手", r.header?.driverName || row.driverName, "text", false, 100)}
-        {input("passengerCount", "客数", r.header?.passengerCount, "number")}
-        <ReportDutyFields header={r.header} serviceDate={r.serviceDate} disabled={busy} inputClassName={fieldClass} />
-      </fieldset>
-      <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-3">
-        <legend className="mb-2 font-semibold">出库</legend>
-        {input("departureAddress", "出库地点", r.departureAddress, "text", true)}
-        {input("departureKm", "出库公里表", r.departureKm, "number", true)}
-        {input("departedAt", "出発日期時間", toJapanInput(r.departedAt), "datetime-local", true)}
-      </fieldset>
-      <fieldset disabled={busy} className="space-y-3"><legend className="mb-2 font-semibold">全部经由地</legend>
-        {stops.map((stop, i) => <div key={stop.id} className="rounded border p-3">
-          <div className="mb-2 flex justify-between"><strong>经由地 {i + 1}</strong>
-            <button type="button" className={buttonClass} onClick={() => {
-              if (window.confirm(`删除第 ${i + 1} 个经由地？保存后生效。`)) { setStops(items => items.filter(s => s.id !== stop.id)); markDirty(); }
-            }}>移除经由地</button></div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {input(`${stop.id}.address`, `经由地 ${i + 1} 地点`, stop.address)}
-            {input(`${stop.id}.arrivedAt`, `经由地 ${i + 1} 到着`, toJapanInput(stop.arrivedAt), "datetime-local")}
-            {input(`${stop.id}.arrivedKm`, `经由地 ${i + 1} 到着公里表`, stop.arrivedKm, "number")}
-            {input(`${stop.id}.departedAt`, `经由地 ${i + 1} 出発`, toJapanInput(stop.departedAt), "datetime-local")}
-            {input(`${stop.id}.departedKm`, `经由地 ${i + 1} 出発公里表`, stop.departedKm, "number")}
-            {input(`${stop.id}.plannedKm`, `经由地 ${i + 1} 计划公里表`, stop.plannedKm, "number")}
-          </div>
-        </div>)}
-        <button type="button" className={buttonClass} disabled={stops.length >= 100} onClick={() => {
-          setStops(items => [...items, { id: createDriverRequestId(), address: "", arrivedAt: null, departedAt: null,
-            arrivedKm: null, departedKm: null, plannedKm: null }]); markDirty();
-        }}>＋ 经由地</button>
-      </fieldset>
-      <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-3"><legend className="mb-2 font-semibold">归库（未归库時三项全空）</legend>
-        {input("returnAddress", "归库地点", r.returnAddress)}
-        {input("returnKm", "归库公里表", r.returnKm, "number")}
-        {input("returnedAt", "到着日期時間", toJapanInput(r.returnedAt), "datetime-local")}
-      </fieldset>
-      <fieldset disabled={busy} className="space-y-2"><legend className="mb-2 font-semibold">休息記録（不从工作総時长中扣除）</legend>
-        {rests.map((rest, i) => <div key={rest.key} className="grid items-end gap-3 sm:grid-cols-3">
-          {input(`${rest.key}.startedAt`, `休息 ${i + 1} 开始`, toJapanInput(rest.startedAt), "datetime-local", true)}
-          {input(`${rest.key}.endedAt`, `休息 ${i + 1} 结束`, toJapanInput(rest.endedAt), "datetime-local")}
-          <button type="button" className={buttonClass} onClick={() => {
-            if (window.confirm(`移除第 ${i + 1} 段休息？保存后生效。`)) { setRests(items => items.filter(item => item.key !== rest.key)); markDirty(); }
-          }}>移除休息</button>
-        </div>)}
-        <button type="button" className={buttonClass} disabled={rests.length >= 100} onClick={() => {
-          setRests(items => [...items, { key: createDriverRequestId(), startedAt: r.departedAt, endedAt: null }]); markDirty();
-        }}>＋ 休息</button>
-      </fieldset>
-      {input("reason", "修改原因（保留修改前后記録）", "", "text", true)}
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <div className="flex justify-end gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={close}>取消</button>
-        <button className={`${buttonClass} font-semibold`} disabled={busy}>{busy ? "保存中…" : "保存修改"}</button></div>
+        <ReportDutyFields header={r.header} serviceDate={r.serviceDate} disabled={busy} inputClassName={fieldClass} manualTimeInput />
+        </div>
+      </section>
+      <section className={styles.journey} aria-label="出库经由地归库">
+        <h3 className={styles.sectionTitle}>出库 · 经由地 · 归库</h3>
+        <p className={styles.journeyHint}>时间可直接输入四位数字（例如 0800），离开输入框后显示为 08:00；早于上一项时自动顺延至次日。</p>
+        <table className={styles.journeyTable}>
+          <colgroup><col style={{ width: "56px" }} /><col /><col style={{ width: "100px" }} />
+            <col style={{ width: "90px" }} /><col style={{ width: "90px" }} /><col style={{ width: "78px" }} /></colgroup>
+          <thead><tr><th>项目</th><th>地址</th><th>公里数</th><th>到着</th><th>出发</th><th>操作</th></tr></thead>
+          <tbody><tr>
+            <th>開始地点</th><td>{cellInput("departureAddress", "開始地点", r.departureAddress, "text", true)}</td>
+            <td>{cellInput("departureKm", "出库公里表", r.departureKm, "number", true)}</td>
+            <td aria-label="出库到着">—</td><td>{cellInput("departedAt", "出発時間", timeValue(r.departedAt), "time", true)}</td><td>—</td>
+          </tr></tbody>
+          {stops.map((stop, i) => <tbody key={stop.id} data-stop-id={stop.id}>
+            <tr><th>经由{i + 1}</th>
+              <td>{cellInput(`${stop.id}.address`, `经由地 ${i + 1} 地点`, stop.address, "text")}</td>
+              <td>{cellInput(`${stop.id}.km`, `经由地 ${i + 1} 公里表`, stop.departedKm ?? stop.arrivedKm ?? stop.plannedKm, "number")}</td>
+              <td>{cellInput(`${stop.id}.arrivedAt`, `经由地 ${i + 1} 到着時間`, timeValue(stop.arrivedAt), "time")}</td>
+              <td>{cellInput(`${stop.id}.departedAt`, `经由地 ${i + 1} 出発時間`, timeValue(stop.departedAt), "time")}</td>
+              <td className={styles.rowAction}>
+                <button type="button" className={styles.removeButton} disabled={busy} aria-label={`削除经由地 ${i + 1}`} onClick={() => {
+                  if (window.confirm(`削除第 ${i + 1} 个经由地？保存后生效。`)) { setStops(items => items.filter(s => s.id !== stop.id)); markDirty(); }
+                }}>削除</button>
+              </td>
+            </tr>
+          </tbody>)}
+          <tbody><tr><td colSpan={6}>
+            <button type="button" className={styles.addButton} disabled={stops.length >= 100 || busy} onClick={() => {
+              setStops(items => [...items, { id: createDriverRequestId(), address: "", arrivedAt: null, departedAt: null,
+                arrivedKm: null, departedKm: null, plannedKm: null }]); markDirty();
+            }}>＋ 经由地</button>
+          </td></tr></tbody>
+          <tbody><tr>
+            <th>終了地点</th><td>{cellInput("returnAddress", "終了地点", r.returnAddress, "text")}</td>
+            <td>{cellInput("returnKm", "归库公里表", r.returnKm, "number")}</td>
+            <td>{cellInput("returnedAt", "到着時間", timeValue(r.returnedAt), "time")}</td><td>—</td><td>—</td>
+          </tr></tbody>
+        </table>
+      </section>
+      <section className={styles.summary} aria-label="本次汇总">
+        <h3 className={styles.sectionTitle}>本次汇总</h3>
+        <div className={styles.summaryRow}>
+          <span>当日公里数</span><strong>{totals.distance === null ? "归库后计算" : `${totals.distance} km`}</strong>
+        </div>
+        <div className={styles.summaryRow}>
+          <span>休憩時間</span><strong>{durationLabel(restMs)}</strong>
+        </div>
+        <div className={styles.summaryRow}>
+          <span>拘束時間</span><strong>{restraintMs === null ? "点呼未完整" : durationLabel(restraintMs)}</strong>
+        </div>
+      </section>
+      {error && <p role="alert" className={styles.error}>{error}</p>}
+      <div role="group" aria-label="日报编辑操作" className={styles.stickyActions}>
+        <button type="button" className={styles.cancelButton}
+          disabled={busy} onClick={close}>取消</button>
+        <button className={styles.saveButton}
+          disabled={busy}>{busy ? "保存中…" : "保存修改"}</button></div>
     </form>
+    </div>
   </dialog>;
 }
 
-function OperationMonth({ region, month }: { region: string; month: string }) {
+function OperationMonth({ region, printMonth, selectedDate, setPrintMonth, setSelectedDate }: {
+  region: string; printMonth: string; selectedDate: string;
+  setPrintMonth: (value: string) => void; setSelectedDate: (value: string) => void;
+}) {
   const [data, setData] = useState<ReturnType<typeof operationDataSchema.parse> | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
   const [company, setCompany] = useState("");
   const [vehicle, setVehicle] = useState("");
-  const [date, setDate] = useState("");
   const [editing, setEditing] = useState<OperationRow | null>(null);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
@@ -225,6 +279,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
       if (!active || document.visibilityState !== "visible") return;
       request?.abort(); const current = new AbortController(); request = current;
       try {
+        const month = selectedDate.slice(0, 7);
         const query = new URLSearchParams({ month }); if (region) query.set("region", region);
         const response = await fetch(`/api/operations-reports?${query}`, { cache: "no-store", signal: current.signal });
         if (!response.ok) throw new Error("无法读取運行日報，請刷新重试。");
@@ -265,25 +320,26 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
       subscription.subscription.unsubscribe(); document.removeEventListener("visibilitychange", visibility);
       window.removeEventListener("focus", focus); window.removeEventListener("beforeunload", beforeUnload);
     };
-  }, [month, region, revision]);
+  }, [region, revision, selectedDate]);
   const rows = data?.rows ?? [];
-  const filtered = filterOperationRows(rows, company, vehicle, date);
+  const dateRows = rows.filter(row => row.report.serviceDate === selectedDate);
+  const filtered = filterOperationRows(dateRows, company, vehicle, "");
   const companies = [...new Set([...(company ? [company] : []), ...rows.flatMap(row => row.company ? [row.company] : [])])].sort();
   const vehicles = [...new Set([...(vehicle ? [vehicle] : []), ...rows.filter(row => !company || row.company === company).flatMap(row =>
     row.report.header?.vehicleNumber ? [row.report.header.vehicleNumber] : [])])].sort();
   async function remove(row: OperationRow) {
-    if (lock.current || !window.confirm(`永久删除 ${operationDateLabel(row.report.serviceDate)} · ${row.driverName} 的日報？\n運転士端的日報、所有经由地和修改历史将全部清除，不留删除日志，无法恢复。`)) return;
+    if (lock.current || !window.confirm(`永久削除 ${operationDateLabel(row.report.serviceDate)} · ${row.driverName} 的日報？\n運転士端的日報、所有经由地和修改歴史将全部清除，不留削除日志，无法恢复。`)) return;
     lock.current = true; setBusy(true); setNotice(""); setError("");
     const current = new AbortController(); write.current = current;
     try {
       await submitCommand({ action: "delete", reportId: row.report.id, expectedVersion: row.report.version }, current.signal);
       if (current.signal.aborted) return;
       setData(old => old ? { ...old, rows: old.rows.filter(item => item.report.id !== row.report.id) } : old);
-      setNotice("日報及其历史已永久删除。"); setRevision(v => v + 1);
+      setNotice("日報及其歴史已永久削除。"); setRevision(v => v + 1);
     } catch (cause) {
       if (!current.signal.aborted) {
         console.error("Operations report deletion failed.", cause instanceof Error ? cause.name : "UnknownError");
-        setError(cause instanceof Error ? cause.message : "删除结果未获确认，請刷新核对。");
+        setError(cause instanceof Error ? cause.message : "削除结果未获确认，請刷新核对。");
       }
     } finally { lock.current = false; setBusy(false); }
   }
@@ -299,6 +355,29 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
       }
     } finally { lock.current = false; setBusy(false); }
   }
+  async function printSelectedMonth() {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setError("");
+    const current = new AbortController(); print.current?.abort(); print.current = current;
+    try {
+      const query = new URLSearchParams({ month: printMonth }); if (region) query.set("region", region);
+      const response = await fetch(`/api/operations-reports?${query}`, { cache: "no-store", signal: current.signal });
+      if (!response.ok) throw new Error("无法读取所选月份日報，請刷新重试。");
+      const result = operationDataSchema.parse(await response.json());
+      if (!result.enabled) throw new Error("運行管理尚未在此环境启用。");
+      if (result.rows.some(row => !row.report.serviceDate.startsWith(`${printMonth}-`) || (region && row.regionId !== region)) ||
+        new Set(result.rows.map(row => row.report.id)).size !== result.rows.length)
+        throw new Error("所选月份日報日期或地域不一致，請刷新。");
+      const selected = filterOperationRows(result.rows, company, vehicle, "");
+      if (!selected.length) throw new Error("所选月份没有符合当前会社／車両筛选的日報。");
+      await printOperationsReports(selected, `${printMonth.slice(5)}月 運行日報`, current.signal);
+    } catch (cause) {
+      if (!current.signal.aborted) {
+        console.error("Monthly operations report print failed.", cause instanceof Error ? cause.name : "UnknownError");
+        setError(cause instanceof Error ? cause.message : "月批量打印失败，請重试。");
+      }
+    } finally { lock.current = false; setBusy(false); }
+  }
   const stamp = operationTimeLabel;
   const duty = (r: DailyReport, prefix: "Start" | "End") => {
     return r.header?.[`duty${prefix}Time`] || "—";
@@ -308,24 +387,30 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
       <label className="flex flex-col gap-1 text-sm">会社<select className={fieldClass} value={company}
         disabled={busy || Boolean(editing)} onChange={e => { setCompany(e.target.value); setVehicle(""); }}>
         <option value="">全部会社</option>{companies.map(name => <option key={name}>{name}</option>)}</select></label>
+      <label className="flex items-center gap-2 text-sm">運行日期<input className={fieldClass} type="date" aria-label="运行日期"
+        required value={selectedDate} onChange={e => {
+          if (validServiceDate(e.target.value)) setSelectedDate(e.target.value);
+        }} /></label>
       <label className="flex flex-col gap-1 text-sm">車両番号<select className={fieldClass} value={vehicle}
         disabled={busy || Boolean(editing)} onChange={e => setVehicle(e.target.value)}>
         <option value="">全部車両</option>{vehicles.map(name => <option key={name}>{name}</option>)}</select></label>
-      <label className="flex flex-col gap-1 text-sm">日期<input className={fieldClass} aria-label="筛选日期" type="date" value={date}
-        min={`${month}-01`} max={new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10)}
-        disabled={busy || Boolean(editing)} onChange={e => setDate(e.target.value)} /></label>
       <button className={buttonClass} disabled={busy || Boolean(editing)} onClick={() => { setData(null); setRevision(v => v + 1); }}>刷新</button>
-      <button className="table-action-button table-action-button--export" disabled={busy || Boolean(editing) || !filtered.length}
-        onClick={() => void output(filtered, `${month.slice(5)}月 運行日報`)}>月批量打印（{filtered.length}份）</button>
+      <button className="table-action-button table-action-button--export" disabled={busy || Boolean(editing)}
+        onClick={() => void printSelectedMonth()}>月批量打印</button>
+      <label className="flex items-center gap-2 text-sm">月批量打印月份<input className={fieldClass} type="month" aria-label="月批量打印月份"
+        required value={printMonth} onChange={e => {
+          if (/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(e.target.value)) setPrintMonth(e.target.value);
+        }} /></label>
     </div>
-    <p className="text-xs text-gray-600">日本時間 · 每10秒同步。工時＝退勤点呼－出勤点呼；日期或時間缺失時不计算。
-      月批量打印遵循当前会社、車両番号和日期筛选，每份日報一页；清空日期可打印整月。导出PDF時在打印窗口選択“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
+    <p className="text-xs text-gray-600">日本時間 · 显示所选日期的运行日報；每10秒同步。工時＝退勤点呼－出勤点呼；日期或時間缺失時不计算。
+      月批量打印使用上方選択月份，并遵循会社和車両筛选，每份日報一页；在打印窗口選択“另存为PDF”。会社按車両番号唯一匹配車両所属会社，未匹配的保留显示。</p>
     {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {!data && !error && <p role="status">正在读取運転士日報…</p>}
     {data && !data.enabled && <p role="status">運行管理尚未在此环境启用，目前仅在隔离测试版开放。</p>}
-    {data?.enabled && <><p className="text-sm text-gray-600">共 {filtered.length} 份日報（含出库中）</p>
-      <div className="rounded border bg-white"><table className="operations-report-table w-full table-fixed border-collapse">
+    {data?.enabled && <><p className="text-sm text-gray-600">{selectedDate} 运行：{filtered.length} 份日報（含出库中）</p>
+      {!filtered.length && <p className="rounded border border-dashed bg-white px-4 py-8 text-center text-sm text-gray-500">所选日期暂无运行日報</p>}
+      <div className="list-panel operations-report-table-region border bg-white"><table className="operations-report-table w-full table-fixed border-collapse">
         <colgroup>
           <col style={{ width: "6%" }} /><col style={{ width: "7%" }} /><col style={{ width: "7%" }} />
           <col style={{ width: "7%" }} /><col style={{ width: "8%" }} /><col style={{ width: "6%" }} />
@@ -336,10 +421,14 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
         <thead className="bg-gray-50"><tr>{operationReportColumns.map(label =>
           <th key={label} className="border-b text-center">{label}</th>)}</tr></thead>
         <tbody>{filtered.map(row => {
-          const r = row.report; const stops = r.stops.filter(stop => stop.address.trim()); const hours = dutyDuration(r);
+          const r = row.report;
+          const routeStops = r.stops.map(stop => stop.address.trim()).filter(Boolean);
+          const pickup = routeStops[0] || "—";
+          const dropoff = routeStops.at(-1) || "—";
+          const hours = dutyDuration(r);
           const cells = [operationDateLabel(r.serviceDate), r.header?.vehicleNumber || "—",
             r.header?.driverName || row.driverName, duty(r, "Start"), r.departureAddress, stamp(r.departedAt),
-            stops[0]?.address || "—", stops.at(-1)?.address || "—", r.returnAddress || "—", stamp(r.returnedAt),
+            pickup, dropoff, r.returnAddress || "—", stamp(r.returnedAt),
             duty(r, "End"), hours === null ? "点呼未完整" : durationLabel(hours)];
           return <tr key={r.id}>{cells.map((value, i) => <td key={i} data-label={operationReportColumns[i]}
             className="whitespace-pre-wrap break-words border-b text-center">{value}
@@ -348,7 +437,7 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
           </td>)}
             <td data-label="操作" className="border-b text-center"><div className="list-action-buttons list-action-buttons--three">
               <div className="driver-action-slot"><button className="table-action-button table-action-button--edit driver-action-button" disabled={busy} onClick={() => setEditing(row)}>编辑</button></div>
-              <div className="driver-action-slot"><button className="table-action-button table-action-button--delete driver-action-button" disabled={busy} onClick={() => void remove(row)}>删除</button></div>
+              <div className="driver-action-slot"><button className="table-action-button table-action-button--delete driver-action-button" disabled={busy} onClick={() => void remove(row)}>削除</button></div>
               <div className="driver-action-slot"><button className="table-action-button table-action-button--export driver-action-button" disabled={busy} onClick={() => void output([row], `${operationDateLabel(r.serviceDate)} 運行日報`)}>导出PDF</button></div>
             </div></td></tr>;
         })}{!filtered.length && <tr><td colSpan={13} className="p-3 text-center text-gray-500">当前筛选没有運転士日報。</td></tr>}</tbody>
@@ -360,10 +449,10 @@ function OperationMonth({ region, month }: { region: string; month: string }) {
 
 export function OperationsReports({ region }: { region: string }) {
   const [month, setMonth] = useState(() => japanDate().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(() => japanDate());
   return <section className="space-y-4 p-4 md:p-6" aria-label="運行管理">
-    <div className="flex flex-wrap items-center gap-4"><h2 className="text-lg font-bold">運行管理</h2>
-      <label className="flex items-center gap-2 text-sm">月份<input className={fieldClass} type="month" aria-label="筛选月份"
-        required value={month} onChange={e => { if (/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value); }} /></label></div>
-    <OperationMonth key={`${month}-${region}`} month={month} region={region} />
+    <h2 className="text-lg font-bold">運行管理</h2>
+    <OperationMonth printMonth={month} setPrintMonth={setMonth} selectedDate={selectedDate}
+      setSelectedDate={setSelectedDate} region={region} />
   </section>;
 }

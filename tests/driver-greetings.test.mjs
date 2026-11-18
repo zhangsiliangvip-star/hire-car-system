@@ -50,14 +50,14 @@ test("staff can read the global driver slogan, while unauthenticated callers are
   assert.equal(route.calls[0].name, "driver_portal_greetings");
 });
 
-test("only administrators can update a bounded global slogan", async () => {
-  const staff = greetingsRoute({ profile: { role: "user" } });
-  assert.equal((await staff.POST(new Request("https://staff.example/api/admin/driver-greetings", {
+test("all staff can update a bounded global slogan, while unauthenticated callers are denied", async () => {
+  const unauthenticated = greetingsRoute({ profile: null });
+  assert.equal((await unauthenticated.POST(new Request("https://staff.example/api/admin/driver-greetings", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slogan: "你好" }),
   }))).status, 403);
-  assert.equal(staff.calls.length, 0);
+  assert.equal(unauthenticated.calls.length, 0);
 
-  const route = greetingsRoute();
+  const route = greetingsRoute({ profile: { role: "user" } });
   const post = (body, headers = { "Content-Type": "application/json" }) => route.POST(new Request(
     "https://staff.example/api/admin/driver-greetings", { method: "POST", headers, body: JSON.stringify(body) },
   ));
@@ -98,6 +98,9 @@ test("database migration limits slogan access and supports optional personalized
   assert.match(migration, /default '平安出行，美好的一天'/);
   assert.match(migration, /if not public\.is_admin\(\) then raise exception 'Administrator required'/);
   assert.match(migration, /grant execute on function public\.driver_portal_greetings\(\),public\.admin_update_driver_global_slogan\(text\)\s+to authenticated/);
+  const staffSloganMigration = readFileSync(new URL("../supabase/migrations/20261205000000_staff_driver_global_slogan.sql", import.meta.url), "utf8");
+  assert.match(staffSloganMigration, /create or replace function public\.admin_update_driver_global_slogan\(target_slogan text\)/);
+  assert.match(staffSloganMigration, /if not public\.is_staff\(\) then raise exception 'Staff required'/);
 });
 
 test("driver management keeps global slogan outside the list and moves personal slogan into mobile settings", () => {

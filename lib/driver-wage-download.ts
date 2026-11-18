@@ -28,6 +28,10 @@ export function wagePdfPageBreaks(height: number, pageHeight: number, blocks: re
 }
 
 export async function renderDriverWagePdf(data: DriverWagePrintData) {
+  return renderPaymentDocumentPdf(buildDriverWagePrintHtml(data));
+}
+
+export async function renderPaymentDocumentPdf(html: string) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
   const frame = document.createElement("iframe");
   frame.title = "工资单PDF生成";
@@ -37,7 +41,7 @@ export async function renderDriverWagePdf(data: DriverWagePrintData) {
     const doc = frame.contentDocument;
     if (!doc) throw new Error("无法创建工资单PDF页面。");
     doc.open();
-    doc.write(buildDriverWagePrintHtml(data));
+    doc.write(html);
     doc.close();
     await doc.fonts.ready;
     const content = doc.querySelector<HTMLElement>(".content");
@@ -48,7 +52,7 @@ export async function renderDriverWagePdf(data: DriverWagePrintData) {
     const canvas = await html2canvas(content, { scale: 2, backgroundColor: "#ffffff" });
     const ratio = canvas.width / content.getBoundingClientRect().width;
     const top = content.getBoundingClientRect().top;
-    const blocks = [...content.querySelectorAll("tr, h1, h2, p, .summary, .notes, footer")].map((node) => {
+    const blocks = [...content.querySelectorAll("tr, h1, h2, p, .summary, .bank, .notes, footer")].map((node) => {
       const rect = node.getBoundingClientRect();
       return { top: Math.floor((rect.top - top) * ratio), bottom: Math.ceil((rect.bottom - top) * ratio) };
     });
@@ -71,17 +75,28 @@ export async function renderDriverWagePdf(data: DriverWagePrintData) {
 }
 
 export async function downloadDriverWageBatch(data: readonly DriverWagePrintData[]) {
+  const saved = await savePdfBatchToDirectory(data.map(item => ({
+    name: driverWagePdfFilename(item.driver, item.month), label: item.driver, render: () => renderDriverWagePdf(item),
+  })), "工资单");
+  if (saved !== "cancelled") alert(`已将${data.length}份工资单保存到所选文件夹。`);
+}
+
+export async function savePdfBatchToDirectory(files: readonly {
+  name: string; label: string; render: () => Promise<Blob>;
+}[], documentName: string, onProgress: (completed: number, total: number) => void = () => {}): Promise<"saved" | "cancelled"> {
   const pickerWindow = window as Window & {
     showDirectoryPicker?: (options: { mode: "readwrite" }) => Promise<DownloadDirectory>;
   };
   if (!pickerWindow.showDirectoryPicker) throw new Error("该浏览器不支持选择下载文件夹，请使用桌面版Chrome或Edge。");
-  const names = data.map((item) => driverWagePdfFilename(item.driver, item.month));
-  if (new Set(names).size !== names.length) throw new Error("司机姓名生成的文件名重复，请调整姓名后重试，避免覆盖工资单。");
+  const names = files.map(item => item.name);
+  if (new Set(names.map(name => name.toLocaleLowerCase())).size !== names.length) {
+    throw new Error(`司机姓名生成的文件名重复，请分别下载，避免覆盖${documentName}。`);
+  }
   let directory: DownloadDirectory;
   try {
     directory = await pickerWindow.showDirectoryPicker({ mode: "readwrite" });
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") return;
+    if (error instanceof DOMException && error.name === "AbortError") return "cancelled";
     throw error;
   }
   const existing: string[] = [];
@@ -93,11 +108,11 @@ export async function downloadDriverWageBatch(data: readonly DriverWagePrintData
       if (!(error instanceof DOMException && error.name === "NotFoundError")) throw error;
     }
   }
-  if (existing.length && !confirm(`所选文件夹已有${existing.length}份同名工资单，是否覆盖？\n${existing.join("\n")}`)) return;
+  if (existing.length && !confirm(`所选文件夹已有${existing.length}份同名${documentName}，是否覆盖？\n${existing.join("\n")}`)) return "cancelled";
   let saved = 0;
-  for (const [index, item] of data.entries()) {
+  for (const [index, item] of files.entries()) {
     try {
-      const blob = await renderDriverWagePdf(item);
+      const blob = await item.render();
       const file = await directory.getFileHandle(names[index], { create: true });
       const writable = await file.createWritable();
       try {
@@ -108,9 +123,10 @@ export async function downloadDriverWageBatch(data: readonly DriverWagePrintData
         throw error;
       }
       saved += 1;
+      onProgress(saved, files.length);
     } catch (error) {
-      throw new Error(`已保存${saved}份；${item.driver}工资单下载失败：${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(`已保存${saved}份；${item.label}${documentName}下载失败：${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  alert(`已将${saved}份工资单保存到所选文件夹。`);
+  return "saved";
 }

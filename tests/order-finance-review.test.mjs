@@ -293,7 +293,8 @@ test("order finance list wires review with save protection and explicit server-o
   assert.doesNotMatch(source, /<OrderFinanceReviewButton/);
   assert.match(source, /blocked=\{pendingSaveCount > 0 \|\| Boolean\(persistenceError\)\}/);
   assert.match(source, /onApproved=\{refreshApprovedOrderFinance\}/);
-  assert.match(source, /syncOrders\(\(payload as DashboardData\)\.orders, version\)/);
+  assert.match(source, /const refreshedOrders = \(payload as DashboardData\)\.orders/);
+  assert.match(source, /syncOrders\(refreshedOrders, version\)/);
   const review = readFileSync(new URL("../components/order-finance-review.tsx", import.meta.url), "utf8");
   assert.match(review, /if \(!count\) return null;/);
   assert.doesNotMatch(review, /无待审核申報/);

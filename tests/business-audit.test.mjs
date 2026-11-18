@@ -26,7 +26,13 @@ function load(relative, mocks = {}, globals = {}) {
       name === "@/lib/driver-selection" ? load("lib\\driver-selection.ts") :
       name === "@/lib/order-vehicles" ? load("lib\\order-vehicles.ts") :
       name === "@/lib/vehicle-order" ? load("lib\\vehicle-order.ts") :
-      name === "@/lib/driver/shifts" ? load("lib\\driver\\shifts.ts") : nodeRequire(name),
+      name === "@/lib/driver/shifts" ? load("lib\\driver\\shifts.ts") :
+      name === "@/lib/driver-bank" ? load("lib\\driver-bank.ts") :
+      name === "@/lib/driver-address" ? load("lib\\driver-address.ts") :
+      name === "@/lib/driver-license" ? load("lib\\driver-license.ts") :
+      name === "@/lib/vehicle-compliance" ? load("lib\\vehicle-compliance.ts") :
+      name === "@/lib/company-export" ? load("lib\\company-export.ts") :
+      name === "@/components/vehicle-compliance" ? load("components\\vehicle-compliance.tsx") : nodeRequire(name),
     console: { error() {}, warn() {} }, URL, URLSearchParams, Date, Intl, AbortController,
     ...globals,
   }, { filename });
@@ -264,6 +270,7 @@ test("external accounting reassignment synchronizes only its name and preserves 
   let draft = { [key]: { ...finance, companyAdvanceCompanyReport: 999, companyAdvancePaymentNote: "外注司机：Before\nDraft remark" } };
   const context = {
     ...load("lib\\order-drivers.ts"), ...load("lib\\reservation-driver-payment.ts"),
+    ...load("lib\\driver-license.ts"), vehicleToday: "2026-10-27", allDriverRecords: [],
     dialogSavingRef: { current: false }, allOrders: records, accountingForm: draft,
     parseAccountingKey: () => ({ orderId: id, date: "2026-10-27" }),
     getOrderDateKeys: () => ["2026-10-27"],
@@ -301,6 +308,8 @@ test("accounting driver autosave submits only persisted finances, preserves unsa
     const alerts = [];
     let release, writes = 0;
     const context = {
+      ...load("lib\\order-drivers.ts"), ...load("lib\\driver-license.ts"),
+      vehicleToday: "2026-10-27", allDriverRecords: [],
       dialogSavingRef: { current: false }, allOrders: records, accountingForm: draft,
       parseAccountingKey: key => ({ orderId: key.split("|")[0], date: key.split("|")[1] }),
       getOrderDateKeys: () => ["2026-10-27", "2026-10-28"],
@@ -350,6 +359,7 @@ test("daily driver selection synchronizes expense type to wage or outsourced", a
     let draft = { [key]: { ...finance } };
     const context = {
       ...load("lib\\order-drivers.ts"), ...load("lib\\reservation-driver-payment.ts"),
+      ...load("lib\\driver-license.ts"), vehicleToday: "2026-10-27", allDriverRecords: [],
       dialogSavingRef: { current: false }, allOrders: records, accountingForm: draft,
       parseAccountingKey: () => ({ orderId: id, date: "2026-10-27" }),
       getOrderDateKeys: () => ["2026-10-27"],
@@ -499,6 +509,9 @@ test("batch imports save one ID per import, line positions and retain membership
   let sequence = 0;
   let orders = [];
   const context = {
+    ...load("lib\\driver-license.ts"),
+    driverRecords: [], vehicleToday: "2026-10-22", getRegionForNewRecords: () => region,
+    alert: message => assert.fail(message),
     dialogSavingRef: { current: false }, waitForOrders: () => Promise.resolve(true),
     finishDialogSave: (_saves, close) => close(),
     requireSpecificRegionForNewData: () => true,
@@ -555,6 +568,12 @@ test("reservation table renders only the first imported order with the exact tot
     exports: {}, require: nodeRequire, groupReservationOrders, getAccountingBatchOrders,
     getMonthlySameSourceOrders, result: null,
     monthlyOrders, ordersInSelectedMonth: monthlyOrders, orderMonth: "2026-10",
+    reservationFinanceValues: new Map([
+      ["first", { driverPayment: 33000 }],
+      ["second", { driverPayment: 33000 }],
+    ]),
+    selectedReservationFinanceColumns: [{ key: "driverPayment", label: "運転士支給" }],
+    formatYen: amount => `¥${amount.toLocaleString("ja-JP")}`,
     OrderDriverLabels: load("components\\driver-name-label.tsx").OrderDriverLabels,
     invoiceStatusSavingIds: new Set(), openInvoiceStatusDialog() {},
     formatOrderDate: (date) => date, isOrderArranged: () => false, statusStyles: {},
@@ -568,6 +587,7 @@ test("reservation table renders only the first imported order with the exact tot
   assert.equal((markup.match(/<tr /g) || []).length, 1);
   assert.match(markup, /First route/);
   assert.match(markup, /合计2单/);
+  assert.match(markup, /data-label="運転士支給"[^>]*>¥33,000<\/td>/);
   assert.doesNotMatch(markup, /Hidden route|aria-expanded|展开/);
 });
 
@@ -782,13 +802,41 @@ test("order deletion migration removes dispatch history and linked reports befor
 
 test("vehicle statistics filter displays plates instead of vehicle names", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  const start = source.indexOf("value={vehicleFinanceVehicleFilter}", source.indexOf("导出車両财务表（A4）"));
+  const start = source.indexOf("value={vehicleFinanceVehicleFilter}", source.indexOf("导出車両财务表（PDF）"));
   assert.ok(start !== -1);
   const filter = source.slice(start, source.indexOf("</select>", start));
   assert.ok(filter.includes("全部車両番号"));
   assert.ok(filter.includes('{vehicle.plate || "未登记番号"}'));
   assert.ok(!/>\s*\{vehicle\.name\}\s*<\/option>/.test(filter));
   assert.ok(filter.includes("value={vehicle.id}"));
+});
+
+test("reservation plate filter follows calendar order and retains historical plates", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const start = source.indexOf("  const orderVehicleFilterPlates =");
+  const logic = source.slice(start, source.indexOf("  const orderDriverFilterOptions =", start));
+  const evaluate = (calendarSortedVehicleRecords) => plain(vm.runInNewContext(
+    ts.transpileModule(`${logic}\norderVehicleFilterOptions;`, {
+      compilerOptions: { target: ts.ScriptTarget.ES2020 },
+    }).outputText,
+    {
+      calendarSortedVehicleRecords,
+      orderMonth: "2026-11",
+      ordersInSelectedMonth: [
+        { plates: { "2026-11-01": ["B", "A", "old10", "old2", "B", ""], "2026-12-01": ["December"] } },
+        { plates: { "2026-11-02": ["stopped"] } },
+      ],
+      getOrderVehiclePlates: (order, dateFilter) =>
+        Object.entries(order.plates).filter(([date]) => dateFilter(date)).flatMap(([, plates]) => plates),
+    },
+  ));
+  assert.deepEqual(evaluate([
+    { plate: "A" }, { plate: "unused" }, { plate: "B" },
+    { plate: "A" }, { plate: "" }, { plate: "stopped" },
+  ]), ["A", "B", "stopped", "old2", "old10"]);
+  assert.deepEqual(evaluate([
+    { plate: "B" }, { plate: "A" }, { plate: "stopped" },
+  ]), ["B", "A", "stopped", "old2", "old10"]);
 });
 
 test("calendar uses exact regional source colors with readable black or white text", () => {
@@ -826,7 +874,10 @@ test("calendar uses exact regional source colors with readable black or white te
 
 test("reservation date filter includes service ranges, excludes off days and preserves other filters", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  const script = source.slice(source.indexOf("  const selectedMonthReservationGroups ="), source.indexOf("  const monthlyFinanceOrders ="));
+  const scriptStart = source.indexOf("  const selectedMonthReservationGroups =");
+  const scriptEnd = source.indexOf("  const reservationFinanceValues =", scriptStart);
+  assert.ok(scriptStart >= 0 && scriptEnd > scriptStart, "reservation filter boundaries exist");
+  const script = source.slice(scriptStart, scriptEnd);
   const base = { date: "2026-10-01", endDate: "2026-10-03", offDates: [], orderSource: "S", company: "A" };
   const orders = [
     { ...base, id: "multi" },
@@ -846,7 +897,7 @@ test("reservation date filter includes service ranges, excludes off days and pre
       orderVehicleFilter: "", orderDriverFilter: "",
       UNASSIGNED_ORDER_VEHICLE: "__unassigned_vehicle__",
       UNASSIGNED_ORDER_DRIVER: "__unassigned_driver__",
-      vehicleRecords: [], resolveOrderVehicle: () => undefined,
+      vehicleRecords: [], calendarSortedVehicleRecords: [], resolveOrderVehicle: () => undefined,
       groupOrdersByImportBatchStartMonth: load("lib\\order-batches.ts").groupOrdersByImportBatchStartMonth,
     };
     const compiled = ts.transpileModule(
@@ -871,7 +922,8 @@ test("reservation management puts the year first and shows all twelve month butt
   const end = source.indexOf("{activeView === \"operations\"", start);
   const controls = source.slice(start, end);
   const monthControlsStart = controls.indexOf("calendar-date-controls mb-3 mt-0");
-  const monthControlsEnd = controls.indexOf('<div className="overflow-x-auto border bg-white">', monthControlsStart);
+  const monthControlsEnd = controls.indexOf('<div className="list-panel overflow-x-auto border bg-white">', monthControlsStart);
+  assert.ok(monthControlsStart >= 0 && monthControlsEnd > monthControlsStart, "month controls end before the reservation table");
   const monthControls = controls.slice(monthControlsStart, monthControlsEnd);
   assert.ok(controls.indexOf('id="order-company-filter"') < controls.indexOf("選択预约年份，当前"));
   assert.ok(controls.indexOf("選択预约年份，当前") < controls.indexOf('aria-label="選択预约月份"'));
@@ -909,7 +961,7 @@ test("reservation date dialog renders a month calendar instead of a dropdown", (
   assert.match(february, /关闭日期筛选/);
 });
 
-test("selection dialogs only close from their top-right cross, not backdrop Escape or selection", () => {
+test("source and driver selections auto-close while date dialogs retain explicit dismissal", () => {
   const hooks = { ...React, useEffect() {}, useRef: () => ({ current: null }), useState: (initial) => [initial, () => {}] };
   const elements = (node) => {
     if (!node || typeof node !== "object") return [];
@@ -943,9 +995,9 @@ test("selection dialogs only close from their top-right cross, not backdrop Esca
       button.props.onClick();
     }
     assert.ok(selections > 0);
-    assert.equal(closes, 0);
+    assert.equal(closes, file !== "order-date-filter-dialog" ? selections : 0);
     cross.props.onClick();
-    assert.equal(closes, 1);
+    assert.equal(closes, file !== "order-date-filter-dialog" ? selections + 1 : 1);
   }
   let opened = false, selected = "";
   const { FinanceDriverSelect } = load("components\\finance-driver-select.tsx", {
@@ -963,6 +1015,147 @@ test("selection dialogs only close from their top-right cross, not backdrop Esca
   assert.equal(selected, "Driver");
   dialog.props.onClose();
   assert.equal(opened, false);
+  for (const name of ["Driver", "Manual Driver", ""]) {
+    elements(render()).find((node) => node.type === "button").props.onClick();
+    const autoClosing = FinanceDriverSelect({
+      drivers: [], orders: [], value: selected,
+      onChange: (value) => { selected = value; },
+    });
+    autoClosing.props.children[1].props.onSelect(name);
+    autoClosing.props.children[1].props.onClose();
+    assert.equal(selected, name);
+    assert.equal(opened, false, "reservation driver selection closes after choosing a value");
+  }
+});
+
+test("reservation source selection closes only the picker and keeps the editor draft", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const start = source.indexOf('if (sourceSelectionOpen === "form") {', source.indexOf("{sourceSelectionOpen && ("));
+  const handler = source.slice(start, source.indexOf('} else if (sourceSelectionOpen === "batch")', start)) + "}";
+  for (const name of ["Source", ""]) {
+    let form = { customer: "Unsaved order", orderSource: "Old" };
+    let open = "form";
+    const picker = load("components\\source-selection-dialog.tsx", {
+      react: { ...React, useEffect() {}, useRef: () => ({ current: null }), useState: initial => [initial, () => {}] },
+    }).SourceSelectionDialog({
+      sources: [{ id: "s", companyName: name || "Source", orderCount: 1 }],
+      selected: "",
+      onSelect: selected => vm.runInNewContext(handler, {
+        sourceSelectionOpen: open, name: selected,
+        setForm: update => { form = update(form); },
+      }),
+      onClose: () => { open = null; },
+    });
+    const buttons = [];
+    const visit = node => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) return node.forEach(visit);
+      if (node.type === "button") buttons.push(node);
+      visit(node.props?.children);
+    };
+    visit(picker);
+    buttons.find(button => name ? button.props["aria-pressed"] !== undefined : button.props.children === "不填写来源").props.onClick();
+    assert.deepEqual(plain(form), { customer: "Unsaved order", orderSource: name });
+    assert.equal(open, null);
+  }
+  const driverSelectors = [...source.matchAll(/<FinanceDriverSelect\b[\s\S]*?\/>/g)].map(([value]) => value);
+  assert.equal(driverSelectors.length, 2);
+  assert.ok(driverSelectors.every((selector) => !selector.includes("closeOnSelect")));
+});
+
+test("source picker closes after manual, all and unassigned selections without closing during typing", () => {
+  const events = [];
+  let stateIndex = 0;
+  const { SourceSelectionDialog } = load("components\\source-selection-dialog.tsx", {
+    react: {
+      ...React, useEffect() {}, useRef: () => ({ current: null }),
+      useState: initial => [stateIndex++ === 1 ? "  Manual Source  " : initial, () => {}],
+    },
+  });
+  const tree = SourceSelectionDialog({
+    sources: [], selected: "", allLabel: "All sources",
+    unassignedValue: "unassigned", unassignedLabel: "Unassigned",
+    onSelect: name => events.push(["select", name]), onClose: () => events.push("close"),
+  });
+  const nodes = [];
+  const visit = node => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) return node.forEach(visit);
+    nodes.push(node);
+    visit(node.props?.children);
+  };
+  visit(tree);
+  for (const input of nodes.filter(node => node.type === "input")) {
+    input.props.onChange({ target: { value: "Search" } });
+  }
+  assert.deepEqual(events, []);
+  for (const [label, value] of [["選択", "Manual Source"], ["All sources", ""], ["Unassigned", "unassigned"]]) {
+    events.length = 0;
+    nodes.find(node => node.type === "button" && node.props.children === label).props.onClick();
+    assert.deepEqual(events, [["select", value], "close"]);
+  }
+});
+
+test("manual driver confirmation selects the trimmed name before closing", () => {
+  let stateIndex = 0;
+  const events = [];
+  const { DriverSelectionDialog } = load("components\\driver-selection-dialog.tsx", {
+    react: {
+      ...React, useEffect() {}, useRef: () => ({ current: null }),
+      useState: (initial) => [stateIndex++ === 1 ? "  Manual Driver  " : initial, () => {}],
+    },
+  });
+  const tree = DriverSelectionDialog({
+    drivers: [], selected: "",
+    onSelect: (name, manual) => events.push([name, manual]),
+    onClose: () => events.push("close"),
+  });
+  const find = (node) => {
+    if (!node || typeof node !== "object") return undefined;
+    if (Array.isArray(node)) return node.map(find).find(Boolean);
+    if (node.type === "button" && node.props.children === "選任") return node;
+    return find(node.props?.children);
+  };
+  const button = find(tree);
+  assert.equal(button.props.disabled, false);
+  button.props.onClick();
+  assert.deepEqual(events, [["Manual Driver", true], "close"]);
+});
+
+test("part-time drivers cannot be assigned by manually entering their names", () => {
+  const states = [];
+  let stateIndex = 0;
+  const events = [];
+  const { DriverSelectionDialog } = load("components\\driver-selection-dialog.tsx", {
+    react: {
+      ...React, useEffect() {}, useRef: () => ({ current: null }),
+      useState: initial => {
+        const index = stateIndex++;
+        if (!(index in states)) states[index] = initial;
+        return [states[index], value => { states[index] = value; }];
+      },
+    },
+  });
+  const render = () => {
+    stateIndex = 0;
+    return DriverSelectionDialog({
+      drivers: [], blockedNames: ["Part-time Driver"], selected: "",
+      onSelect: name => events.push(["select", name]),
+      onClose: () => events.push("close"),
+    });
+  };
+  const find = (tree, predicate) => {
+    if (!tree || typeof tree !== "object") return undefined;
+    if (Array.isArray(tree)) return tree.map(node => find(node, predicate)).find(Boolean);
+    if (predicate(tree)) return tree;
+    return find(tree.props?.children, predicate);
+  };
+  find(render(), node => node.type === "input" && node.props["aria-label"] === "手動输入運転士姓名")
+    .props.onChange({ target: { value: "Part-time Driver" } });
+  find(render(), node => node.type === "button" && node.props.children === "選任").props.onClick();
+  assert.deepEqual(events, []);
+  const error = find(render(), node => node.props?.role === "alert");
+  assert.match(error.props.children, /非常勤/);
 });
 
 test("all dashboard modal backdrops are inert and cancel buttons are removed", () => {
@@ -991,7 +1184,7 @@ test("all dashboard modal backdrops are inert and cancel buttons are removed", (
     ts.forEachChild(node, visit);
   };
   visit(ast);
-  assert.equal(overlays.length, 15);
+  assert.equal(overlays.length, 16);
   for (const [start, end, closing] of [
     ["function importBatchOrders()", "function openNewDriver()", "setShowBatchOrderForm(false)"],
     ["function saveDriver()", "function deleteDriver(", "setShowDriverForm(false)"],
@@ -1011,7 +1204,7 @@ test("all dashboard modal backdrops are inert and cancel buttons are removed", (
   assert.equal((selection.match(/setSourceSelectionOpen\(null\)/g) || []).length, 1);
   assert.equal((selection.match(/setDriverSelectionTarget\(null\)/g) || []).length, 1);
   assert.match(source, /setDeleteCompleted\(true\)/);
-  assert.match(source, /disabled=\{isDeleting \|\| deleteCompleted \|\| !deletePassword\}/);
+  assert.match(source, /disabled=\{isDeleting \|\| deleteCompleted \|\| \(pendingDelete.kind !== "merge" && !deletePassword\)\}/);
 });
 
 test("single-record save dialogs close on confirmation, retain failures and avoid duplicate records", async () => {
@@ -1021,6 +1214,7 @@ test("single-record save dialogs close on confirmation, retain failures and avoi
   for (const [kind, start, end, initial, recordKey, formKey, idKey, nameKey, savedName] of [
     ["Driver", "function saveDriver()", "function deleteDriver(", {
       name: "Driver", reading: "", phone: "", wechat: "", whatsapp: "", licenseExpiry: "", personalSlogan: "",
+      bankName: " Test Bank ", bankBranch: "Branch", bankAccountType: "普通", bankAccountNumber: "0012345", bankAccountHolder: "テスト",
     }, "driverRecords", "driverForm", "editingDriverId", "editingDriverName", "Driver"],
     ["Source", "function saveSource()", "function updateSourceColor(", {
       companyName: "Source", shortName: "", contactName: "", contactInfo: "", address: "", color: "",
@@ -1031,7 +1225,7 @@ test("single-record save dialogs close on confirmation, retain failures and avoi
     }, "companyRecords", "companyForm", "editingCompanyId", "editingCompanyName", "Company"],
     ["Vehicle", "function saveVehicle()", "function deleteVehicle(", {
       name: "Alphard", plate: "1234", defaultParkingFee: 0, defaultInsuranceFee: 0,
-      ownerCompany: "", seats: "7", fuelType: "汽油", inspectionExpiry: "", liabilityExpiry: "",
+      ownerCompany: "", seats: "7", fuelType: "汽油", inspectionExpiry: "2026-11-13", liabilityExpiry: "2027-02-28",
       notes: "", status: "运营中",
     }, "vehicleRecords", "vehicleForm", "editingVehicleId", "editingVehicleName", "Alphard"],
   ]) {
@@ -1042,6 +1236,10 @@ test("single-record save dialogs close on confirmation, retain failures and avoi
       [recordKey]: [], [formKey]: initial, [idKey]: null, [nameKey]: null,
       allDriverRecords: [], allOrderSourceRecords: [], allCompanyRecords: [], allVehicleRecords: [],
       companySealBusy: false,
+      vehicleExpiryValidity: { inspection: true, liability: true },
+      driverRestState: { busy: false, dirty: false },
+      driverBankSchema: load("lib\\driver-bank.ts").driverBankSchema,
+      ...load("lib\\driver-address.ts"),
       dialogSavingRef: { current: false },
       setDialogSaving() {}, setPersistenceError() {},
       waitForOrders: () => Promise.resolve(confirmed), waitForDrivers: () => Promise.resolve(confirmed),
@@ -1069,6 +1267,14 @@ test("single-record save dialogs close on confirmation, retain failures and avoi
     }).outputText, context);
     await context[`save${kind}`]();
     assert.equal(context[recordKey].length, 1, kind);
+    if (kind === "Driver") {
+      assert.equal(context[recordKey][0].bankName, "Test Bank");
+      assert.equal(context[recordKey][0].bankAccountNumber, "0012345");
+    }
+    if (kind === "Vehicle") {
+      assert.equal(context[recordKey][0].inspectionExpiry, "2026-11-13");
+      assert.equal(context[recordKey][0].liabilityExpiry, "2027-02-28");
+    }
     assert.equal(context[nameKey], savedName);
     await context[`save${kind}`]();
     assert.equal(context[recordKey].length, 1, kind);
@@ -1130,7 +1336,7 @@ test("company seal entry opens dedicated uploader and saves only seal without ov
   assert.match(source, /<CompanySealUpload standalone value=\{sealDraft\}/);
 });
 
-test("delete confirmation remains open after success and blocks repeated deletion", async () => {
+test("delete confirmation closes after confirmed success and blocks repeated deletion", async () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const first = source.indexOf("async function confirmPendingDelete()");
   let deletes = 0;
@@ -1142,14 +1348,40 @@ test("delete confirmation remains open after success and blocks repeated deletio
   context.setDeleteCompleted = (value) => { context.deleteCompleted = value; };
   context.setIsDeleting = (value) => { context.isDeleting = value; };
   context.setDeletePassword = (value) => { context.deletePassword = value; };
+  context.setPendingDelete = value => { context.pendingDelete = value; };
   vm.createContext(context);
   vm.runInContext(source.slice(first, source.indexOf("function addBalanceExpenseItem(", first)), context);
   await context.confirmPendingDelete();
   assert.equal(context.deleteCompleted, true);
-  assert.ok(context.pendingDelete);
+  assert.equal(context.pendingDelete, null);
   context.deletePassword = "test";
   await context.confirmPendingDelete();
   assert.equal(deletes, 1);
+});
+
+test("failed confirmation remains open and preserves input with an explicit error", async () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const start = source.indexOf("async function confirmPendingDelete()");
+  for (const kind of [undefined, "merge"]) {
+    let error = "", busy = false, closed = false;
+    const pending = { kind, action: async () => { throw new Error("Server rejected action"); } };
+    const context = {
+      pendingDelete: pending, isDeleting: false, deleteCompleted: false, deletePassword: "test",
+      setDeleteError: value => { error = value; },
+      setIsDeleting: value => { busy = value; },
+      setPendingDelete: () => { closed = true; },
+      setDeletePassword: () => assert.fail("Failed action must preserve password"),
+      setDeleteCompleted: () => assert.fail("Failed action must not complete"),
+      Error,
+      console: { error() {} },
+    };
+    vm.createContext(context);
+    vm.runInContext(source.slice(start, source.indexOf("function addBalanceExpenseItem(", start)), context);
+    await context.confirmPendingDelete();
+    assert.equal(error, "Server rejected action");
+    assert.equal(busy, false);
+    assert.equal(closed, false);
+  }
 });
 
 test("dated statistics sort oldest first and use departure time to break date ties", () => {
@@ -1175,6 +1407,35 @@ test("dated statistics sort oldest first and use departure time to break date ti
   assert.match(source, /rows: financeDisplayGroups\.map/);
   assert.match(source, /rows: filteredDriverFinanceDetails,/);
   assert.match(source, /rows: filteredVehicleFinanceDetails,/);
+});
+
+test("salary year and month selectors preserve the other component and leave other finance panels unchanged", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const block = source.slice(source.indexOf("function FinanceSummaryPanel("), source.indexOf("export default function Home()"));
+  const context = { require: nodeRequire, exports: {} };
+  vm.createContext(context);
+  vm.runInContext(ts.transpileModule(block + "\nglobalThis.panel = FinanceSummaryPanel;", {
+    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText, context);
+  const walk = node => !React.isValidElement(node) ? [] :
+    [node, ...React.Children.toArray(node.props.children).flatMap(walk)];
+  const changes = [];
+  const props = { title: "給料統計", month: "2026-10", separateYearMonth: true,
+    onMonthChange: month => changes.push(month) };
+  const nodes = walk(context.panel(props));
+  const year = nodes.find(node => node.props["aria-label"] === "給料統計年份");
+  const month = nodes.find(node => node.props["aria-label"] === "給料統計月份");
+  assert.equal(year.props.value, "2026"); assert.equal(month.props.value, "10");
+  assert.equal(React.Children.count(year.props.children), 81);
+  assert.equal(React.Children.count(month.props.children), 12);
+  year.props.onChange({ target: { value: "2025" } });
+  month.props.onChange({ target: { value: "02" } });
+  assert.deepEqual(changes, ["2025-10", "2026-02"]);
+  const unusual = walk(context.panel({ ...props, month: "2019-12" }));
+  assert.ok(unusual.some(node => node.type === "option" && node.props.value === "2019"));
+  assert.ok(walk(context.panel({ ...props, separateYearMonth: false }))
+    .some(node => node.type === "input" && node.props.type === "month"));
+  assert.match(source, /title="給料統計"\s+separateYearMonth\s+month=\{financeMonth\}/);
 });
 
 test("wage driver dropdown follows monthly wages and includes drivers with manual wage items", () => {
@@ -1299,11 +1560,86 @@ test("outsourced wage vehicle numbers are blank without changing daily amounts o
   });
   assert.doesNotMatch(html, /外注番号999/);
   assert.match(html, /<td><\/td><td class="number">100<\/td>/);
-  assert.match(html, /<td>品川 100<\/td>/);
+  assert.match(html, /<td>100<\/td>/);
   assert.match(html, /工資総额<strong>¥2,000<\/strong>/);
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /const serviceVehicle = getServiceVehicle\(\{ \.\.\.order, financeByDate: \{ day: finance \} \}, "day"\)/);
   assert.match(source, /isOutsourcedVehicle: isOutsourcedVehicle\(serviceVehicle\.vehicle\)/);
+});
+
+test("wage exports show month-day dates, single-line names, no assignee and only final plate digits", () => {
+  const { buildDriverWagePrintHtml } = load("lib\\driver-wage-print.ts", {
+    "@/lib/print-a4": { printA4Html() {} },
+  });
+  for (const [plate, expected] of [
+    ["足立300い5292", "5292"], ["品川 300 あ 12-34", "1234"],
+    ["品川300あ・・・7", "7"], ["足立３００い００１２", "0012"],
+    ["品川300あ12", "12"], ["品川300あ123", "123"], ["", ""], ["未設定", ""],
+  ]) {
+    const html = buildDriverWagePrintHtml({
+      driver: "Test", month: "2026-10", region: "Tokyo", manualItems: [],
+      rows: [{ serviceDate: "2026-10-01", time: "09:00", customer: 'Long <order> "name"\nsecond line',
+        vehicleNumber: plate, driverAdvances: 0, overtimeHours: 0, overtimeFee: 0,
+        percentageWage: 0, fixedWage: 1000, bonusWage: 0, totalWage: 1000,
+        accountingAssignee: "PRIVATE ASSIGNEE" }],
+    });
+    assert.match(html, /<td>10-01<\/td>/);
+    assert.ok(html.includes(`</td>\n  <td>${expected}</td><td class="number">`), plate);
+    assert.doesNotMatch(html, /核算|PRIVATE ASSIGNEE|<small>|2026-10-01/);
+    assert.match(html, /class="order-name" title="Long &lt;order&gt; &quot;name&quot;/);
+    assert.match(html, /white-space:\s*nowrap/);
+  }
+});
+
+test("salary summaries separate base wages from signed additions and count adjustments exactly once", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const block = source.slice(source.indexOf("  const driverFinanceManualWageTotal ="),
+    source.indexOf("  function addDriverWageItemDraft()"));
+  const totals = (selected, items) => {
+    const context = { selectedDriverFinanceDriver: selected,
+      selectedDriverWageItems: items.filter(item => item.driver === selected), monthDriverWageItems: items,
+      filteredDriverFinanceDetails: [{ driverWages: 591028, driverAdvances: 15120 }] };
+    vm.runInNewContext(ts.transpileModule(block + "\nglobalThis.result = { wages: driverFinanceTotalWage, additions: driverFinanceManualWageTotal, payment: driverFinanceTotalAdvances + driverFinanceTotalWage + driverFinanceManualWageTotal };",
+      { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
+    return plain(context.result);
+  };
+  const items = [{ driver: "Test", amount: -190000 }, { driver: "Other", amount: 500 }];
+  assert.deepEqual(totals("Test", items), { wages: 591028, additions: -190000, payment: 416148 });
+  assert.deepEqual(totals("", items), { wages: 591028, additions: -189500, payment: 416648 });
+  assert.deepEqual(totals("Other", items), { wages: 591028, additions: 500, payment: 606648 });
+  assert.deepEqual(totals("Test", []), { wages: 591028, additions: 0, payment: 606148 });
+  const start = source.indexOf('<div className="mb-2 flex flex-wrap justify-end gap-2">', source.indexOf('title="給料統計"'));
+  const end = source.indexOf('data-table="driver-finance"', start);
+  const header = source.slice(start, end);
+  assert.ok(header.indexOf(">立替<") < header.indexOf("工資総额"));
+  assert.ok(header.indexOf("工資総额") < header.indexOf(">追加項目<"));
+  assert.ok(header.indexOf(">追加項目<") < header.indexOf(">支付総额<"));
+  assert.match(source, /<h3 className="font-semibold">追加項目<\/h3>/);
+});
+
+test("company export office names stay together on the line below the company", () => {
+  const { companyExportLines, companyExportHtml } = load("lib\\company-export.ts");
+  const name = "ウィナーリンクス株式会社 本社営業所";
+  assert.deepEqual(plain(companyExportLines(name)), ["ウィナーリンクス株式会社", "本社営業所"]);
+  assert.deepEqual(plain(companyExportLines("会社　大阪営業所")), ["会社", "大阪営業所"]);
+  assert.deepEqual(plain(companyExportLines("大川株式会社")), ["大川株式会社"]);
+  const escape = value => value.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  assert.equal(companyExportHtml("A<& 本社営業所", escape),
+    'A&lt;&amp;<span style="display:block;white-space:nowrap">本社営業所</span>');
+  assert.ok(companyExportHtml(name, escape, " 御中").endsWith("本社営業所 御中</span>"));
+  const wages = load("lib\\driver-wage-print.ts", { "@/lib/print-a4": {} });
+  const data = { month: "2026-10", company: name, region: "Tokyo", rows: [],
+    manualItems: [{ driver: "Test", companyName: name, name: "Adjustment", amount: -100 }] };
+  const expected = companyExportHtml(name, escape);
+  const companyHtml = wages.buildCompanyWagePrintHtml(data);
+  assert.equal(companyHtml.split(expected).length - 1, 2);
+  const individualHtml = wages.buildDriverWagePrintHtml({ ...data, driver: `Test ／ ${name}` });
+  assert.ok(individualHtml.includes(`Test ／ ${expected}`));
+  const { summarizeBalance } = load("lib\\balance-summary.ts");
+  const balance = load("lib\\balance-print.ts", { "@/lib/print-a4": {} });
+  const balanceData = { ...data, summary: summarizeBalance("", [], [], []) };
+  assert.ok(balance.buildBalancePrintHtml(balanceData).includes(expected));
+  assert.ok(balance.buildCompanyAdvancePrintHtml(balanceData).includes(expected));
 });
 
 test("driver wage print totals include manually entered wage items", () => {
@@ -1322,11 +1658,16 @@ test("driver wage print totals include manually entered wage items", () => {
     }],
     manualItems: [{ name: "月度津贴", amount: 500 }],
   });
-  assert.match(html, /工資総额<strong>¥1,500<\/strong>/);
+  assert.match(html, /工資総额<strong>¥1,000<\/strong>/);
+  assert.match(html, /追加項目<strong>¥500<\/strong>/);
   assert.match(html, /支付総额<strong>¥1,600<\/strong>/);
   assert.doesNotMatch(html, /<th>工資総额<\/th>/);
   assert.match(html, /月度津贴/);
-  assert.match(html, /class="content fit-page-width"/);
+  assert.match(html, /class="content expand-pages"/);
+  assert.match(html, /body\s*\{\s*font:\s*13px/);
+  assert.match(html, /\.summary strong\s*\{[^}]*font-size:\s*20px/);
+  assert.match(html, /tbody td\s*\{[^}]*font-size:\s*13px/);
+  assert.match(html, /\.number\s*\{[^}]*font-size:\s*13px[^}]*font-weight:\s*700/);
 
   const companyHtml = buildCompanyWagePrintHtml({
     month: "2026-10",
@@ -1343,6 +1684,73 @@ test("driver wage print totals include manually entered wage items", () => {
   });
   assert.doesNotMatch(companyHtml, /<th>工資総额<\/th>/);
   assert.match(companyHtml, /<th>支付総额<\/th>/);
+  assert.match(companyHtml, /tbody td\s*\{[^}]*font-size:\s*13px/);
+  assert.match(companyHtml, /\.number\s*\{[^}]*font-size:\s*13px[^}]*font-weight:\s*700/);
+  for (const selector of ["body", "h1", "h2", ".meta", ".summary strong", "tbody td", ".number"]) {
+    const rule = new RegExp(`(?:^|\\n)\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]+)\\}`);
+    const font = (report) => report.match(rule)?.[1].match(/font(?:-size)?:\s*([^;]+)/)?.[1];
+    assert.ok(font(html), selector);
+    assert.equal(font(companyHtml), font(html), selector);
+  }
+  assert.match(companyHtml, /月份：2026-10<\/span><span>運転士人数：1 人<\/span><\/div><\/header>/);
+  assert.match(companyHtml, /<th>運転士<\/th>/);
+  assert.match(companyHtml, /<td>Test Driver<\/td>/);
+  assert.doesNotMatch(companyHtml, /分区|币种|東京|<small>|<p>運転士人数/);
+});
+
+test("long wage exports retain compact readable rows, paginate without shrinking and preserve signed totals", () => {
+  const { buildDriverWagePrintHtml, buildCompanyWagePrintHtml } = load("lib\\driver-wage-print.ts", {
+    "@/lib/print-a4": { printA4Html() {} },
+  });
+  const rows = Array.from({ length: 70 }, (_, index) => ({
+    serviceDate: `2026-10-${String(index % 28 + 1).padStart(2, "0")}`,
+    time: "09:00", customer: `Test order ${index + 1}`, vehicleNumber: "TEST 100",
+    driverAdvances: 216, overtimeHours: 0, overtimeFee: 0, percentageWage: 0,
+    fixedWage: index === 69 ? 39028 : 8000, bonusWage: 0,
+    totalWage: index === 69 ? 39028 : 8000, accountingAssignee: "Test staff",
+  }));
+  const html = buildDriverWagePrintHtml({
+    driver: "Test Driver", month: "2026-10", region: "Tokyo", rows,
+    manualItems: [{ name: "Deduction", amount: -190000 }],
+  });
+  const companyHtml = buildCompanyWagePrintHtml({
+    month: "2026-10", company: "Test Company", region: "Tokyo",
+    rows: rows.map(row => ({ ...row, driver: "Test Driver", regionId: "tokyo", regionName: "Tokyo" })),
+    manualItems: [{ driver: "Test Driver", companyName: "Test Company", name: "Deduction", amount: -190000 }],
+  });
+  for (const report of [html, companyHtml]) {
+    assert.doesNotMatch(report, /class="notes"|<footer>|未扣除税費|不作为考勤认定|已保存财务記録生成/);
+    assert.match(report, /<th>立替<\/th>/);
+    assert.match(report, /立替<strong>¥15,120<\/strong>/);
+    assert.doesNotMatch(report, /運転士立替/);
+    assert.match(report, /class="content expand-pages"/);
+    assert.doesNotMatch(report, /fit-page-width|height:\s*276mm/);
+    assert.match(report, /\.sheet\s*\{[^}]*height:\s*auto[^}]*overflow:\s*visible/);
+    assert.match(report, /thead\s*\{\s*display:\s*table-header-group/);
+    assert.match(report, /tfoot\s*\{\s*display:\s*table-row-group/);
+    assert.match(report, /tr,[^}]*break-inside:\s*avoid/);
+    assert.match(report, /工資総额<strong>¥591,028<\/strong>/);
+    assert.match(report, /追加項目<strong>¥-190,000<\/strong>/);
+    assert.match(report, /repeat\(4, 1fr\)/);
+    assert.doesNotMatch(report, /手動工資|手動项目/);
+    assert.match(report, /支付総额<strong>¥416,148<\/strong>/);
+    assert.match(report, /-190,000/);
+  }
+  assert.equal((html.match(/class="order-name"/g) || []).length, 70);
+  assert.match(html, /<title>2026-10月給与明細<\/title>/);
+  assert.match(html, /<h1>2026-10月給与明細<\/h1>/);
+  assert.match(html, /<span><strong>Test Driver<\/strong><\/span>/);
+  assert.doesNotMatch(html, /運転士：/);
+  assert.match(html, /有記録日数：28 日<\/span><\/div><\/header>/);
+  assert.doesNotMatch(html, /工資月份|運転士月度工資表/);
+  assert.doesNotMatch(html, /分区：|币种：|<p>有記録日数/);
+  assert.match(html, /<th>車番<\/th>/);
+  assert.doesNotMatch(html, /車両番号/);
+  assert.doesNotMatch(html, /核算|Test staff|2026-10-01/);
+  assert.match(html, /<td>10-01<\/td>/);
+  assert.match(html, /\.order-name\s*\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/);
+  assert.match(html, /padding:\s*4px 2px/);
+  if (process.env.WAGE_LAYOUT_PREVIEW) fs.writeFileSync(process.env.WAGE_LAYOUT_PREVIEW, html);
 });
 
 test("A4 report exports omit signature fields and preserve report content", () => {
@@ -1365,7 +1773,7 @@ test("A4 report exports omit signature fields and preserve report content", () =
   const reports = [
     [wages.buildDriverWagePrintHtml({
       ...base, driver: "Test Driver", manualItems: [{ name: "Allowance", amount: 500 }],
-    }), "運転士月度工資表", "工資月份：2026-10"],
+    }), "2026-10月給与明細", "有記録日数：0 日"],
     [wages.buildCompanyWagePrintHtml({ ...base, manualItems: [] }), "所属会社全员工資総表", "月份：2026-10"],
     [vehicles.buildVehicleFinancePrintHtml({
       ...base, vehicleNumber: "100", monthly: null,
@@ -1388,12 +1796,91 @@ test("A4 report exports omit signature fields and preserve report content", () =
     assert.ok(html.includes(`<h1>${title}</h1>`), title);
     assert.ok(html.includes(metadata), title);
     assert.match(html, /<table/);
-    assert.match(html, /body\s*\{\s*font:\s*12px/, `${title} readable base font`);
+    assert.match(html, /body\s*\{\s*font:\s*(?:12|13)px/, `${title} readable base font`);
   }
   assert.equal(reports.slice(0, 2).reduce((total, [html]) =>
-    total + (html.match(/class="content fit-page-width"/g)?.length ?? 0), 0), 2);
-  assert.match(reports[0][0], /工資総额<strong>¥500<\/strong>/);
+    total + (html.match(/class="content expand-pages"/g)?.length ?? 0), 0), 2);
+  assert.match(reports[0][0], /工資総额<strong>¥0<\/strong>/);
+  assert.match(reports[0][0], /追加項目<strong>¥500<\/strong>/);
   assert.match(reports[5][0], /Keep this note/);
+});
+
+test("order expense A4 export totals every expense category without double-counting overtime or fuel units", async () => {
+  let printed;
+  const { buildOrderExpensePrintHtml, printOrderExpenses } = load("lib\\order-expense-print.ts", {
+    "@/lib/print-a4": { printA4Html(html, title) { printed = { html, title }; } },
+  });
+  const data = {
+    name: "Expense Test", period: "2026-10-01 ～ 2026-10-02", note: "Unsaved note",
+    rows: [
+      { date: "2026-10-02", driver: "B", vehicleNumber: "200", offDate: false,
+        etcCompany: 100, etcTrip: 200, fuelCost: 300, fuelLiters: 2,
+        driverAdvanceCompany: 400, driverAdvanceTrip: 500,
+        companyAdvanceCompany: 600, companyAdvanceTrip: 700,
+        externalDriverFee: 800, overtime: 900, wages: 1000 },
+      { date: "2026-10-01", driver: "A", vehicleNumber: "100", offDate: true,
+        etcCompany: 10, etcTrip: 20, fuelCost: 30, fuelLiters: 0.2,
+        driverAdvanceCompany: 40, driverAdvanceTrip: 50,
+        companyAdvanceCompany: 60, companyAdvanceTrip: 70,
+        externalDriverFee: 80, overtime: 90, wages: 100 },
+    ],
+  };
+  const html = buildOrderExpensePrintHtml(data);
+  for (const [label, amount] of [
+    ["ETC 総额", "330"], ["燃油費合计", "330"],
+    ["運転士立替合计", "990"], ["会社立替合计", "1,430"],
+    ["外注運転士費用合计", "880"], ["運転士工資合计", "1,100"],
+  ]) {
+    assert.ok(html.includes(`<div class="card">${label}<strong>${amount}</strong></div>`), label);
+  }
+  assert.match(html, /class="card card--total">支出总和（JPY）<strong>5,060<\/strong>/);
+  assert.match(html, /\.card--total\s*\{[^}]*text-align:\s*right;/,
+    "grand total label and amount align to the right edge");
+  assert.ok(html.indexOf('class="card card--total"') < html.indexOf("<h2>备注</h2>"),
+    "grand total appears before notes");
+  assert.match(html, /<h2>备注<\/h2><div class="note">Unsaved note<\/div>\s*<\/article>/,
+    "notes are the last report block");
+  assert.ok(html.indexOf("2026-10-01（休运）") < html.indexOf("2026-10-02</strong>"));
+  assert.match(html, /<small>外注運転士費用<\/small><strong>800<\/strong>/);
+  assert.match(html, /超時工資已包含在運転士工資中/);
+  assert.match(html, /Unsaved note/);
+  await printOrderExpenses(data);
+  assert.equal(printed.html, html);
+  assert.equal(printed.title, "团务費用明細打印");
+
+  for (const rows of [[], [Object.fromEntries(Object.entries(data.rows[0]).map(
+    ([key, value]) => [key, typeof value === "number" ? 0 : value],
+  ))]]) {
+    const emptyHtml = buildOrderExpensePrintHtml({ ...data, rows });
+    assert.match(emptyHtml, /支出总和（JPY）<strong>0<\/strong>/);
+    assert.doesNotMatch(emptyHtml, /NaN|Infinity/);
+  }
+
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const exportStart = source.indexOf("await printOrderExpenses({");
+  const exportEnd = source.indexOf("} catch (error)", exportStart);
+  assert.ok(exportStart >= 0);
+  const exportSource = source.slice(exportStart, exportEnd);
+  assert.match(exportSource, /Object\.entries\(primaryAccountingForm\)/);
+  assert.match(exportSource, /externalDriverFee: getOrderFinanceAmount\(finance, "externalDriverFee"\)/);
+  assert.match(exportSource, /wages: totals\.driverWages/);
+});
+
+test("order expense bottom total matches the reported ETC, advances and wages example", () => {
+  const { buildOrderExpensePrintHtml } = load("lib\\order-expense-print.ts", {
+    "@/lib/print-a4": { printA4Html() {} },
+  });
+  const html = buildOrderExpensePrintHtml({
+    name: "Total example", period: "2026-11-05", note: "",
+    rows: [{
+      date: "2026-11-05", driver: "", vehicleNumber: "", offDate: false,
+      etcCompany: 7010, etcTrip: 0, fuelCost: 0, fuelLiters: 0,
+      driverAdvanceCompany: 27226, driverAdvanceTrip: 0,
+      companyAdvanceCompany: 0, companyAdvanceTrip: 0,
+      externalDriverFee: 0, overtime: 6000, wages: 96000,
+    }],
+  });
+  assert.match(html, /支出总和（JPY）<strong>130,236<\/strong>/);
 });
 
 test("mobile viewport permits native page zoom", () => {
@@ -1576,8 +2063,8 @@ test("mobile calendar centers one order name and daily driver group per continuo
   assert.match(compact, /flex-col items-center justify-center break-all px-1 text-center text-xs leading-4/);
   assert.ok(compact.indexOf("order.customer") < compact.indexOf("segment.label"));
   assert.match(compact, /items-center justify-center break-all px-1 text-center/);
-  assert.match(compact, /top: \(orderCardHeight \/ 2 - 4\) \* calendarScale, transform: "translateY\(-50%\)"/);
-  assert.match(source, /paddingTop: executionPadding \+ \(isSplittable \? 24 : 0\)/);
+  assert.match(compact, /top: \(cardHeight \/ 2 - 4\) \* calendarScale, transform: "translateY\(-50%\)"/);
+  assert.match(source, /paddingTop: executionPadding \+ \(!isCompactCalendar \? 24 : 0\)/);
   assert.doesNotMatch(compact, /barDates\.map|order\.time|order\.status|order\.orderSource|取消拆分/);
   assert.match(compact, /getTripSummary\(order, day\.date\)/);
   assert.match(compact, /barDates\.slice\(segment\.start, segment\.end\)/);
@@ -1586,14 +2073,18 @@ test("mobile calendar centers one order name and daily driver group per continuo
 });
 
 test("mobile calendar card measurements expand lanes for wrapped content", () => {
-  let current = {};
+  let current = { cards: {}, vehicles: {} };
   let resize;
   let cleanup;
   let disconnected = false;
   const contents = [
-    { dataset: { calendarCardVehicle: "a" }, offsetHeight: 140 },
-    { dataset: { calendarCardVehicle: "a" }, offsetHeight: 220 },
-    { dataset: { calendarCardVehicle: "b" }, offsetHeight: 30 },
+    { dataset: { calendarCardOrder: "a" }, getBoundingClientRect: () => ({ height: 140 }), scrollHeight: 1400 },
+    { dataset: { calendarCardOrder: "a" }, getBoundingClientRect: () => ({ height: 220 }), scrollHeight: 2400 },
+    { dataset: { calendarCardOrder: "b" }, getBoundingClientRect: () => ({ height: 30 }), scrollHeight: 300 },
+  ];
+  const vehicles = [
+    { dataset: { calendarVehicleContent: "a" }, getBoundingClientRect: () => ({ height: 180 }), scrollHeight: 1900 },
+    { dataset: { calendarVehicleContent: "b" }, getBoundingClientRect: () => ({ height: 40 }), scrollHeight: 400 },
   ];
   const { useCalendarCardHeights } = load("lib\\use-calendar-card-heights.ts", {
     react: {
@@ -1607,19 +2098,32 @@ test("mobile calendar card measurements expand lanes for wrapped content", () =>
       disconnect() { disconnected = true; }
     },
   });
-  useCalendarCardHeights({ current: { querySelectorAll: () => contents } }, true);
-  assert.deepEqual(plain(current), { a: 230, b: 56 });
+  useCalendarCardHeights({
+    current: { querySelectorAll: (selector) => selector.includes("card")
+      ? contents : vehicles },
+  }, true);
+  assert.deepEqual(plain(current), {
+    cards: { a: 230, b: 56 },
+    vehicles: { a: 197, b: 57 },
+  });
   const previous = current;
   resize();
   assert.equal(current, previous, "unchanged dimensions do not cause another render");
-  contents[1].offsetHeight = 300;
+  contents[1].getBoundingClientRect = () => ({ height: 300 });
   resize();
-  assert.equal(current.a, 310);
-  useCalendarCardHeights({ current: { querySelectorAll: () => contents } }, true, 0.5);
-  assert.equal(current.a, 610, "screen-pixel heights convert back into unscaled lane heights");
+  assert.equal(current.cards.a, 310);
+  useCalendarCardHeights({
+    current: { querySelectorAll: (selector) => selector.includes("card")
+      ? contents : vehicles },
+  }, true, 0.5);
+  assert.equal(current.cards.a, 610, "screen-pixel heights convert back into unscaled lane heights");
+  assert.equal(current.vehicles.a, 377, "vehicle text height also converts back to the base scale");
   assert.equal(disconnected, false);
   cleanup();
   assert.equal(disconnected, true);
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /data-calendar-card-order=\{order\.id\}/);
+  assert.match(source, /mobileCalendarHeights\.cards\[order\.id\]/);
 });
 
 test("mobile calendar dates contain whole contiguous months across year and leap boundaries", () => {
@@ -1792,6 +2296,9 @@ test("mobile calendar shows only the region control and calendar without changin
   const header = source.slice(source.indexOf('<header className="dashboard-header'), source.indexOf("</header>"));
   assert.doesNotMatch(header, />\s*当日\s*</);
   assert.match(header, /type="date"\s+aria-label="日历快速查询日期"[\s\S]*setCalendarCenterDate\(selectedDate\)/);
+  assert.match(header, /<\/label>\s*<button[\s\S]*aria-label="定位到今日"[\s\S]*calendarTodayRequestedRef\.current = true;[\s\S]*setCalendarTodayRequest/);
+  assert.match(css, /\.mobile-calendar-quick-today-button \{\s*display: none;/);
+  assert.match(css, /\.mobile-calendar-view \.mobile-calendar-quick-today-button \{\s*display: inline-flex;/);
   assert.match(source, /activeView === "calendar" \? " mobile-calendar-view" : ""/);
   for (const name of ["calendar-region-selector", "calendar-toolbar", "calendar-vehicle-filters", "calendar-scroll"]) {
     assert.ok(source.includes(`className="${name} `), name);
@@ -1826,10 +2333,11 @@ test("calendar orders vehicles by generation and puts out-of-service vehicles la
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /outOfService: getVehicleDisplayStatus\(vehicle\) !== "运营中"/);
   assert.match(source, /\.sort\(compareCalendarVehicles\)/);
+  assert.match(source, /filterCalendarVisibleVehicles\(calendarSortedVehicleRecords\)\.filter\(\(record\) =>/);
 });
 
 test("calendar vehicle order can be dragged and is shared through the database", () => {
-  const { compareCalendarVehicles, moveCalendarVehicle } = load("lib\\vehicle-order.ts");
+  const { compareCalendarVehicles, filterCalendarVisibleVehicles, moveCalendarVehicle } = load("lib\\vehicle-order.ts");
   const sorted = [
     { id: "t", name: "Tesla", calendarOrder: 0 },
     { id: "a4", name: "Alphard 四代", calendarOrder: 1 },
@@ -1838,6 +2346,15 @@ test("calendar vehicle order can be dragged and is shared through the database",
     { id: "x", name: "Alphard 四代", calendarOrder: 0, outOfService: true },
   ].sort(compareCalendarVehicles).map((vehicle) => vehicle.id);
   assert.deepEqual(sorted, ["t", "a4", "a3", "h", "x"]);
+  assert.deepEqual(
+    plain(filterCalendarVisibleVehicles([
+      { id: "running", status: "运营中", showInCalendar: true },
+      { id: "stopped", status: "停运中", showInCalendar: true },
+      { id: "hidden", status: "停运中", showInCalendar: false },
+      { id: "legacy", status: "停运中" },
+    ]).map(vehicle => vehicle.id)),
+    ["running", "stopped", "legacy"],
+  );
   const ids = ["a", "b", "c", "d"];
   assert.deepEqual(plain(moveCalendarVehicle(ids, "d", "a", false)), ["d", "a", "b", "c"]);
   assert.deepEqual(plain(moveCalendarVehicle(ids, "a", "c", true)), ["b", "c", "a", "d"]);
@@ -1849,7 +2366,16 @@ test("calendar vehicle order can be dragged and is shared through the database",
   assert.match(route, /calendarOrder: z\.number\(\)\.int\(\)\.min\(0\)\.max\(1_000_000\)\.nullable\(\)\.default\(null\)/);
   assert.match(route, /calendar_order: vehicle\.calendarOrder \?\? null/);
   assert.match(route, /calendarOrder: row\.calendar_order \?\? null/);
+  assert.match(route, /show_in_calendar: vehicle\.showInCalendar \?\? true/);
+  assert.match(route, /showInCalendar: row\.show_in_calendar \?\? true/);
+  assert.match(route, /showInCalendar: z\.boolean\(\)\.default\(true\)/);
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  assert.match(source, /aria-label="日历显示"/);
+  assert.match(source, /<option value="显示">显示<\/option>\s*<option value="不显示">不显示<\/option>/);
+  assert.match(source, /showInCalendar: event\.target\.value === "显示"/);
+  assert.match(source, /showInCalendar: vehicleForm\.showInCalendar !== false/);
+  const visibilityMigration = fs.readFileSync(path.join(root, "supabase\\migrations\\20261208000000_vehicle_calendar_visibility.sql"), "utf8");
+  assert.match(visibilityMigration, /add column if not exists show_in_calendar boolean not null default true/);
   assert.match(source, /setData\("application\/x-calendar-vehicle", vehicleRecord\.id\)/);
   assert.match(source, /break-all text-center text-\[13px\] font-bold/);
   assert.match(source, /reorderCalendarVehicle\(\s*draggingCalendarVehicleId,/);
@@ -1874,6 +2400,9 @@ test("vehicle form selects start empty so the first fuel type, seat count, and c
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /<option value="">請選択燃油类型<\/option>\s*\{fuelTypes\.map/);
   assert.match(source, /<option value="">請選択座位数<\/option>/);
+  assert.match(source, /車両座位数[\s\S]*?<option value="">請選択座位数<\/option>/);
+  assert.match(source, /車両状態[\s\S]*?<option value="运营中">运营中<\/option>/);
+  assert.doesNotMatch(source, /有效期提前1个月显示黄色，过期后自动停运/);
   assert.match(source, /<option value="">請選択所属会社<\/option>/);
 });
 
@@ -1985,9 +2514,10 @@ test("order conflicts cover editing, multi-day ranges, and close departure times
 test("overlapping multi-day orders stack inside the same calendar cell row", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.ok(!source.includes("gridRow: isSingleDayOrder ? 1 : orderLane + 1"));
-  assert.ok(source.includes("const laneOffset = orderLane * (orderCardHeight + orderCardGap) + orderCardGap;"));
+  assert.ok(source.includes("const laneOffset = orderLaneOffsets.get(orderLane) ?? orderCardGap;"));
   assert.ok(source.includes("const baseOrderCardHeight = 56;"));
-  assert.doesNotMatch(source, /maxDailyOrderCount|orderCardHeights/);
+  assert.match(source, /minHeight: isMobileCalendar\s*\?\s*`\$\{mobileCalendarVehicleRowHeight \* calendarScale\}px`/);
+  assert.doesNotMatch(source, /maxDailyOrderCount/);
   const layout = source.slice(source.indexOf("            const orderLanes ="), source.indexOf("\n            return (", source.indexOf("            const orderLanes =")));
   const evaluate = (
     visibleOrders,
@@ -1996,6 +2526,8 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
       ? { startDate: "2026-10-01", endDate: "2026-10-02" }
       : null,
     driverExecutionByOrder = new Map(),
+    mobileCalendarVehicleHeight = 0,
+    mobileCalendarCardHeights = {},
   ) => {
     const context = {
       visibleOrders,
@@ -2003,13 +2535,18 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
       isMobileCalendar,
       mobileCalendarVisibleRange,
       vehicleRecord: { id: "vehicle" },
-      mobileCalendarCardHeights: {},
+      mobileCalendarHeights: {
+        cards: mobileCalendarCardHeights,
+        vehicles: { vehicle: mobileCalendarVehicleHeight },
+      },
       driverExecutionByOrder,
     };
     const script = ts.transpileModule(`${layout}\nresult = {
       heights: [...singleDayCellHeights.values()],
-      offsets: visibleOrders.map((order) => (orderLanes.get(order.id) || 0) * (orderCardHeight + orderCardGap) + orderCardGap),
+      offsets: visibleOrders.map((order) => orderLaneOffsets.get(orderLanes.get(order.id)) ?? orderCardGap),
       cardHeight: orderCardHeight,
+      orderCardHeights: visibleOrders.map((order) => orderCardHeights.get(order.id)),
+      rowHeight: mobileCalendarVehicleRowHeight,
     };`, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
     vm.runInNewContext(script, context);
     return plain(context.result);
@@ -2031,6 +2568,29 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
     assert.ok(parseFloat(mobileHeights[0]) - (offsets.at(-1) + cardHeight) >= 12);
   }
   assert.deepEqual(evaluate([], true).heights, ["72px", "72px"]);
+  assert.equal(evaluate([], true).rowHeight, 72);
+  assert.equal(evaluate([], true, undefined, new Map(), 150).rowHeight, 150);
+  const unequalOrderHeights = evaluate([
+    { id: "long", date: "2026-10-01", endDate: "2026-10-02" },
+    { id: "short", date: "2026-10-01", endDate: "2026-10-02" },
+  ], true, undefined, new Map(), 0, { long: 180 });
+  assert.deepEqual(unequalOrderHeights.orderCardHeights, [180, 56]);
+  assert.deepEqual(unequalOrderHeights.offsets, [4, 188]);
+  assert.equal(unequalOrderHeights.rowHeight, 256);
+  const offscreenTallOrder = [
+    { id: "tall", date: "2026-10-01", endDate: "2026-10-01" },
+    { id: "normal", date: "2026-10-02", endDate: "2026-10-02" },
+  ];
+  const normalDateLayout = evaluate(offscreenTallOrder, true, {
+    startDate: "2026-10-02", endDate: "2026-10-02",
+  }, new Map(), 0, { tall: 600, normal: 56 });
+  assert.equal(normalDateLayout.rowHeight, 72, "offscreen bookings must not reserve lane height");
+  assert.equal(evaluate(offscreenTallOrder, true, {
+    startDate: "2026-10-03", endDate: "2026-10-03",
+  }, new Map(), 0, { tall: 600 }).rowHeight, 72);
+  const css = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  assert.match(css, /\.mobile-calendar-view \.calendar-vehicle-row > \.calendar-order-card \{\s*position: absolute;\s*left: 0;\s*right: 0;\s*top: 0;/);
+  assert.match(css, /\.mobile-calendar-view \.calendar-vehicle-row \{\s*position: relative;/);
   const crowdedEarlierDate = [
     ...Array.from({ length: 4 }, (_, index) => ({
       id: `early-${index}`,
@@ -2052,6 +2612,13 @@ test("overlapping multi-day orders stack inside the same calendar cell row", () 
       endDate: "2026-10-01",
     }).heights,
     ["252px", "252px"],
+  );
+  assert.equal(
+    evaluate(crowdedEarlierDate, true, {
+      startDate: "2026-10-01",
+      endDate: "2026-10-01",
+    }).rowHeight,
+    252,
   );
   assert.deepEqual(evaluate([
     { id: "first", date: "2026-10-01", endDate: "2026-10-01" },
@@ -2459,16 +3026,16 @@ test("vehicle-name options persist deletions, preserve selected names and restor
   }
   button("管理車名");
   confirmed = false;
-  button("删除車名 Alphard");
+  button("削除車名 Alphard");
   assert.equal(saved, null);
   confirmed = true;
   failWrite = true;
-  button("删除車名 Alphard");
+  button("削除車名 Alphard");
   assert.equal(selectedDeleted, 0);
   assert.equal(saved, null);
   assert.ok(nodes(render()).some((node) => node.props?.role === "alert"));
   failWrite = false;
-  button("删除車名 Alphard");
+  button("削除車名 Alphard");
   assert.equal(selectedDeleted, 1);
   assert.ok(!JSON.parse(saved).includes("Alphard"));
   states.length = 0; // Reopening the dialog reads the persisted list.
@@ -2477,7 +3044,7 @@ test("vehicle-name options persist deletions, preserve selected names and restor
   assert.equal(tree.find((node) => node.type === "input").props.value, "Alphard");
   assert.ok(!tree.some((node) => node.type === "option" && node.props.value === "Alphard"));
   button("管理車名");
-  for (const name of JSON.parse(saved)) button(`删除車名 ${name}`);
+  for (const name of JSON.parse(saved)) button(`削除車名 ${name}`);
   assert.deepEqual(JSON.parse(saved), []);
   assert.ok(nodes(render()).some((node) => node.type === "option" && node.props.value === MANUAL_VEHICLE_NAME));
   button("恢复默认");
@@ -2538,19 +3105,22 @@ test("daily itinerary includes independent drivers and payment shortcuts while d
   const helpers = source.slice(source.indexOf("function getOrderDateKeys("), source.indexOf("function getOrderFinanceForOrder("));
   const legend = source.indexOf(">每日行程与車費</legend>");
   const first = source.lastIndexOf("<fieldset", legend), last = source.indexOf("</fieldset>", legend) + "</fieldset>".length;
-  const sourceField = source.indexOf("{/* 来源 */}");
-  const statusField = source.indexOf("{/* 予約状態 */}", sourceField);
-  const vehicleField = source.indexOf("{/* 車両 */}", statusField);
+  const formStart = source.indexOf("{showForm && (");
+  const sourceField = source.indexOf('setSourceSelectionOpen("form")', formStart);
+  const statusField = source.indexOf("value={form.status}", formStart);
+  const vehicleField = source.indexOf("value={form.vehicle}", formStart);
   const plateField = source.indexOf("<OrderVehiclePlateSelect", vehicleField);
-  const startDate = source.indexOf("{/* 开始日期 */}");
-  const endDate = source.indexOf("{/* 終了日期 */}", startDate);
+  const startDate = source.indexOf("value={form.date}", formStart);
+  const endDate = source.indexOf("value={form.endDate}", formStart);
   const offDate = source.indexOf('htmlFor="order-off-date"', endDate);
-  const customerField = source.indexOf("{/* 訂単名称 */}");
+  const customerField = source.indexOf("value={form.customer}", formStart);
   const departureTime = source.indexOf("value={form.time}", plateField);
-  assert.ok(customerField < startDate && startDate < endDate && endDate < offDate &&
-    offDate < sourceField && sourceField < statusField && statusField < vehicleField &&
-    vehicleField < plateField && plateField < first &&
-    last < departureTime && departureTime < source.indexOf("{/* 上車地点 */}", departureTime));
+  const fieldPositions = [customerField, sourceField, statusField, startDate, endDate, offDate,
+    vehicleField, plateField, first, last, departureTime, source.indexOf("value={form.pickup}", formStart)];
+  assert.ok(fieldPositions.every(position => position >= formStart) && formStart >= 0,
+    "all reservation editor fields exist");
+  assert.deepEqual(fieldPositions, [...fieldPositions].sort((a, b) => a - b),
+    "reservation editor fields follow the displayed order");
   assert.equal((source.match(/htmlFor="order-off-date"/g) || []).length, 1);
   assert.ok(last < source.indexOf("{/* 上車地点 */}", last));
   assert.doesNotMatch(source, /每日運転士費用快捷输入/);
@@ -2884,11 +3454,35 @@ test("overtime requests are independent from wages and preserve historical reque
   assert.match(source, /overtimeRequest: Object\.values\(primaryAccountingForm\)\.reduce/);
 });
 
+test("all numeric inputs hide native mouse increment controls without changing numeric validation", () => {
+  const styles = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  assert.match(styles, /input\[type="number"\]\s*\{[^}]*-moz-appearance: textfield;[^}]*appearance: textfield;/);
+  assert.match(styles, /input\[type="number"\]::-webkit-inner-spin-button,\s*input\[type="number"\]::-webkit-outer-spin-button\s*\{[^}]*-webkit-appearance: none;[^}]*margin: 0;/);
+  const layout = fs.readFileSync(path.join(root, "app\\layout.tsx"), "utf8");
+  assert.match(layout, /import "\.\/globals\.css"/);
+});
+
+test("accounting daily date and summary stay sticky below the measured dialog header", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const styles = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  const start = source.indexOf('{accountingPreviewOrder && accountingTotals && (');
+  const dialog = source.slice(start, source.indexOf("{selectedOrderDetails &&", start));
+  assert.match(dialog, /ref=\{accountingHeaderRef\} className="dialog-floating-header/);
+  assert.match(source, /new ResizeObserver\(updateOffset\)/);
+  assert.match(source, /observer\.observe\(header\)/);
+  assert.match(source, /return \(\) => observer\.disconnect\(\)/);
+  assert.match(source, /setProperty\("--accounting-header-height", `\$\{header\.getBoundingClientRect\(\)\.height\}px`\)/);
+  assert.match(dialog, /key=\{financeKey\}[\s\S]*?className="accounting-day-header[\s\S]*?<h3 className="font-semibold">\{formatOrderDate\(date\)\}/);
+  assert.match(styles, /\.accounting-day-header\s*\{[^}]*position: sticky;[^}]*top: calc\(var\(--accounting-header-height, 4.75rem\) - 1.5rem\);[^}]*z-index: 10;[^}]*background: #fff;/);
+});
+
 test("accounting save action stays pinned inside the scrollable dialog", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   const start = source.indexOf('{accountingPreviewOrder && accountingTotals && (');
   const dialog = source.slice(start, source.indexOf("{selectedOrderDetails &&", start));
-  assert.match(dialog, /max-h-\[92vh\].*overflow-y-auto/);
+  assert.match(dialog, /editor-dialog editor-dialog--wide.*overflow-y-auto/);
+  const styles = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
+  assert.match(styles, /\.editor-dialog\s*\{[^}]*max-height:\s*92dvh/);
   assert.match(dialog, /className="pointer-events-none sticky bottom-3 z-10 mt-6 flex justify-end"/);
   assert.match(dialog, /pointer-events-auto inline-flex min-h-11 items-center gap-2 rounded-xl/);
   assert.match(dialog, /shadow-lg shadow-emerald-950\/20 ring-4 ring-white\/90/);
@@ -2914,18 +3508,70 @@ test("new and edit reservation saves float with the same style as accounting whi
   assert.match(floating, /<svg aria-hidden="true"/);
 });
 
+test("reservation driver payment totals wages, overtime and advances across all days and imported orders", () => {
+  const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
+  const helpers = source.slice(source.indexOf("function getOrderFinanceAmount("), source.indexOf("/** The order as seen"));
+  const reservationHelpers = source.slice(
+    source.indexOf("function getReservationFinance("),
+    source.indexOf("function updateReservationDailyDriver("),
+  );
+  const calculation = source.slice(source.indexOf("function calculateOrderFinance("), source.indexOf("function getOrderDateKeys("));
+  const aggregation = source.slice(source.indexOf("function getOrderFinanceForOrder("), source.indexOf("function summarizeFinanceEntries("));
+  const mapStart = source.indexOf("const reservationFinanceValues = new Map(");
+  const mapCode = source.slice(mapStart, source.indexOf("const selectedReservationFinanceColumns", mapStart));
+  const first = { id: "first", regionId: region, importBatchId: "batch", importBatchIndex: 0,
+    date: "2026-10-31", time: "", financeByDate: {
+      "2026-10-31": { driverWage: 10000, driverBonusWage: 500, driverOvertimeHours: 2,
+        driverOvertimeRate: 1500, driverAdvanceCompanyReport: 1000, driverAdvanceTripReport: 2000 },
+      "2026-11-01": { dailyFare: 20000, driverWageMode: "percentage", driverWagePercentage: 50,
+        driverAdvanceTripReport: 2000 },
+    } };
+  const second = { ...first, id: "second", importBatchIndex: 1,
+    financeByDate: { "2026-11-02": { driverWage: 4000, driverOvertimeFee: 500 } } };
+  const separate = { ...first, id: "separate", importBatchId: undefined, financeByDate: {} };
+  const otherRegion = { ...second, id: "other-region", regionId: "other" };
+  const { groupOrdersByImportBatch } = load("lib\\order-batches.ts");
+  const context = {
+    monthlyOrders: [second, first, separate, otherRegion],
+    groupOrdersByImportBatch,
+    reservationFinanceColumnOptions: [
+      { key: "driverPayment", label: "運転士支給" },
+      { key: "etc", label: "ETC" },
+      { key: "fuelCost", label: "燃油費" },
+      { key: "orderPrice", label: "訂単价格" },
+      { key: "driverAdvances", label: "運転士立替" },
+      { key: "companyAdvances", label: "会社立替" },
+    ],
+  };
+  vm.createContext(context);
+  vm.runInContext(ts.transpileModule(helpers + reservationHelpers + calculation + aggregation + mapCode +
+    "\nglobalThis.payments = reservationFinanceValues;", {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, context);
+  // First: 10,000 + 500 + 3,000 + 3,000, then 10,000 + 2,000. Second: 4,000 + 500.
+  assert.equal(context.payments.get("first").driverPayment, 33000);
+  assert.equal(context.payments.get("second").driverPayment, 33000);
+  assert.equal(context.payments.get("separate").driverPayment, 0);
+  assert.equal(context.payments.get("other-region").driverPayment, 4500);
+  const tableStart = source.indexOf('<table className="reservation-list-table');
+  const table = source.slice(tableStart, source.indexOf("</table>", tableStart));
+  assert.match(table, /data-label=\{option\.label\}[\s\S]*?\{formatYen\(reservationFinanceValues\.get\(order\.id\)\?\.\[option\.key\] \?\? 0\)\}/);
+});
+
 test("reservation table omits order status and preserves request status controls", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
-  const start = source.indexOf('<table className="w-full min-w-[1400px] table-fixed text-center text-sm">');
+  const start = source.indexOf('<table className="reservation-list-table');
   const table = source.slice(start, source.indexOf("</table>", start));
-  const headers = [...table.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1]);
+  const headers = [...table.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map((match) => match[1].trim());
   assert.deepEqual(headers, [
     "用車日期", "予約情報", "来源", "車両",
-    "運転士", "請求書状態", "操作",
+    "運転士", "{option.label}", "請求書状態", "操作",
   ]);
   const columnWidths = [...table.matchAll(/<col className="w-\[(\d+)%\]" \/>/g)].map((match) => Number(match[1]));
-  assert.deepEqual(columnWidths, [12, 18, 11, 13, 16, 14, 16]);
-  assert.equal(columnWidths.reduce((sum, width) => sum + width, 0), 100);
+  assert.deepEqual(columnWidths, [12, 17, 11, 13, 12, 10, 14]);
+  assert.match(table, /<col key=\{option\.key\} className="w-\[11%\]" \/>/);
+  assert.equal(columnWidths.reduce((sum, width) => sum + width, 0) + 11, 100);
+  assert.match(source, /key: "driverPayment", label: "運転士支給"/);
   assert.doesNotMatch(table, /配車時間|order\.time/);
   assert.doesNotMatch(table, /訂単状態|order\.status/);
   assert.match(table, /点击選択請求書状態和变更范围/);
@@ -2980,7 +3626,8 @@ test("dialog close controls float with their sticky headers", () => {
   for (const source of dialogSources) {
     const closeButtons = source.match(/>\s*×\s*<\/button>/g) || [];
     const stickyHeaders = source.match(/className="dialog-floating-header/g) || [];
-    assert.equal(stickyHeaders.length, closeButtons.length);
+    const confirmations = source.match(/className="confirmation-close"/g) || [];
+    assert.equal(stickyHeaders.length + confirmations.length, closeButtons.length);
   }
   const styles = fs.readFileSync(path.join(root, "app\\globals.css"), "utf8");
   assert.match(styles, /\.dialog-floating-header\s*\{[^}]*position:\s*sticky/);
@@ -2996,6 +3643,8 @@ test("overtime editor has five fields and recalculates both read-only totals on 
   const context = {
     require: nodeRequire, exports: {}, financeKey: "day",
     OrderReceipts: "order-receipts", financeOrder: { id: "fixture-order" }, date: "2026-10-27",
+    dialogSaving: false, pendingSaveCount: 0, persistenceError: "",
+    accountingForm: {}, accountingFormBaseline: {},
     setAccountingForm: (update) => { context.finance = update({ day: context.finance }).day; },
   };
   vm.createContext(context);
@@ -3011,10 +3660,10 @@ test("overtime editor has five fields and recalculates both read-only totals on 
   const edit = (index, value) => input(index).props.onChange({ target: { value } });
   assert.match(context.render()[0].props.className, /md:col-start-1 md:row-start-1/);
   assert.match(context.render()[1].props.className, /md:col-start-2 md:row-start-1/);
-  assert.match(context.render()[1].props.className, /md:row-span-2/);
+  assert.match(context.render()[1].props.className, /md:row-span-3/);
   assert.match(context.render()[2].props.className, /md:col-start-1 md:row-start-2/);
   assert.match(source, /grid items-start gap-3 md:col-span-2 md:grid-cols-2/);
-  assert.match(source, /<fieldset disabled=\{finance.driverPaymentType === "company_advance"\} className="min-w-0 rounded border p-3 md:col-span-2 md:row-start-3/);
+  assert.match(source, /<fieldset disabled=\{finance.driverPaymentType === "company_advance"\} className="min-w-0 rounded border p-3 md:col-start-1 md:row-start-3/);
   assert.match(source, /lg:grid-cols-4" : "lg:grid-cols-3"/);
   assert.deepEqual(plain(labels().map((label) => label.props.children.props.children[0])), [
     "超時時間", "超時費用（旅報）", "超時請求（旅報）", "超時費用（工資）", "超時工資",
@@ -3465,9 +4114,22 @@ test("manual driver wage items can be entered with all-company filtering", () =>
   assert.match(add, /driverFinanceCompanyFilter === "" \? undefined : driverWageItemCompanyName/);
   assert.match(save, /draft\.companyName === undefined/);
   assert.match(save, /companyName: draft\.companyName \?\? ""/);
-  assert.match(panel, /driverFinanceCompanyFilter === "" && \(/);
-  assert.match(panel, /請選択所属会社/);
+  assert.doesNotMatch(panel, /driverFinanceCompanyFilter === "" &&/);
+  assert.match(panel, /<span className="min-w-32 whitespace-normal break-words text-sm \[overflow-wrap:anywhere\]" title=\{draft\.companyName \|\| "未设置所属会社"\}>/);
+  assert.match(panel, /<label className="w-fit max-w-full text-sm font-medium">\s*所属会社/);
+  assert.match(panel, /className="mt-1 w-auto min-w-48 max-w-full rounded border bg-white px-2 py-2"/);
+  assert.match(panel, /draft\.id && !draft\.editing \? "gap-x-10" : "gap-x-6"/);
+  assert.match(panel, /<span className="w-48 whitespace-normal break-words text-sm" title=\{draft\.name\}>/);
+  assert.match(panel, /請選択会社/);
   assert.match(panel, /未设置所属会社/);
+  assert.match(panel, /className="w-fit max-w-full text-sm font-medium">\s*所属会社/);
+  assert.match(panel, /className="w-48 text-sm font-medium">\s*项目名称/);
+  assert.match(panel, /type="text"\s*inputMode="decimal"/);
+  assert.match(panel, /draft\.id && !draft\.editing/);
+  assert.match(panel, /formatYen\(Number\(draft\.amount\)\)/);
+  assert.match(panel, /driverWageItemDrafts\.some\(\(draft\) => !draft\.id \|\| draft\.editing\)/);
+  assert.match(save, /editing: false/);
+  assert.match(save, /companyName: item\.companyName/);
 });
 
 test("metadata validation, nested financial changes and Japan-local time", () => {
@@ -3556,7 +4218,8 @@ test("business POST returns trusted metadata and rejects client-supplied audit f
     "@/lib/company-seal": { isCompanySealDataUrl: () => true, MAX_SEAL_DATA_LENGTH: 350000 },
     "@/lib/audit": audit,
   });
-  const driver = { id, regionId: region, name: "Driver", phone: "", wechat: "", whatsapp: "", licenseExpiry: "", personalSlogan: "一路平安" };
+  const driver = { id, regionId: region, name: "Driver", phone: "", wechat: "", whatsapp: "", licenseExpiry: "", personalSlogan: "一路平安",
+    bankName: "Test Bank", bankBranch: "Branch", bankAccountType: "普通", bankAccountNumber: "0012345", bankAccountHolder: "テスト" };
   const post = (entry) => route.POST({ json: async () => ({
     collection: "drivers", upsert: [entry], deleteIds: [], deletePassword: "",
   }) });
@@ -3568,6 +4231,13 @@ test("business POST returns trusted metadata and rejects client-supplied audit f
   assert.equal(writes, 1);
   assert.equal(metadataReads, 0);
   assert.equal(savedDriverRow.personal_slogan, "一路平安");
+  assert.equal(savedDriverRow.bank_account_number, "0012345");
+  assert.equal(savedDriverRow.bank_name, "Test Bank");
+  assert.equal(savedDriverRow.bank_branch, "Branch");
+  assert.equal(savedDriverRow.bank_account_type, "普通");
+  assert.equal(savedDriverRow.bank_account_holder, "テスト");
+  assert.equal((await post({ ...driver, bankAccountNumber: "123abc" })).status, 400);
+  assert.equal(writes, 1);
 });
 
 test("persistence strips audit metadata, merges saved stamp without losing queued edits", async () => {
@@ -3837,7 +4507,7 @@ test("calendar vehicle quick filters follow the date controls and hide reservati
 test("calendar date headers list drivers' submitted rest days in red", () => {
   const source = fs.readFileSync(path.join(root, "app\\page.tsx"), "utf8");
   assert.match(source, /useDriverRestDays\(Boolean\(currentProfile\) && activeView === "calendar", dates\.map\(day => day\.date\)\)/);
-  assert.match(source, /driverRecords\.find\(driver => driver\.id === day\.driverId\)\?\.name/);
+  assert.match(source, /driverRecords\.find\(record => record\.id === day\.driverId\)/);
   const header = source.slice(source.indexOf('className="calendar-date-header'), source.indexOf("{filteredCalendarVehicleRecords.map((vehicleRecord)"));
   assert.ok(header.indexOf("休日") < header.indexOf("calendar-rest-drivers"));
   assert.match(header, /calendar-rest-drivers[^"]*text-red-600/);

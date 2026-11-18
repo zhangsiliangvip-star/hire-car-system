@@ -3,14 +3,19 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { Database } from "@/lib/supabase/database.types";
 import { isDriverPath, isDriverPwaEnabled } from "@/lib/driver/test-runtime";
+import { sessionCookieName } from "@/lib/supabase/session";
 
 export async function proxy(request: NextRequest) {
   if (process.env.NODE_ENV === "development" && request.nextUrl.pathname === "/_next/hmr") {
     return NextResponse.next();
   }
   const { url, publishableKey } = getSupabaseConfig();
+  const pathname = request.nextUrl.pathname;
+  const sessionPath = pathname.startsWith("/auth/confirm")
+    ? new URL(safeNextPath(request.nextUrl.searchParams.get("next")), request.url).pathname : pathname;
   let response = NextResponse.next({ request });
   const supabase = createServerClient<Database>(url, publishableKey, {
+    cookieOptions: { name: sessionCookieName(url, isDriverPath(sessionPath) ? "driver" : "staff") },
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -31,7 +36,6 @@ export async function proxy(request: NextRequest) {
   const { data, error } = await supabase.auth.getClaims();
   if (error && error.name !== "AuthSessionMissingError") throw error;
 
-  const pathname = request.nextUrl.pathname;
   const isPublicRoute =
     pathname === "/login" ||
     pathname === "/forgot-password" ||
@@ -53,7 +57,7 @@ export async function proxy(request: NextRequest) {
     if (!isDriverPwaEnabled()) return safeNextPath(request.nextUrl.searchParams.get("next"));
     if (loginPath === "/login") {
       const { data: isStaff, error: staffError } = await supabase.rpc("is_staff");
-      if (!staffError && isStaff === true) return safeNextPath(request.nextUrl.searchParams.get("next"));
+      return !staffError && isStaff === true ? safeNextPath(request.nextUrl.searchParams.get("next")) : null;
     }
     const { data: driver, error: driverError } = await supabase.rpc("driver_identity");
     return !driverError && driver?.length === 1 ? "/driver" : null;

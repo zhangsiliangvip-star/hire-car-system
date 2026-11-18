@@ -38,7 +38,6 @@ import type {
   OrderStatus,
   Region,
   Vehicle,
-  VehicleDisplayStatus,
   VehicleDraft,
   VehicleMonthlyFinance,
   VehicleStatus,
@@ -52,14 +51,19 @@ import { summarizeRequestAmounts } from "@/lib/request-amount-summary";
 import { printInvoice } from "@/lib/invoice-print";
 import { printVehicleFinance, printVehicleSummary } from "@/lib/vehicle-finance-print";
 import { summarizeVehicles, totalVehicleSummaries, type VehicleMonthlySummary } from "@/lib/vehicle-finance-summary";
-import { printCompanyWages, printDriverWages } from "@/lib/driver-wage-print";
+import { printDriverWages } from "@/lib/driver-wage-print";
+import { downloadCompanyWageExcel, downloadDriverWageExcel } from "@/lib/driver-wage-excel";
 import { downloadDriverWageBatch } from "@/lib/driver-wage-download";
+import { DriverPayments } from "@/components/driver-payments";
 import { groupDriverFinanceByBatch } from "@/lib/driver-finance-groups";
 import { DriverSelectionDialog } from "@/components/driver-selection-dialog";
 import { SourceSelectionDialog } from "@/components/source-selection-dialog";
 import { OrderDateFilterDialog } from "@/components/order-date-filter-dialog";
-import { rankDriversByMonthlyAttendance } from "@/lib/driver-selection";
+import {
+  filterDriversByEmploymentType, filterScheduleDrivers, rankDriversByMonthlyAttendance,
+} from "@/lib/driver-selection";
 import { getDriverSegments, getServiceDriver, getOrderDriverNames, getOrderDriverLabel } from "@/lib/order-drivers";
+import { formatMobilePhone } from "@/lib/phone-format";
 import { changeOrderVehicle, getServiceVehicle, getOrderVehiclePlates, getVehicleSegments, getCalendarVehicleRows } from "@/lib/order-vehicles";
 import { hasValidDriverPayment, isDriverWageEntry, setReservationDriverPayment,
   withCompanyAdvanceDriver } from "@/lib/reservation-driver-payment";
@@ -74,6 +78,7 @@ import {
   compareCalendarVehicles,
   moveCalendarVehicle,
   getVehicleModelOrder,
+  filterCalendarVisibleVehicles,
   isOutsourcedVehicle,
   orderUsesVehicle,
   resolveOrderVehicle,
@@ -89,14 +94,25 @@ import { OrderFinanceReviewProvider } from "@/components/order-finance-review";
 import { DriverExecutionBadge } from "@/components/driver-execution-badge";
 import { DriverNameLabel, OrderDriverLabels } from "@/components/driver-name-label";
 import { OperationsReports } from "@/components/operations-reports";
+import { DriverRestEditor, type DriverRestEditorState } from "@/components/driver-rest-editor";
+import { driverBankSchema, emptyDriverBank } from "@/lib/driver-bank";
+import { driverPostalCodeSchema, splitDriverAddress } from "@/lib/driver-address";
+import { DriverPostalCode } from "@/components/driver-postal-code";
+import { DriverCompanySelect } from "@/components/driver-company-select";
+import { formatDriverPhone } from "@/lib/driver-phone";
 import { useDriverExecutionStatus } from "@/lib/use-driver-execution-status";
 import { useDriverRestDays } from "@/lib/use-driver-rest-days";
 import { getJapaneseHolidays } from "@/lib/japanese-holidays";
 import { getAccountingAssigneeName } from "@/lib/accounting-assignee";
 import { findOrderConflicts, type OrderConflict } from "@/lib/order-conflicts";
 import { getAccountingBatchOrders, groupOrdersByImportBatch, groupOrdersByImportBatchStartMonth, groupReservationOrders } from "@/lib/order-batches";
+import { getOrderMergeError } from "@/lib/order-merge";
 import { getMonthlySameSourceOrders } from "@/lib/order-invoice-status";
 import { normalizeOrderTimeInput } from "@/lib/order-time-input";
+import { getEffectiveVehicleStatus, getJapanDate } from "@/lib/vehicle-compliance";
+import { DriverLicenseDate, VehicleExpiryDate, VehicleOwnerLabel } from "@/components/vehicle-compliance";
+import { JapaneseEraDateInput } from "@/components/japanese-era-date-input";
+import { findDepartedDriver, findExpiredDriver, isDriverLicenseExpired as licenseExpired } from "@/lib/driver-license";
 
 const DEFAULT_VEHICLE_NAME = "Alphard 01";
 const ALL_REGIONS_ID = "__all_regions__";
@@ -156,6 +172,7 @@ type VehicleMonthlyFinanceForm = {
 
 type DriverWageItemDraft = {
   id?: string;
+  editing?: boolean;
   companyName?: string;
   name: string;
   amount: string;
@@ -336,19 +353,6 @@ function toDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function getVehicleDisplayStatus(vehicle: Vehicle): VehicleDisplayStatus {
-  const today = toDateKey(new Date());
-  const isExpired = [vehicle.inspectionExpiry, vehicle.liabilityExpiry].some(
-    (expiryDate) => expiryDate !== "" && expiryDate < today,
-  );
-
-  return isExpired ? "休運" : vehicle.status;
-}
-
-function isDriverLicenseExpired(driver: Pick<Driver, "licenseExpiry">) {
-  return driver.licenseExpiry !== "" && driver.licenseExpiry < toDateKey(new Date());
 }
 
 function shiftDateKey(dateKey: string, days: number) {
@@ -543,6 +547,7 @@ function createEmptyDraft(
     phone: "",
     pickup: "",
     destination: "",
+    flightNumber: "",
     status: "仮予約",
     notes: "",
     driver: "",
@@ -569,6 +574,18 @@ type FinanceTotals = {
   fuelConsumption: number;
   profit: number;
 };
+
+const reservationFinanceColumnOptions = [
+  { key: "driverPayment", label: "運転士支給" },
+  { key: "etc", label: "ETC" },
+  { key: "fuelCost", label: "燃油費" },
+  { key: "orderPrice", label: "訂単价格" },
+  { key: "driverAdvances", label: "運転士立替" },
+  { key: "companyAdvances", label: "会社立替" },
+] as const;
+
+type ReservationFinanceColumnKey = typeof reservationFinanceColumnOptions[number]["key"];
+type ReservationFinanceValues = Record<ReservationFinanceColumnKey, number>;
 
 function formatYen(amount: number) {
   const safeAmount = Number.isFinite(amount) ? amount : 0;
@@ -832,6 +849,26 @@ function getOrderFinanceForOrder(order: Order, month?: string): FinanceTotals {
   );
 }
 
+function getReservationFinanceValues(order: Order): ReservationFinanceValues {
+  const financeByDate = getReservationFinance(order);
+  const entries = Object.values(financeByDate);
+  const totals = getOrderFinanceForOrder(order);
+  const sumField = (
+    field: "etcCompanyReport" | "etcTripReport" | "fuelCost" |
+      "companyAdvanceCompanyReport" | "companyAdvanceTripReport",
+  ) => entries.reduce((total, finance) => total + getOrderFinanceAmount(finance, field), 0);
+
+  return {
+    driverPayment: totals.driverWages + totals.driverAdvances,
+    etc: sumField("etcCompanyReport") + sumField("etcTripReport"),
+    fuelCost: sumField("fuelCost"),
+    orderPrice: sumDailyFares(financeByDate),
+    driverAdvances: totals.driverAdvances,
+    companyAdvances:
+      sumField("companyAdvanceCompanyReport") + sumField("companyAdvanceTripReport"),
+  };
+}
+
 function summarizeFinanceEntries(
   entries: readonly Partial<OrderFinance>[],
 ): FinanceTotals {
@@ -887,6 +924,7 @@ function FinanceSummaryPanel({
   onMonthChange,
   headerActions,
   trailingHeaderActions,
+  separateYearMonth = false,
   children,
 }: {
   title: string;
@@ -894,15 +932,40 @@ function FinanceSummaryPanel({
   onMonthChange: (month: string) => void;
   headerActions?: ReactNode;
   trailingHeaderActions?: ReactNode;
+  separateYearMonth?: boolean;
   children: ReactNode;
 }) {
+  const yearOptions = [...new Set([
+    ...Array.from({ length: 81 }, (_, index) => String(2020 + index)),
+    month.slice(0, 4),
+  ])].sort();
   return (
     <div className="p-4 md:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold">{title}</h2>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {headerActions}
+          {separateYearMonth ? <>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
+            年份
+            <select aria-label={`${title}年份`} value={month.slice(0, 4)}
+              onChange={event => onMonthChange(`${event.target.value}-${month.slice(5, 7)}`)}
+              className="rounded border bg-white px-3 py-2 text-sm text-gray-900">
+              {yearOptions.map(year => <option key={year} value={year}>{year}年</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
+            月份
+            <select aria-label={`${title}月份`} value={month.slice(5, 7)}
+              onChange={event => onMonthChange(`${month.slice(0, 4)}-${event.target.value}`)}
+              className="rounded border bg-white px-3 py-2 text-sm text-gray-900">
+              {Array.from({ length: 12 }, (_, index) => {
+                const value = String(index + 1).padStart(2, "0");
+                return <option key={value} value={value}>{index + 1}月</option>;
+              })}
+            </select>
+          </label>
+          </> : <label className="flex items-center gap-2 text-sm font-medium text-gray-600">
             统计月份
             <input
               type="month"
@@ -910,7 +973,7 @@ function FinanceSummaryPanel({
               onChange={(event) => onMonthChange(event.target.value)}
               className="rounded border bg-white px-3 py-2 text-sm text-gray-900"
             />
-          </label>
+          </label>}
           {trailingHeaderActions}
         </div>
       </div>
@@ -925,6 +988,24 @@ function FinanceSummaryPanel({
 
 export default function Home() {
   const router = useRouter();
+  const [vehicleToday, setVehicleToday] = useState(getJapanDate);
+  useEffect(() => {
+    const updateDate = () => setVehicleToday(getJapanDate());
+    const interval = window.setInterval(updateDate, 60_000);
+    window.addEventListener("focus", updateDate);
+    document.addEventListener("visibilitychange", updateDate);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", updateDate);
+      document.removeEventListener("visibilitychange", updateDate);
+    };
+  }, []);
+  function getVehicleDisplayStatus(vehicle: Vehicle): VehicleStatus {
+    return getEffectiveVehicleStatus(vehicle, vehicleToday);
+  }
+  function isDriverLicenseExpired(driver: Pick<Driver, "licenseExpiry">) {
+    return licenseExpired(driver, vehicleToday);
+  }
   useEffect(() => {
     document.addEventListener("wheel", preventNumberInputWheelChange, true);
     return () => document.removeEventListener("wheel", preventNumberInputWheelChange, true);
@@ -939,7 +1020,7 @@ export default function Home() {
     pinching: isCalendarPinching,
   } = useCalendarZoom(isMobileCalendar);
   const isCompactCalendar = isMobileCalendar;
-  const mobileCalendarCardHeights = useCalendarCardHeights(calendarScrollRef, isMobileCalendar, calendarScale);
+  const mobileCalendarHeights = useCalendarCardHeights(calendarScrollRef, isMobileCalendar, calendarScale);
   const calendarTodayRequestedRef = useRef(false);
   const calendarQueryDateRef = useRef<string | null>(null);
   const [calendarQueryDate, setCalendarQueryDate] = useState("");
@@ -1094,7 +1175,7 @@ export default function Home() {
     getDeletePassword,
     getRegionForNewRecords,
   );
-  const refreshApprovedOrderFinance = useCallback(async (signal: AbortSignal) => {
+  const refreshApprovedOrderFinance = useCallback(async (signal: AbortSignal, onOrders?: (orders: Order[]) => void) => {
     const version = getVersionOrders();
     const response = await fetch("/api/data", { cache: "no-store", signal });
     const payload = await readJsonSafely(response);
@@ -1103,7 +1184,9 @@ export default function Home() {
       throw new Error("訂単财务返回格式无效。");
     if (signal.aborted) return;
     if (getVersionOrders() !== version) throw new Error("訂単有新的本地修改，請刷新核对已批准金額。");
-    syncOrders((payload as DashboardData).orders, version);
+    const refreshedOrders = (payload as DashboardData).orders;
+    syncOrders(refreshedOrders, version);
+    onOrders?.(refreshedOrders);
   }, [getVersionOrders, syncOrders]);
   const {
     items: allOrderSourceRecords,
@@ -1193,6 +1276,7 @@ export default function Home() {
     replaceItems: replaceDriverWageItems,
     syncItems: syncDriverWageItems,
     getChangeVersion: getVersionDriverWageItems,
+    waitForSave: waitForDriverWageItems,
   } = usePersistedCollection<DriverWageItem>(
     "driverWageItems",
     reportPersistenceError,
@@ -1238,6 +1322,7 @@ export default function Home() {
   const [pendingDelete, setPendingDelete] = useState<{
     message: string;
     action: (password: string) => void | Promise<void>;
+    kind?: "merge";
   } | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -1258,9 +1343,28 @@ export default function Home() {
   const selectedOrderDetails = selectedOrderDetailsSnapshot
     ? allOrders.find(order => order.id === selectedOrderDetailsSnapshot.id) || null : null;
   const [orderDetailsDate, setOrderDetailsDate] = useState("");
+  const [orderDetailsCopied, setOrderDetailsCopied] = useState(false);
   const [orderDetailsMode, setOrderDetailsMode] = useState<"itinerary" | "vehicle">("itinerary");
   const [accountingPreviewOrder, setAccountingPreviewOrder] = useState<Order | null>(null);
+  const [mergeOrderId, setMergeOrderId] = useState<string | null>(null);
+  const [mergeSourceId, setMergeSourceId] = useState("");
+  const accountingHeaderRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const header = accountingHeaderRef.current;
+    if (!header) return;
+    const updateOffset = () => {
+      header.parentElement?.style.setProperty("--accounting-header-height", `${header.getBoundingClientRect().height}px`);
+    };
+    updateOffset();
+    const observer = new ResizeObserver(updateOffset);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [accountingPreviewOrder]);
   const [accountingForm, setAccountingForm] = useState<Record<string, OrderFinance>>({});
+  const [accountingFormBaseline, setAccountingFormBaseline] = useState<Record<string, OrderFinance>>({});
+  const accountingAdvanceSyncFailed = useRef(false);
+  const accountingFormCurrent = useRef(accountingForm);
+  useLayoutEffect(() => { accountingFormCurrent.current = accountingForm; }, [accountingForm]);
   const [accountingBatchOrders, setAccountingBatchOrders] = useState<Order[]>([]);
   const [accountingOrderMeta, setAccountingOrderMeta] = useState<
     Record<string, { orderSource: string; company: string; status: Order["status"] }>
@@ -1277,7 +1381,8 @@ export default function Home() {
   const driverRestDays = useDriverRestDays(Boolean(currentProfile) && activeView === "calendar", dates.map(day => day.date));
   const restingDriverNamesByDate = new Map<string, string[]>();
   for (const day of driverRestDays) {
-    const name = driverRecords.find(driver => driver.id === day.driverId)?.name;
+    const driver = driverRecords.find(record => record.id === day.driverId);
+    const name = driver?.employmentType === "非常勤" ? undefined : driver?.name;
     if (name) restingDriverNamesByDate.set(day.date, [...(restingDriverNamesByDate.get(day.date) ?? []), name]);
   }
   const driverExecutionByOrder = new Map(driverExecution.data?.rows.map(row => [row.orderId, row]));
@@ -1337,6 +1442,25 @@ export default function Home() {
   const [orderVehicleFilter, setOrderVehicleFilter] = useState("");
   const [orderDriverFilter, setOrderDriverFilter] = useState("");
   const [showOrderDateFilter, setShowOrderDateFilter] = useState(false);
+  const [reservationFinanceColumns, setReservationFinanceColumns] =
+    useState<ReservationFinanceColumnKey[]>(["driverPayment"]);
+  const [showReservationFinanceColumnPicker, setShowReservationFinanceColumnPicker] = useState(false);
+  const reservationFinanceColumnPickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showReservationFinanceColumnPicker) return;
+
+    function closePickerOnOutsidePointerDown(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !reservationFinanceColumnPickerRef.current?.contains(event.target)
+      ) {
+        setShowReservationFinanceColumnPicker(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closePickerOnOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", closePickerOnOutsidePointerDown);
+  }, [showReservationFinanceColumnPicker]);
   const [financeMonth, setFinanceMonth] = useState(getCurrentMonthKey);
   const [balanceMonth, setBalanceMonth] = useState(getCurrentMonthKey);
   const [balanceCompanyFilter, setBalanceCompanyFilter] = useState("");
@@ -1348,6 +1472,10 @@ export default function Home() {
   const [driverFinanceCompanyFilter, setDriverFinanceCompanyFilter] = useState("");
   const [driverWageBatchDownloading, setDriverWageBatchDownloading] = useState(false);
   const driverWageBatchDownloadingRef = useRef(false);
+  const [driverWageExcelDownloading, setDriverWageExcelDownloading] = useState(false);
+  const driverWageExcelDownloadingRef = useRef(false);
+  const [companyWageExcelDownloading, setCompanyWageExcelDownloading] = useState(false);
+  const companyWageExcelDownloadingRef = useRef(false);
   const [vehicleFinanceVehicleFilter, setVehicleFinanceVehicleFilter] = useState("");
   const [orderSourceFilter, setOrderSourceFilter] = useState("");
   const [orderCompanyFilter, setOrderCompanyFilter] = useState("");
@@ -1397,11 +1525,20 @@ export default function Home() {
   });
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [showDriverForm, setShowDriverForm] = useState(false);
+  const [showDepartedDrivers, setShowDepartedDrivers] = useState(false);
+  const [driverEmploymentTypeFilter, setDriverEmploymentTypeFilter] = useState<"常勤" | "非常勤">("常勤");
   const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
   const [editingDriverName, setEditingDriverName] = useState<string | null>(null);
+  const [driverRestState, setDriverRestState] = useState<DriverRestEditorState>({ busy: false, dirty: false });
   const [driverForm, setDriverForm] = useState<DriverDraft>({
+    ...emptyDriverBank,
+    employmentStatus: "在職",
+    employmentType: "常勤",
     name: "",
     reading: "",
+    address: "",
+    postalCode: "",
+    companyName: "",
     phone: "",
     wechat: "",
     whatsapp: "",
@@ -1415,6 +1552,7 @@ export default function Home() {
   const [driverGlobalSloganSaving, setDriverGlobalSloganSaving] = useState(false);
   const [driverGlobalSloganError, setDriverGlobalSloganError] = useState("");
   const [showVehicleForm, setShowVehicleForm] = useState(false);
+  const [vehicleExpiryValidity, setVehicleExpiryValidity] = useState({ inspection: true, liability: true });
   const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
   const [editingVehicleName, setEditingVehicleName] = useState<string | null>(null);
   const [vehicleForm, setVehicleForm] = useState<VehicleDraft>({
@@ -1429,6 +1567,7 @@ export default function Home() {
     liabilityExpiry: "",
     notes: "",
     status: "运营中",
+    showInCalendar: true,
   });
   const [vehicleNameMode, setVehicleNameMode] = useState("");
   const [form, setForm] = useState<OrderDraft>(() => createEmptyDraft());
@@ -1630,10 +1769,10 @@ export default function Home() {
           signal: controller.signal,
         });
         const payload = await readJsonSafely(response);
-        if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "无法读取全体标语。"));
+        if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "无法读取全体提示。"));
         if (typeof payload !== "object" || payload === null ||
           !("slogan" in payload) || typeof payload.slogan !== "string") {
-          throw new Error("全体标语返回格式无效。");
+          throw new Error("全体提示返回格式无效。");
         }
         if (active) {
           setDriverGlobalSlogan(payload.slogan);
@@ -1642,7 +1781,7 @@ export default function Home() {
       } catch (error) {
         if (controller.signal.aborted) return;
         console.error("Driver global slogan load failed.", error);
-        if (active) setDriverGlobalSloganError(error instanceof Error ? error.message : "无法读取全体标语。");
+        if (active) setDriverGlobalSloganError(error instanceof Error ? error.message : "无法读取全体提示。");
       } finally {
         if (active) setDriverGlobalSloganLoading(false);
       }
@@ -1712,9 +1851,11 @@ export default function Home() {
     new Set(orders.flatMap(order => getOrderDriverNames(order)).filter(Boolean)),
   ).filter((name) => !driverRecords.some((driver) => driver.name === name));
   const driverRows = rankDriversByMonthlyAttendance([
-    ...driverRecords,
+    ...driverRecords.filter(driver => showDepartedDrivers || driver.employmentStatus !== "離職"),
     ...unregisteredDriverNames.map((name, index) => ({
       id: `unregistered-driver-${index}`,
+      employmentStatus: "在職" as const,
+      employmentType: "非常勤" as const,
       name,
       reading: "",
       phone: "",
@@ -1725,6 +1866,7 @@ export default function Home() {
       regionId: undefined,
     })),
   ], orders, toDateKey(new Date()));
+  const visibleDriverRows = filterDriversByEmploymentType(driverRows, driverEmploymentTypeFilter);
   const unregisteredVehicleNames = Array.from(
     new Set(orders.map((order) => order.vehicle).filter(Boolean)),
   ).filter((name) => !vehicleRecords.some((vehicle) => vehicle.name === name));
@@ -1764,7 +1906,8 @@ export default function Home() {
     }))
     .sort(compareCalendarVehicles)
     .map(({ vehicle }) => vehicle);
-  const filteredCalendarVehicleRecords = calendarSortedVehicleRecords.filter(({ name: vehicle }) => {
+  const filteredCalendarVehicleRecords = filterCalendarVisibleVehicles(calendarSortedVehicleRecords).filter((record) => {
+    const vehicle = record.name;
     const modelOrder = getVehicleModelOrder(vehicle);
     const isOutsourced = isOutsourcedVehicle(vehicle);
     if (calendarVehicleFilter === "all") return true;
@@ -1791,8 +1934,25 @@ export default function Home() {
     .filter((vehicle) => getVehicleDisplayStatus(vehicle) === "运营中")
     .map((vehicle) => vehicle.name);
   const selectedOrderServiceDate = selectedOrderDetails && getOrderDateKeys(selectedOrderDetails).includes(orderDetailsDate)
-    ? orderDetailsDate : selectedOrderDetails?.date || "";
+    ? orderDetailsDate : selectedOrderDetails
+      ? getOrderDateKeys(selectedOrderDetails).find(date => !selectedOrderDetails.offDates.includes(date)) || selectedOrderDetails.date
+      : "";
   const selectedOrderVehicleRef = selectedOrderDetails ? getServiceVehicle(selectedOrderDetails, selectedOrderServiceDate) : null;
+  const orderDetailDates = selectedOrderDetails ? getOrderDateKeys(selectedOrderDetails) : [];
+  const orderDetailActiveDates = selectedOrderDetails
+    ? orderDetailDates.filter(date => !selectedOrderDetails.offDates.includes(date)) : [];
+  const orderDetailDatesDiffer = selectedOrderDetails
+    ? new Set(orderDetailActiveDates.map(date => getServiceVehicle(selectedOrderDetails, date).vehiclePlate)).size > 1 ||
+      new Set(orderDetailActiveDates.map(date => getServiceDriver(selectedOrderDetails, date))).size > 1
+    : false;
+  const orderDetailDailyRows = selectedOrderDetails && orderDetailDatesDiffer ? orderDetailActiveDates.map(date => {
+    const vehicle = getServiceVehicle(selectedOrderDetails, date);
+    const driverName = getServiceDriver(selectedOrderDetails, date);
+    const driver = driverRecords.find(record => record.name === driverName && record.regionId === selectedOrderDetails.regionId)
+      || driverRecords.find(record => record.name === driverName);
+    return { date, vehicle: vehicle.vehicle, plate: vehicle.vehiclePlate, driverName,
+      phone: formatMobilePhone(driver?.phone) || "-", whatsapp: driver?.whatsapp || "-", wechat: driver?.wechat || "-" };
+  }) : [];
   const selectedOrderVehicle = selectedOrderDetails && selectedOrderVehicleRef?.vehiclePlate
     ? resolveOrderVehicle(vehicleRecords, { ...selectedOrderDetails, ...selectedOrderVehicleRef })
     : undefined;
@@ -1805,9 +1965,15 @@ export default function Home() {
       )
     : undefined;
   const selectedOrderDriverNames = selectedOrderDetails ? getOrderDriverNames(selectedOrderDetails).filter(Boolean) : [];
+  const selectedOrderDriverRecords = selectedOrderDriverNames.map(name => ({
+    id: name, name,
+    licenseExpiry: driverRecords.find(driver => driver.name === name &&
+      driver.regionId === selectedOrderDetails?.regionId)?.licenseExpiry || "",
+  }));
   function selectedDriverContact(field: "licenseExpiry" | "phone" | "whatsapp" | "wechat") {
     return selectedOrderDriverNames.map(name => {
-      const value = driverRecords.find(driver => driver.name === name)?.[field] || "-";
+      const value = (field === "phone" ? formatMobilePhone(driverRecords.find(driver => driver.name === name)?.phone)
+        : driverRecords.find(driver => driver.name === name)?.[field]) || "-";
       return selectedOrderDriverNames.length > 1 ? `${name}：${value}` : value;
     }).join("／") || "-";
   }
@@ -1815,15 +1981,27 @@ export default function Home() {
     licenseExpiry: selectedDriverContact("licenseExpiry"), phone: selectedDriverContact("phone"),
     whatsapp: selectedDriverContact("whatsapp"), wechat: selectedDriverContact("wechat"),
   };
+  const orderDetailsCopyText = !selectedOrderDetails ? "" : (orderDetailDatesDiffer
+    ? orderDetailDailyRows.map(row => [`配車日：${row.date}`, `車名：${row.vehicle || "-"}`, `車両番号：${row.plate || "未填写"}`,
+        `運転士：${row.driverName || "未安排"}`, `携帯番号：${row.phone}`, `WhatsApp：${row.whatsapp}`, `微信：${row.wechat}`].join("\n")).join("\n\n")
+    : [`配車日：${orderDetailDates.length > 1 ? `${orderDetailDates[0]} ～ ${orderDetailDates[orderDetailDates.length - 1]}` : orderDetailDates[0] || "-"}`,
+        `車名：${selectedOrderVehicleRef?.vehicle || "-"}`, `車両番号：${selectedOrderVehicleRef?.vehiclePlate || "未填写"}`,
+        `運転士：${getOrderDriverLabel(selectedOrderDetails)}`, `携帯番号：${selectedOrderDriver.phone}`,
+        `WhatsApp：${selectedOrderDriver.whatsapp}`, `微信：${selectedOrderDriver.wechat}`].join("\n"));
   const selectedMonthReservationGroups = groupOrdersByImportBatchStartMonth(orders, orderMonth);
   const ordersInSelectedMonth = selectedMonthReservationGroups.flat();
-  const orderVehicleFilterOptions = Array.from(
-    new Set(
-      ordersInSelectedMonth
-        .flatMap((order) => getOrderVehiclePlates(order, date => date.startsWith(`${orderMonth}-`)))
-        .filter(Boolean),
-    ),
-  ).sort((first, second) => first.localeCompare(second, "ja", { numeric: true }));
+  const orderVehicleFilterPlates = new Set(
+    ordersInSelectedMonth
+      .flatMap((order) => getOrderVehiclePlates(order, date => date.startsWith(`${orderMonth}-`)))
+      .filter(Boolean),
+  );
+  const orderVehicleFilterOptions = Array.from(new Set([
+    ...calendarSortedVehicleRecords
+      .map((vehicle) => vehicle.plate)
+      .filter((plate) => orderVehicleFilterPlates.has(plate)),
+    ...Array.from(orderVehicleFilterPlates)
+      .sort((first, second) => first.localeCompare(second, "ja", { numeric: true })),
+  ]));
   const orderDriverFilterOptions = Array.from(
     new Set(ordersInSelectedMonth.flatMap(order => getOrderDriverNames(order,
       date => date.startsWith(`${orderMonth}-`))).filter(Boolean)),
@@ -1852,6 +2030,27 @@ export default function Home() {
   const monthlyOrders = selectedMonthReservationGroups
     .filter((group) => group.some(matchesReservationFilters))
     .flat();
+  const reservationFinanceValues = new Map(
+    groupOrdersByImportBatch(monthlyOrders).flatMap(group => {
+      const totals = group.reduce<ReservationFinanceValues>((sum, order) => {
+        const values = getReservationFinanceValues(order);
+        for (const option of reservationFinanceColumnOptions) {
+          sum[option.key] += values[option.key];
+        }
+        return sum;
+      }, {
+        driverPayment: 0,
+        etc: 0,
+        fuelCost: 0,
+        orderPrice: 0,
+        driverAdvances: 0,
+        companyAdvances: 0,
+      });
+      return group.map(order => [order.id, totals] as const);
+    }),
+  );
+  const selectedReservationFinanceColumns = reservationFinanceColumnOptions
+    .filter(option => reservationFinanceColumns.includes(option.key));
   const monthlyFinanceOrders = orders
     .filter(
       (order) =>
@@ -2073,11 +2272,11 @@ export default function Home() {
     ...monthlyFinanceOrders.map((order) => order.company).filter(Boolean),
     ...driverWageItems.map((item) => item.companyName).filter(Boolean),
   ])].sort((first, second) => first.localeCompare(second));
-  const buildCompanyDriverFinanceDetails = (sourceOrders: readonly Order[]) => sourceOrders
-    .filter((order) => driverFinanceCompanyFilter === "" ||
-      (driverFinanceCompanyFilter === "__unassigned_company__"
+  const buildCompanyDriverFinanceDetails = (sourceOrders: readonly Order[], companyFilter = driverFinanceCompanyFilter) => sourceOrders
+    .filter((order) => companyFilter === "" ||
+      (companyFilter === "__unassigned_company__"
         ? !order.company
-        : order.company === driverFinanceCompanyFilter))
+        : order.company === companyFilter))
     .flatMap((order) =>
       Object.entries(order.financeByDate || {})
         .filter(
@@ -2188,6 +2387,7 @@ export default function Home() {
       )
       .map((item) => ({
         id: item.id,
+        editing: false,
         companyName: item.companyName,
         name: item.name,
         amount: String(item.amount),
@@ -2196,14 +2396,14 @@ export default function Home() {
   const driverFinanceCompanyLabel = driverFinanceCompanyFilter === "__unassigned_company__"
     ? "未设置所属会社"
     : driverFinanceCompanyFilter || "全部所属会社";
-  const driverFinanceManualWageTotal = selectedDriverWageItems.reduce(
+  const driverFinanceManualWageTotal = (selectedDriverFinanceDriver ? selectedDriverWageItems : monthDriverWageItems).reduce(
     (total, item) => total + item.amount,
     0,
   );
   const driverFinanceTotalWage = filteredDriverFinanceDetails.reduce(
     (total, row) => total + row.driverWages,
     0,
-  ) + driverFinanceManualWageTotal;
+  );
   const driverFinanceTotalAdvances = filteredDriverFinanceDetails.reduce(
     (total, row) => total + row.driverAdvances, 0,
   );
@@ -2219,6 +2419,7 @@ export default function Home() {
       return;
     }
     setDriverWageItemDrafts((drafts) => [...drafts, {
+      editing: true,
       companyName: driverFinanceCompanyFilter === "" ? undefined : driverWageItemCompanyName,
       name: "",
       amount: "",
@@ -2275,18 +2476,47 @@ export default function Home() {
     });
     setDriverWageItemDrafts(saved.map((item) => ({
       id: item.id,
+      editing: false,
+      companyName: item.companyName,
       name: item.name,
       amount: String(item.amount),
     })));
   }
   function deleteDriverWageItem(item: DriverWageItem) {
     requestDelete(
-      `确定删除「${item.driver}」的工資项目「${item.name}」吗？`,
+      `确定削除「${item.driver}」的工資项目「${item.name}」吗？`,
       () => {
         setDriverWageItems((current) => current.filter((record) => record.id !== item.id));
         setDriverWageItemDrafts((current) => current.filter((draft) => draft.id !== item.id));
       },
     );
+  }
+  async function exportDriverWageExcel() {
+    if (driverWageExcelDownloadingRef.current) return;
+    if (activeRegionId === ALL_REGIONS_ID || !selectedDriverFinanceDriver) {
+      alert("請先選択一个分区和一位運転士，再导出月度工資表。");
+      return;
+    }
+    if (!filteredDriverFinanceDetails.length && !selectedDriverWageItems.length) {
+      alert("该運転士本月暂无工資記録。");
+      return;
+    }
+    driverWageExcelDownloadingRef.current = true;
+    setDriverWageExcelDownloading(true);
+    try {
+      await downloadDriverWageExcel({
+        driver: `${selectedDriverFinanceDriver} ／ ${driverFinanceCompanyLabel}`,
+        month: financeMonth,
+        region: regionNameById.get(activeRegionId) || "",
+        rows: filteredDriverFinanceDetails,
+        manualItems: selectedDriverWageItems,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Excel工資表导出失败，請重试。");
+    } finally {
+      driverWageExcelDownloadingRef.current = false;
+      setDriverWageExcelDownloading(false);
+    }
   }
   async function exportAllDriverWages() {
     if (driverWageBatchDownloadingRef.current) return;
@@ -2320,12 +2550,15 @@ export default function Home() {
     }
   }
   async function exportCompanyWages() {
+    if (companyWageExcelDownloadingRef.current) return;
     if (companyDriverFinanceDetails.length === 0 && monthDriverWageItems.length === 0) {
       alert("所选月份及所属会社暂无運転士工資記録。");
       return;
     }
+    companyWageExcelDownloadingRef.current = true;
+    setCompanyWageExcelDownloading(true);
     try {
-      await printCompanyWages({
+      await downloadCompanyWageExcel({
         month: financeMonth,
         company: driverFinanceCompanyLabel,
         region: activeRegionId === ALL_REGIONS_ID ? "全部分区" : regionNameById.get(activeRegionId) || "未知地域",
@@ -2338,7 +2571,10 @@ export default function Home() {
         })),
       });
     } catch (error) {
-      alert(error instanceof Error ? error.message : "会社工資総表导出失败，請重试。");
+      alert(error instanceof Error ? error.message : "Excel会社工資総表导出失败，請重试。");
+    } finally {
+      companyWageExcelDownloadingRef.current = false;
+      setCompanyWageExcelDownloading(false);
     }
   }
   const filteredVehicleFinanceDetails = monthlyFinanceOrders
@@ -2633,6 +2869,13 @@ export default function Home() {
           driverSelectionTarget?.startsWith("accounting-finance:")
         ? accountingPreviewOrder?.regionId
         : driverSelectionOrder?.regionId;
+  const isScheduleDriverSelection = driverSelectionTarget !== null &&
+    driverSelectionTarget !== "driver-finance-filter" &&
+    driverSelectionTarget !== "accounting-batch" &&
+    !driverSelectionTarget.startsWith("accounting-finance:");
+  const regionDriverSelectionCandidates = driverRecords.filter(
+    (driver) => driver.regionId === driverSelectionRegionId,
+  );
   const driverSelectionCandidates = driverSelectionTarget === "driver-finance-filter"
     ? rankDriversByMonthlyAttendance(driverFinanceDrivers.map((name) => {
         const driver = driverRecords.find((record) =>
@@ -2653,7 +2896,9 @@ export default function Home() {
         };
       }), orders, todayDateKey).map((driver) => ({ ...driver, serviceDays: 0 }))
     : driverSelectionTarget !== null ? rankDriversByMonthlyAttendance(
-        driverRecords.filter((driver) => driver.regionId === driverSelectionRegionId),
+        isScheduleDriverSelection
+          ? filterScheduleDrivers(regionDriverSelectionCandidates)
+          : regionDriverSelectionCandidates,
         orders,
         todayDateKey,
       )
@@ -2674,25 +2919,27 @@ export default function Home() {
   function requestDelete(
     message: string,
     action: (password: string) => void | Promise<void>,
+    kind?: "merge",
   ) {
     setDeleteError("");
     setDeletePassword("");
     setDeleteCompleted(false);
-    setPendingDelete({ message, action });
+    setPendingDelete({ message, action, kind });
   }
 
   async function confirmPendingDelete() {
-    if (!pendingDelete || isDeleting || deleteCompleted || !deletePassword) return;
+    if (!pendingDelete || isDeleting || deleteCompleted || (pendingDelete.kind !== "merge" && !deletePassword)) return;
     setDeleteError("");
     setIsDeleting(true);
     try {
       await pendingDelete.action(deletePassword);
       setDeleteCompleted(true);
       setDeletePassword("");
+      setPendingDelete(null);
     } catch (error) {
       console.error("Failed to complete a confirmed deletion.", error);
       setDeleteError(
-        error instanceof Error ? error.message : "删除失败，請稍后重试。",
+        error instanceof Error ? error.message : pendingDelete.kind === "merge" ? "合并失败，請稍后重试。" : "削除失败，請稍后重试。",
       );
     } finally {
       setIsDeleting(false);
@@ -2794,7 +3041,7 @@ export default function Home() {
 
   function deleteBalanceExpenseItem(item: BalanceExpenseItem) {
     requestDelete(
-      `确定删除「${item.companyName || "未填写会社"}」的${item.kind === "income" ? "收入" : "支出"}项目「${item.name}」及其所有月份金額吗？`,
+      `确定削除「${item.companyName || "未填写会社"}」的${item.kind === "income" ? "收入" : "支出"}项目「${item.name}」及其所有月份金額吗？`,
       () =>
         setBalanceExpenseItems((items) =>
           items.filter((current) => current.id !== item.id),
@@ -2908,6 +3155,16 @@ export default function Home() {
     setShowLoginAccountForm(false);
   }
 
+  function closeLoginAccountForm() {
+    if (accountBusy) return;
+    setAccountPassword("");
+    setAccountPasswordConfirmation("");
+    setAccountError("");
+    setAccountMessage("");
+    setShowLoginAccountForm(false);
+    setEditingLoginAccountId(null);
+  }
+
   function openLoginAccountForm(account?: LoginAccount) {
     setAccountPassword("");
     setAccountPasswordConfirmation("");
@@ -2964,7 +3221,7 @@ export default function Home() {
   }
 
   function deleteLoginAccount(account: LoginAccount) {
-    requestDelete(`确定要删除登录账号「${account.email}」吗？`, async (password) => {
+    requestDelete(`确定要削除登录账号「${account.email}」吗？`, async (password) => {
       const response = await fetch("/api/admin/accounts", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -2972,7 +3229,7 @@ export default function Home() {
       });
       const payload = await readJsonSafely(response);
       if (!response.ok) {
-        throw new Error(buildApiErrorMessage(response, payload, "删除账号失败。"));
+        throw new Error(buildApiErrorMessage(response, payload, "削除账号失败。"));
       }
       await loadLoginAccounts();
     });
@@ -3053,12 +3310,11 @@ export default function Home() {
   ) {
     setOrders((currentOrders) => {
       return currentOrders.flatMap((order) => {
-        if (
-          order.id !== orderId ||
-          orderUsesVehicle(order, { ...target, regionId: order.regionId })
-        ) return [order];
+        if (order.id !== orderId) return [order];
 
         const orderEndDate = order.endDate || order.date;
+        const sameVehicle = orderUsesVehicle(order, { ...target, regionId: order.regionId });
+        if (sameVehicle && startDate <= order.date && endDate >= orderEndDate) return [order];
         const movedOffDates = order.offDates.filter(
           (offDate) => offDate >= startDate && offDate <= endDate,
         );
@@ -3069,6 +3325,7 @@ export default function Home() {
 
         const hasBefore = order.date < startDate;
         const hasAfter = orderEndDate > endDate;
+        const splitGroupId = order.splitGroupId || createId();
         const remainingOrders: Order[] = [];
         const usesDailyFares = hasDailyFares(order.financeByDate);
         const getPartPrice = (financeByDate: Order["financeByDate"], legacyPrice: number) =>
@@ -3082,6 +3339,7 @@ export default function Home() {
           );
           remainingOrders.push({
             ...order,
+            splitGroupId,
             endDate: shiftDateKey(startDate, -1),
             orderPrice: getPartPrice(financeByDate, order.orderPrice),
             offDates: order.offDates.filter((offDate) => offDate < startDate),
@@ -3097,6 +3355,7 @@ export default function Home() {
           );
           remainingOrders.push({
             ...order,
+            splitGroupId,
             id: hasBefore ? createId() : order.id,
             date: shiftDateKey(endDate, 1),
             endDate: orderEndDate,
@@ -3113,6 +3372,7 @@ export default function Home() {
         );
         remainingOrders.push({
           ...order,
+          splitGroupId,
           id: createId(),
           vehicle: target.name,
           vehiclePlate: target.plate,
@@ -3212,6 +3472,13 @@ export default function Home() {
       alert("請選択有效的日期和运营中的車両。");
       return;
     }
+    if (findDepartedDriver(driverRecords, batchOrderDriver, getRegionForNewRecords() ?? undefined)) {
+      alert("该運転士已離職，不可新增派单。"); return;
+    }
+    if (findExpiredDriver(driverRecords, batchOrderDriver, getRegionForNewRecords() ?? undefined, vehicleToday)) {
+      alert("该運転士免許已过期，不可用于新预约。請更新有效期或選択其他運転士。");
+      return;
+    }
 
     const importBatchId = createId();
     setOrders((currentOrders) => [
@@ -3254,9 +3521,16 @@ export default function Home() {
     if (!requireSpecificRegionForNewData()) return;
     setEditingDriverId(null);
     setEditingDriverName(null);
+    setDriverRestState({ busy: false, dirty: false });
     setDriverForm({
+      ...emptyDriverBank,
+      employmentStatus: "在職",
+      employmentType: "常勤",
       name: "",
       reading: "",
+      address: "",
+      postalCode: "",
+      companyName: "",
       phone: "",
       wechat: "",
       whatsapp: "",
@@ -3269,9 +3543,18 @@ export default function Home() {
   function openEditDriver(driver: Driver) {
     setEditingDriverId(driver.id.startsWith("unregistered-") ? null : driver.id);
     setEditingDriverName(driver.name);
+    setDriverRestState({ busy: false, dirty: false });
     setDriverForm({
+      ...driverBankSchema.parse({
+        bankName: driver.bankName, bankBranch: driver.bankBranch, bankAccountType: driver.bankAccountType,
+        bankAccountNumber: driver.bankAccountNumber, bankAccountHolder: driver.bankAccountHolder,
+      }),
       name: driver.name,
       reading: driver.reading || "",
+      ...splitDriverAddress(driver.address, driver.postalCode),
+      companyName: driver.companyName || "",
+      employmentStatus: driver.employmentStatus || "在職",
+      employmentType: driver.employmentType ?? "常勤",
       phone: driver.phone,
       wechat: driver.wechat,
       whatsapp: driver.whatsapp,
@@ -3283,14 +3566,34 @@ export default function Home() {
 
   function saveDriver() {
     if (dialogSavingRef.current) return;
+    if (driverRestState.busy) return;
+    if (driverRestState.dirty) {
+      alert("請先点击“保存本月休息日”，再保存運転士资料。");
+      return;
+    }
     if (editingDriverId === null && !requireSpecificRegionForNewData()) return;
     const driverRegionId = editingDriverId === null
       ? getRegionForNewRecords()
       : allDriverRecords.find((driver) => driver.id === editingDriverId)?.regionId;
     if (!driverRegionId) return;
+    const bank = driverBankSchema.safeParse(driverForm);
+    if (!bank.success) {
+      alert("請检查银行口座：番号只能输入半角数字（最多20位），银行名、支店名及名义最多200字。");
+      return;
+    }
+    const postalCode = driverPostalCodeSchema.safeParse(driverForm.postalCode);
+    if (!postalCode.success) {
+      alert("請输入有效的7位郵便番号，例如123-4567，也可留空。");
+      return;
+    }
     const savedDriver: DriverDraft = {
+      ...bank.data,
       name: driverForm.name.trim(),
       reading: driverForm.reading.trim(),
+      ...splitDriverAddress(driverForm.address, postalCode.data),
+      companyName: (driverForm.companyName ?? "").trim(),
+      employmentStatus: driverForm.employmentStatus ?? "在職",
+      employmentType: driverForm.employmentType ?? "常勤",
       phone: driverForm.phone.trim(),
       wechat: driverForm.wechat.trim(),
       whatsapp: driverForm.whatsapp.trim(),
@@ -3300,6 +3603,10 @@ export default function Home() {
 
     if (!savedDriver.name) {
       alert("請填写運転士。");
+      return;
+    }
+    if ((savedDriver.address?.length ?? 0) > 1000 || (savedDriver.companyName?.length ?? 0) > 200) {
+      alert("住所先最多1000字，所属会社最多200字。");
       return;
     }
 
@@ -3354,15 +3661,15 @@ export default function Home() {
         body: JSON.stringify({ slogan: driverGlobalSlogan }),
       });
       const payload = await readJsonSafely(response);
-      if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "全体标语保存失败。"));
+      if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "全体提示保存失败。"));
       if (typeof payload !== "object" || payload === null ||
         !("slogan" in payload) || typeof payload.slogan !== "string") {
-        throw new Error("全体标语保存结果无效，請刷新核对。");
+        throw new Error("全体提示保存结果无效，請刷新核对。");
       }
       setDriverGlobalSlogan(payload.slogan);
     } catch (error) {
       console.error("Driver global slogan save failed.", error);
-      setDriverGlobalSloganError(error instanceof Error ? error.message : "全体标语保存失败，請重试。");
+      setDriverGlobalSloganError(error instanceof Error ? error.message : "全体提示保存失败，請重试。");
     } finally {
       setDriverGlobalSloganSaving(false);
     }
@@ -3376,7 +3683,7 @@ export default function Home() {
     const linkedNotice = linkedOrders
       ? `将清空 ${linkedOrders} 笔未开始予約的運転士字段；已开始或过去的予約保留原信息。`
       : "";
-    requestDelete(`确定删除運転士「${driver.name}」吗？${linkedNotice}`, () => {
+    requestDelete(`确定削除運転士「${driver.name}」吗？${linkedNotice}`, () => {
       setDriverRecords((current) =>
         current.filter((record) => record.id !== driver.id),
       );
@@ -3527,7 +3834,7 @@ export default function Home() {
       ? `将清空 ${linkedOrders} 笔未开始予約的来源字段；已开始或过去的予約保留原信息。`
       : "";
 
-    requestDelete(`确定删除来源「${source.companyName}」吗？${linkedNotice}`, () => {
+    requestDelete(`确定削除来源「${source.companyName}」吗？${linkedNotice}`, () => {
       setOrderSourceRecords((current) =>
         current.filter((record) => record.id !== source.id),
       );
@@ -3709,7 +4016,7 @@ export default function Home() {
       ? `将清空 ${linkedOrders} 笔未开始予約的会社字段；已开始或过去的予約保留原信息。`
       : "";
     requestDelete(
-      `确定删除所属会社「${company.name}」吗？${linkedNotice}`,
+      `确定削除所属会社「${company.name}」吗？${linkedNotice}`,
       () => {
         setCompanyRecords((current) =>
           current.filter((record) => record.id !== company.id),
@@ -3729,6 +4036,7 @@ export default function Home() {
 
   function openNewVehicle() {
     if (!requireSpecificRegionForNewData()) return;
+    setVehicleExpiryValidity({ inspection: true, liability: true });
     setEditingVehicleId(null);
     setEditingVehicleName(null);
     setVehicleNameMode(vehicleNameOptions[0]);
@@ -3744,11 +4052,13 @@ export default function Home() {
       liabilityExpiry: "",
       notes: "",
       status: "运营中",
+      showInCalendar: true,
     });
     setShowVehicleForm(true);
   }
 
   function openEditVehicle(vehicle: Vehicle) {
+    setVehicleExpiryValidity({ inspection: true, liability: true });
     setEditingVehicleId(vehicle.id.startsWith("unregistered-") ? null : vehicle.id);
     setEditingVehicleName(vehicle.name);
     setVehicleNameMode(vehicle.name);
@@ -3764,12 +4074,17 @@ export default function Home() {
       liabilityExpiry: vehicle.liabilityExpiry || "",
       notes: vehicle.notes,
       status: vehicle.status,
+      showInCalendar: vehicle.showInCalendar !== false,
     });
     setShowVehicleForm(true);
   }
 
   function saveVehicle() {
     if (dialogSavingRef.current) return;
+    if (!vehicleExpiryValidity.inspection || !vehicleExpiryValidity.liability) {
+      alert("請先修正車検或自賠責的和历日期，再保存。");
+      return;
+    }
     if (editingVehicleId === null && !requireSpecificRegionForNewData()) return;
     const vehicleRegionId = editingVehicleId === null
       ? getRegionForNewRecords()
@@ -3792,6 +4107,7 @@ export default function Home() {
       liabilityExpiry: vehicleForm.liabilityExpiry,
       notes: vehicleForm.notes.trim(),
       status: vehicleForm.status,
+      showInCalendar: vehicleForm.showInCalendar !== false,
     };
 
     if (
@@ -3802,7 +4118,7 @@ export default function Home() {
       savedVehicle.defaultInsuranceFee < 0 ||
       savedVehicle.defaultInsuranceFee > 99_999_999_999_999
     ) {
-      alert("默认停車场月費和保险月費必须为非负整数。");
+      alert("駐車場料金和保険料必须为非负整数。");
       return;
     }
 
@@ -3922,7 +4238,7 @@ export default function Home() {
     const linkedNotice = linkedOrders
       ? `将清空 ${linkedOrders} 笔未开始予約的車両字段；已开始或过去的予約保留原信息。`
       : "";
-    requestDelete(`确定删除車両「${vehicle.plate || vehicle.name}」吗？${linkedNotice}`, () => {
+    requestDelete(`确定削除車両「${vehicle.plate || vehicle.name}」吗？${linkedNotice}`, () => {
       setVehicleRecords((current) =>
         current.filter((record) => record.id !== vehicle.id),
       );
@@ -4117,6 +4433,7 @@ export default function Home() {
       regionId: order.regionId,
       importBatchId: order.importBatchId,
       importBatchIndex: order.importBatchIndex,
+      splitGroupId: order.splitGroupId,
       ...((order.endDate || order.date) === order.date ? getServiceVehicle(order, order.date)
         : { vehicle: order.vehicle, vehiclePlate: order.vehiclePlate || "" }),
       date: order.date,
@@ -4127,6 +4444,7 @@ export default function Home() {
       phone: order.phone,
       pickup: order.pickup,
       destination: order.destination,
+      flightNumber: order.flightNumber || "",
       status: order.status,
       notes: order.notes,
       driver: order.driver || "",
@@ -4164,7 +4482,7 @@ export default function Home() {
         ]),
       ].sort();
       if (dates.length === 0 || dates.length > 3660) {
-        alert("单笔訂単财务明細最多支持 3660 个日历日。");
+        alert("单笔訂単财务明細最多支持 3660 个日歴日。");
         return;
       }
       const orderForm = Object.fromEntries(
@@ -4204,6 +4522,8 @@ export default function Home() {
       ),
     );
     setAccountingForm(form);
+    setAccountingFormBaseline(form);
+    accountingAdvanceSyncFailed.current = false;
     setAccountingStatus(order.accountingStatus || "未完成");
     setAccountingInvoiceStatus(order.invoiceStatus);
     setAccountingInvoiceSentDate(order.invoiceSentDate);
@@ -4216,6 +4536,10 @@ export default function Home() {
   function saveAccounting() {
     if (dialogSavingRef.current) return;
     if (!accountingPreviewOrder) return;
+    if (accountingAdvanceSyncFailed.current) {
+      alert("立替切换结果未能同步到表单。請刷新页面并重新打开财务窗口核对后再保存。");
+      return;
+    }
 
     const financeByOrder = new Map<string, Order["financeByDate"]>(
       accountingBatchOrders.map((batchOrder) => [batchOrder.id, {}]),
@@ -4334,7 +4658,7 @@ export default function Home() {
   function addOrder(skipConflictCheck = false) {
     if (dialogSavingRef.current) return;
     if (editingOrderId !== null && !orders.some((order) => order.id === editingOrderId)) {
-      alert("预约已删除，請关闭窗口后重新操作。");
+      alert("预约已削除，請关闭窗口后重新操作。");
       return;
     }
     const targetRegionId = editingOrderId === null
@@ -4376,18 +4700,36 @@ export default function Home() {
           Number.isSafeInteger(amount) && amount >= 0 && amount <= 99_999_999_999_999) &&
         (finance.companyAdvancePaymentNote || "").length <= 1000 && hasValidDriverPayment(finance),
       )) {
-      alert("車費、運転士工資、会社立替及外注運転士費用须为不超过 99,999,999,999,999 的非负日元整数；運転士工資与外注費用须按費用类型選択。行程簡概及外注運転士备注最多1000字，预约最多3660个日历日。");
+      alert("車費、運転士工資、会社立替及外注運転士費用须为不超过 99,999,999,999,999 的非负日元整数；運転士工資与外注費用须按費用类型選択。行程簡概及外注運転士备注最多1000字，预约最多3660个日歴日。");
       return;
     }
     const savedForm: OrderDraft = {
       ...form,
       vehiclePlate: formVehicle ? formVehicle.plate : form.vehiclePlate,
+      flightNumber: form.flightNumber.trim().toUpperCase().replace(/\s+/g, ""),
       financeByDate: form.financeByDate,
       driver: form.driver.trim(),
       orderSource: form.orderSource.trim(),
       company: form.company.trim(),
       salesRep: form.salesRep.trim(),
     };
+    const previousOrder = orders.find(order => order.id === editingOrderId);
+    if (getOrderDateKeys(savedForm).some(date => !savedForm.offDates.includes(date) &&
+      !(previousOrder && date >= previousOrder.date && date <= (previousOrder.endDate || previousOrder.date) &&
+        !previousOrder.offDates.includes(date) && getServiceDriver(previousOrder, date) === getServiceDriver(savedForm, date)) &&
+      findDepartedDriver(driverRecords, getServiceDriver(savedForm, date), targetRegionId ?? undefined))) {
+      alert("该運転士已離職，不可新增或变更派单。"); return;
+    }
+    if (getOrderDateKeys(savedForm).some(date => {
+      if (savedForm.offDates.includes(date)) return false;
+      const name = getServiceDriver(savedForm, date);
+      const unchanged = previousOrder && date >= previousOrder.date && date <= (previousOrder.endDate || previousOrder.date) &&
+        !previousOrder.offDates.includes(date) && getServiceDriver(previousOrder, date) === name;
+      return !unchanged && findExpiredDriver(driverRecords, name, targetRegionId ?? undefined, vehicleToday);
+    })) {
+      alert("该運転士免許已过期，不可新增或变更派单。請更新有效期或選択其他運転士。");
+      return;
+    }
     if (!skipConflictCheck) {
       const conflicts = findOrderConflicts(
         { ...savedForm, regionId: targetRegionId },
@@ -4423,16 +4765,53 @@ export default function Home() {
 
   function requestOrderDeletion(order: Order) {
     requestDelete(
-      `确定永久删除予約「${order.customer || order.id}」吗？此操作会一并清除财务、派单、执行記録及相关小票，且无法恢复。`,
+      `确定永久削除予約「${order.customer || order.id}」吗？此操作会一并清除财务、派单、执行記録及相关小票，且无法恢复。`,
       async () => {
         setOrders((currentOrders) =>
           currentOrders.filter((currentOrder) => currentOrder.id !== order.id),
         );
         if (!(await waitForOrders())) {
-          throw new Error("訂単删除未获服务器确认。請检查保存错误并重新载入核对数据。");
+          throw new Error("訂単削除未获服务器确认。請检查保存错误并重新载入核对数据。");
         }
         closeForm();
       },
+    );
+  }
+
+  const mergeableOrderIds = useMemo(() => new Set(orders
+    .filter(order => orders.some(candidate => getOrderMergeError(order, candidate) === null))
+    .map(order => order.id)), [orders]);
+  const mergeTarget = orders.find(order => order.id === mergeOrderId);
+  const mergeCandidates = mergeTarget
+    ? orders.filter(order => getOrderMergeError(mergeTarget, order) === null)
+      .sort((first, second) => first.date.localeCompare(second.date))
+    : [];
+  function requestOrderMerge() {
+    const source = mergeCandidates.find(order => order.id === mergeSourceId);
+    if (!mergeTarget || !source) return;
+    requestDelete(
+      `合并「${mergeTarget.customer}」的 ${formatOrderDate(mergeTarget.date)} ～ ${formatOrderDate(mergeTarget.endDate)} 与 ${formatOrderDate(source.date)} ～ ${formatOrderDate(source.endDate)}？每日车辆、司机和财务保留，另一段独立订单将被移除。`,
+      async () => {
+        if (!(await waitForOrders())) throw new Error("请先处理未保存的订单修改，再合并。");
+        const response = await fetch("/api/orders/merge", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetId: mergeTarget.id, sourceId: source.id,
+            targetVersion: mergeTarget.lastOperation ?? null, sourceVersion: source.lastOperation ?? null,
+          }),
+        });
+        const payload = await readJsonSafely(response);
+        if (!response.ok) throw new Error(buildApiErrorMessage(response, payload, "订单合并失败。"));
+        setMergeOrderId(null); setMergeSourceId(""); setSplitSelection(null);
+        try {
+          await refreshApprovedOrderFinance(new AbortController().signal);
+        } catch (error) {
+          console.error("Merged orders refresh failed.", error);
+          setPersistenceError("订单已合并，但列表刷新失败。请重新载入后再编辑，勿重复合并。");
+          window.location.reload();
+        }
+      },
+      "merge",
     );
   }
 
@@ -4533,6 +4912,21 @@ export default function Home() {
     if (targets.some(({ orderId, date }) => !allOrders.some(order => order.id === orderId &&
       getOrderDateKeys(order).includes(date)))) {
       alert("訂単或用車日期已变化，請关闭财务窗口后重新打开。");
+      return;
+    }
+    if (targets.some(({ orderId, date }) => {
+      const order = allOrders.find(item => item.id === orderId);
+      return date >= vehicleToday && order && getServiceDriver(order, date) !== name &&
+        findDepartedDriver(allDriverRecords, name, order.regionId);
+    })) {
+      alert("该運転士已離職，不可新增或变更派单；歴史财务記録仍可核对。"); return;
+    }
+    if (targets.some(({ orderId, date }) => {
+      const order = allOrders.find(item => item.id === orderId);
+      return date >= vehicleToday && order && getServiceDriver(order, date) !== name &&
+        findExpiredDriver(allDriverRecords, name, order.regionId, vehicleToday);
+    })) {
+      alert("该運転士免許已过期，不可新增或变更派单；歴史财务記録仍可核对。");
       return;
     }
     if (targets.some(({ key, orderId, date }) => accountingForm[key]?.driverPaymentType !==
@@ -4829,31 +5223,54 @@ export default function Home() {
             </label>
           )}
           {activeView === "calendar" && (
-            <label className="calendar-quick-date flex items-center gap-1 text-sm">
-              <span>日期</span>
-              <input
-                type="date"
-                aria-label="日历快速查询日期"
-                value={calendarQueryDate}
-                className="min-w-0 rounded border border-slate-500 bg-slate-800 px-2 py-1 text-white"
-                onChange={(event) => {
-                  const dateKey = event.target.value;
-                  setCalendarQueryDate(dateKey);
-                  if (!dateKey) return;
-                  const [year, month, day] = dateKey.split("-").map(Number);
-                  const selectedDate = new Date(year, month - 1, day);
+            <>
+              <label className="calendar-quick-date flex items-center gap-1 text-sm">
+                <span>日期</span>
+                <input
+                  type="date"
+                  aria-label="日历快速查询日期"
+                  value={calendarQueryDate}
+                  className="min-w-0 rounded border border-slate-500 bg-slate-800 px-2 py-1 text-white"
+                  onChange={(event) => {
+                    const dateKey = event.target.value;
+                    setCalendarQueryDate(dateKey);
+                    if (!dateKey) return;
+                    const [year, month, day] = dateKey.split("-").map(Number);
+                    const selectedDate = new Date(year, month - 1, day);
+                    if (isMobileCalendar) {
+                      calendarQueryDateRef.current = dateKey;
+                      calendarTodayRequestedRef.current = true;
+                      calendarAnchorRef.current = null;
+                      setMobileCalendarFirstMonth(new Date(year, month - 3, 1));
+                      setCalendarTodayRequest((request) => request + 1);
+                    } else {
+                      setCalendarCenterDate(selectedDate);
+                    }
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                aria-label="定位到今日"
+                onClick={() => {
+                  const today = new Date();
+                  const todayKey = toDateKey(today);
+                  setCalendarQueryDate(todayKey);
                   if (isMobileCalendar) {
-                    calendarQueryDateRef.current = dateKey;
+                    calendarQueryDateRef.current = todayKey;
                     calendarTodayRequestedRef.current = true;
                     calendarAnchorRef.current = null;
-                    setMobileCalendarFirstMonth(new Date(year, month - 3, 1));
+                    setMobileCalendarFirstMonth(new Date(today.getFullYear(), today.getMonth() - 2, 1));
                     setCalendarTodayRequest((request) => request + 1);
                   } else {
-                    setCalendarCenterDate(selectedDate);
+                    setCalendarCenterDate(today);
                   }
                 }}
-              />
-            </label>
+                className="calendar-today-button mobile-calendar-quick-today-button rounded border border-blue-300 bg-blue-700 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-600"
+              >
+                今日
+              </button>
+            </>
           )}
           <div className="hidden text-right text-xs sm:block">
             <p className="font-semibold">{currentProfile.fullName.trim() || "未填写姓名"}</p>
@@ -4966,6 +5383,7 @@ export default function Home() {
                 items: [
                   { id: "orderFinance", label: "経理統計", icon: "finance" },
                   { id: "driverFinance", label: "給料統計", icon: "salary" },
+                  { id: "driverPayments", label: "支払管理", icon: "finance" },
                   ...(canViewVehicleAndBalanceReports
                     ? [
                         { id: "vehicleFinance" as const, label: "車両統計", icon: "vehicleFinance" },
@@ -5028,40 +5446,60 @@ export default function Home() {
               regionId={activeRegionId === ALL_REGIONS_ID ? "" : activeRegionId} />
           )}
           {activeView === "login" && currentProfile?.role === "admin" && (
-            <div className="p-4 md:p-6">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-bold">ログイン管理</h2>
+            <div className="login-management p-4 md:p-6">
+              <div className="account-page-header mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="account-eyebrow">账号与访问权限</p>
+                  <h2 className="text-lg font-bold">ログイン管理</h2>
+                  <p className="account-page-description">统一管理工作人员账号与地域权限。</p>
+                </div>
                 <button
                   type="button"
                   disabled={accountBusy}
                   onClick={() => {
                     if (showLoginAccountForm) {
-                      setAccountPassword("");
-                      setAccountPasswordConfirmation("");
-                      setShowLoginAccountForm(false);
-                      setEditingLoginAccountId(null);
+                      closeLoginAccountForm();
                     } else {
                       setAccountError("");
                       openLoginAccountForm();
                     }
                   }}
-                  className="rounded bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                  className="account-toggle rounded bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
                 >
                   {showLoginAccountForm ? "取消" : "+ 新增账号"}
                 </button>
               </div>
-              <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="account-access-notice mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
                 账号由管理员直接创建并设置初始密码，无需邮件邀請。普通用户只能管理所属地域的数据；管理员可以查看并管理全部地域。
               </p>
-              {accountMessage && <p role="status" className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">{accountMessage}</p>}
-              {accountError && (
+              {!showLoginAccountForm && accountMessage && <p role="status" className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">{accountMessage}</p>}
+              {!showLoginAccountForm && accountError && (
                 <p role="alert" className="mb-4 rounded border border-rose-300 bg-rose-50 p-3 text-sm text-rose-900">
                   {accountError}
                 </p>
               )}
               {showLoginAccountForm && (
-                <form onSubmit={saveLoginAccount} className="mb-5 grid gap-4 rounded border bg-white p-4 sm:grid-cols-2 xl:grid-cols-3">
+                <dialog className="account-editor-dialog" aria-labelledby="account-editor-title"
+                  ref={node => { if (node && !node.open) node.showModal(); }}
+                  onCancel={event => {
+                    event.preventDefault();
+                    closeLoginAccountForm();
+                  }}>
+                <form onSubmit={saveLoginAccount}
+                  className="account-editor mb-5 grid gap-4 rounded border bg-white p-4 sm:grid-cols-2 xl:grid-cols-3">
                   <fieldset disabled={accountBusy} className="contents">
+                  <div className="dialog-floating-header account-section-heading account-editor-heading">
+                    <span className="account-section-number" aria-hidden="true">01</span>
+                    <div>
+                      <h3 id="account-editor-title">{editingLoginAccountId === null ? "创建工作人员账号" : "编辑账号资料"}</h3>
+                      <p>维护基本信息，并配置所属会社与访问权限。</p>
+                    </div>
+                    <span className="account-mode-badge">{editingLoginAccountId === null ? "新建账号" : "资料编辑"}</span>
+                    <button type="button" className="account-dialog-close" aria-label="关闭账号编辑"
+                      disabled={accountBusy} onClick={closeLoginAccountForm}>×</button>
+                  </div>
+                  {accountError && <p role="alert" className="account-form-notice rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{accountError}</p>}
+                  {accountMessage && <p role="status" className="account-form-notice rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">{accountMessage}</p>}
                   <label className="text-sm font-medium">
                     用户姓名
                     <input required value={loginAccountForm.fullName} onChange={(event) => setLoginAccountForm((current) => ({ ...current, fullName: event.target.value }))} className="mt-1 w-full rounded border p-2" />
@@ -5128,7 +5566,14 @@ export default function Home() {
                       <option value="admin">管理员</option>
                     </select>
                   </label>
-                    <div className="rounded border bg-slate-50 p-3 sm:col-span-2 xl:col-span-3">
+                    <div className="account-password-panel rounded border bg-slate-50 p-3 sm:col-span-2 xl:col-span-3">
+                      <div className="account-section-heading">
+                        <span className="account-section-number" aria-hidden="true">02</span>
+                        <div>
+                          <h3>登录安全</h3>
+                          <p>{editingLoginAccountId === null ? "为新账号设置安全的初始密码。" : "密码独立管理，保存资料不会变更密码。"}</p>
+                        </div>
+                      </div>
                       <p className="mb-2 text-sm text-gray-600">
                         {editingLoginAccountId === null
                           ? "设置初始登录密码（8 至 128 个字符），請通过安全方式告知用户。"
@@ -5152,13 +5597,14 @@ export default function Home() {
                       </div>
                       {editingLoginAccountId !== null && (
                         <button type="button" disabled={accountBusy} onClick={setLoginAccountPassword}
-                          className="mt-3 rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                          className="account-password-action mt-3 rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                           设置新密码
                         </button>
                       )}
                     </div>
-                  <div className="flex items-end">
-                    <button type="submit" disabled={accountBusy} className="w-full rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
+                  <div className="account-editor-footer flex items-end">
+                    <p>{editingLoginAccountId === null ? "确认资料后，创建账号即可使用。" : "请核对资料与权限后保存修改。"}</p>
+                    <button type="submit" disabled={accountBusy} className="account-save w-full rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
                       {accountBusy ? "正在处理…" : editingLoginAccountId === null
                         ? "创建账号"
                         : "保存資料"}
@@ -5166,8 +5612,9 @@ export default function Home() {
                   </div>
                   </fieldset>
                 </form>
+                </dialog>
               )}
-              <div className="overflow-x-auto border bg-white">
+              <div className="account-list-panel overflow-x-auto border bg-white">
                 <table className="management-table w-full min-w-[1250px] table-fixed text-center text-sm" data-table="accounts">
                   <colgroup>
                     <col style={{ width: "10%" }} /><col style={{ width: "22%" }} />
@@ -5219,7 +5666,7 @@ export default function Home() {
                               <button type="button" disabled={accountBusy} onClick={() => openLoginAccountForm(account)} className="table-action-button table-action-button--edit driver-action-button">编辑</button>
                             </div>
                             <div className="driver-action-slot">
-                              <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="table-action-button table-action-button--delete driver-action-button" title={account.id === currentProfile.id ? "不能删除当前账号" : undefined}>删除</button>
+                              <button type="button" disabled={accountBusy || account.id === currentProfile.id} onClick={() => deleteLoginAccount(account)} className="table-action-button table-action-button--delete driver-action-button" title={account.id === currentProfile.id ? "不能削除当前账号" : undefined}>削除</button>
                             </div>
                           </div>
                         </td>
@@ -5245,7 +5692,7 @@ export default function Home() {
                   onClick={exportOrderFinance}
                   className="table-action-button table-action-button--export"
                 >
-                  导出财务表（A4）
+                  导出财务表（PDF）
                 </button>
               }
               trailingHeaderActions={
@@ -5343,7 +5790,7 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              <div className="order-finance-table-region border bg-white">
+              <div className="list-panel order-finance-table-region border bg-white">
                 <table className="management-table order-finance-management-table w-full min-w-[1400px] table-fixed text-center text-sm" data-table="order-finance">
                   <colgroup>
                     <col style={{ width: "15%" }} /><col style={{ width: "25%" }} />
@@ -5442,6 +5889,7 @@ export default function Home() {
           {activeView === "driverFinance" && (
             <FinanceSummaryPanel
               title="給料統計"
+              separateYearMonth
               month={financeMonth}
               onMonthChange={(month) => {
                 setFinanceMonth(month);
@@ -5478,14 +5926,20 @@ export default function Home() {
                   }}
                   className="table-action-button table-action-button--export"
                 >
-                  导出工資表（A4）
+                  导出工資表（PDF）
+                </button>
+                <button type="button" onClick={exportDriverWageExcel}
+                  disabled={driverWageExcelDownloading}
+                  className="table-action-button table-action-button--excel disabled:opacity-50">
+                  {driverWageExcelDownloading ? "Excel导出中…" : "导出工資表（Excel）"}
                 </button>
                 <button
                   type="button"
                   onClick={exportCompanyWages}
-                  className="table-action-button table-action-button--export"
+                  disabled={companyWageExcelDownloading}
+                  className="table-action-button table-action-button--excel disabled:opacity-50"
                 >
-                  会社全员工資総表（A4）
+                  {companyWageExcelDownloading ? "Excel导出中…" : "会社全员工資総表（Excel）"}
                 </button>
                 <button
                   type="button"
@@ -5532,7 +5986,7 @@ export default function Home() {
             >
               <div className="mb-2 flex flex-wrap justify-end gap-2">
                 <div className="rounded border px-4 py-2 text-right">
-                  <span className="mr-3 text-sm font-semibold">運転士立替</span>
+                  <span className="mr-3 text-sm font-semibold">立替</span>
                   <span className="text-lg font-bold tabular-nums">{formatYen(driverFinanceTotalAdvances)}</span>
                 </div>
                 <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-2 text-right">
@@ -5543,12 +5997,16 @@ export default function Home() {
                     {formatYen(driverFinanceTotalWage)}
                   </span>
                 </div>
+                <div className="rounded border border-amber-200 bg-amber-50 px-4 py-2 text-right">
+                  <span className="mr-3 text-sm font-semibold text-amber-800">追加項目</span>
+                  <span className="text-lg font-bold tabular-nums text-amber-950">{formatYen(driverFinanceManualWageTotal)}</span>
+                </div>
                 <div className="rounded border border-blue-200 bg-blue-50 px-4 py-2 text-right">
                   <span className="mr-3 text-sm font-semibold text-blue-800">支付総额</span>
-                  <span className="text-lg font-bold tabular-nums text-blue-950">{formatYen(driverFinanceTotalAdvances + driverFinanceTotalWage)}</span>
+                  <span className="text-lg font-bold tabular-nums text-blue-950">{formatYen(driverFinanceTotalAdvances + driverFinanceTotalWage + driverFinanceManualWageTotal)}</span>
                 </div>
               </div>
-              <div className="driver-finance-table-region overflow-x-auto border bg-white">
+              <div className="list-panel driver-finance-table-region overflow-x-auto border bg-white">
                 <table className="management-table driver-finance-management-table w-full min-w-[1400px] table-fixed text-center text-sm" data-table="driver-finance">
                   <colgroup>
                     <col style={{ width: "16%" }} /><col style={{ width: "16%" }} />
@@ -5614,7 +6072,7 @@ export default function Home() {
               <section className="mt-4 rounded border bg-white p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="font-semibold">手動工資项目</h3>
+                    <h3 className="font-semibold">追加項目</h3>
                     <p className="mt-1 text-xs text-gray-500">
                       按所选月份、運転士和所属会社保存；全部会社筛选時可为每个项目单独選択会社。金額可填写正数或负数，并计入工資及支付総额。
                     </p>
@@ -5635,90 +6093,114 @@ export default function Home() {
                 </div>
                 {!selectedDriverFinanceDriver ? (
                   <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    請先選択運転士，再录入手動工資项目。
+                    請先選択運転士，再录入追加項目。
                   </p>
                 ) : driverWageItemsMigrationPending ? (
                   <p role="alert" className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    手動工資项目尚未启用，請先应用数据库迁移后再录入。
+                    追加項目尚未启用，請先应用数据库迁移后再录入。
                   </p>
                 ) : driverWageItemDrafts.length === 0 ? (
-                  <p className="text-sm text-gray-500">当前月份暂无手動工資项目。</p>
+                  <p className="text-sm text-gray-500">当前月份暂无追加項目。</p>
                 ) : (
                   <div className="space-y-2">
                     {driverWageItemDrafts.map((draft, index) => (
-                      <div key={draft.id || `new-${index}`} className="flex flex-wrap items-end gap-2">
-                        {driverFinanceCompanyFilter === "" && (
-                          <label className="min-w-[180px] flex-1 text-sm font-medium">
-                            所属会社
-                            <select
-                              value={
-                                draft.companyName === undefined
-                                  ? "__select_company__"
-                                  : draft.companyName || "__unassigned_company__"
-                              }
-                              onChange={(event) =>
+                      <div key={draft.id || `new-${index}`} className={`flex flex-wrap items-end gap-y-3 border-b pb-3 ${draft.id && !draft.editing ? "gap-x-10" : "gap-x-6"}`}>
+                        {draft.id && !draft.editing ? (
+                          <>
+                            <span className="min-w-32 whitespace-normal break-words text-sm [overflow-wrap:anywhere]" title={draft.companyName || "未设置所属会社"}>
+                              {draft.companyName || "未设置所属会社"}
+                            </span>
+                            <span className="w-48 whitespace-normal break-words text-sm" title={draft.name}>{draft.name}</span>
+                            <span className="min-w-32 text-right text-sm font-semibold tabular-nums">
+                              {formatYen(Number(draft.amount))}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
                                 setDriverWageItemDrafts((current) =>
                                   current.map((item, itemIndex) =>
-                                    itemIndex === index
-                                      ? {
-                                          ...item,
-                                          companyName:
-                                            event.target.value === "__select_company__"
-                                              ? undefined
-                                              : event.target.value === "__unassigned_company__"
-                                                ? ""
-                                                : event.target.value,
-                                        }
-                                      : item,
+                                    itemIndex === index ? { ...item, editing: true } : item,
                                   ),
                                 )
                               }
-                              className="mt-1 w-full rounded border bg-white px-3 py-2"
+                              className="table-action-button"
                             >
-                              <option value="__select_company__">請選択所属会社</option>
-                              <option value="__unassigned_company__">未设置所属会社</option>
-                              {driverFinanceCompanies.map((company) => (
-                                <option key={company} value={company}>{company}</option>
-                              ))}
-                            </select>
-                          </label>
+                              修改
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <label className="w-fit max-w-full text-sm font-medium">
+                              所属会社
+                              <select
+                                title={draft.companyName || "未设置所属会社"}
+                                value={
+                                  draft.companyName === undefined
+                                    ? "__select_company__"
+                                    : draft.companyName || "__unassigned_company__"
+                                }
+                                onChange={(event) =>
+                                  setDriverWageItemDrafts((current) =>
+                                    current.map((item, itemIndex) =>
+                                      itemIndex === index
+                                        ? {
+                                            ...item,
+                                            companyName:
+                                              event.target.value === "__select_company__"
+                                                ? undefined
+                                                : event.target.value === "__unassigned_company__"
+                                                  ? ""
+                                                  : event.target.value,
+                                          }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                                className="mt-1 w-auto min-w-48 max-w-full rounded border bg-white px-2 py-2"
+                              >
+                                <option value="__select_company__">請選択会社</option>
+                                <option value="__unassigned_company__">未设置所属会社</option>
+                                {driverFinanceCompanies.map((company) => (
+                                  <option key={company} value={company}>{company}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="w-48 text-sm font-medium">
+                              项目名称
+                              <input
+                                type="text"
+                                maxLength={200}
+                                value={draft.name}
+                                onChange={(event) =>
+                                  setDriverWageItemDrafts((current) =>
+                                    current.map((item, itemIndex) =>
+                                      itemIndex === index ? { ...item, name: event.target.value } : item,
+                                    ),
+                                  )
+                                }
+                                className="mt-1 w-full rounded border px-2 py-2"
+                                placeholder="项目名称"
+                              />
+                            </label>
+                            <label className="w-48 text-sm font-medium">
+                              金額（JPY）
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={draft.amount}
+                                onChange={(event) =>
+                                  setDriverWageItemDrafts((current) =>
+                                    current.map((item, itemIndex) =>
+                                      itemIndex === index ? { ...item, amount: event.target.value } : item,
+                                    ),
+                                  )
+                                }
+                                className="mt-1 w-full rounded border px-2 py-2 text-right tabular-nums"
+                                placeholder="可输入负数"
+                              />
+                            </label>
+                          </>
                         )}
-                        <label className="min-w-[180px] flex-1 text-sm font-medium">
-                          项目名称
-                          <input
-                            type="text"
-                            maxLength={200}
-                            value={draft.name}
-                            onChange={(event) =>
-                              setDriverWageItemDrafts((current) =>
-                                current.map((item, itemIndex) =>
-                                  itemIndex === index ? { ...item, name: event.target.value } : item,
-                                ),
-                              )
-                            }
-                            className="mt-1 w-full rounded border px-3 py-2"
-                            placeholder="例如：月度津贴"
-                          />
-                        </label>
-                        <label className="w-48 text-sm font-medium">
-                          金額（JPY）
-                          <input
-                            type="number"
-                            min="-99999999999999"
-                            max="99999999999999"
-                            step="1"
-                            value={draft.amount}
-                            onChange={(event) =>
-                              setDriverWageItemDrafts((current) =>
-                                current.map((item, itemIndex) =>
-                                  itemIndex === index ? { ...item, amount: event.target.value } : item,
-                                ),
-                              )
-                            }
-                            className="mt-1 w-full rounded border px-3 py-2 text-right tabular-nums"
-                            placeholder="可输入负数"
-                          />
-                        </label>
                         <button
                           type="button"
                           onClick={() => {
@@ -5735,7 +6217,7 @@ export default function Home() {
                           }}
                           className="table-action-button table-action-button--delete"
                         >
-                          删除
+                          削除
                         </button>
                       </div>
                     ))}
@@ -5743,24 +6225,70 @@ export default function Home() {
                       <span className="text-sm text-gray-600">
                         项目合计：{formatYen(driverFinanceManualWageTotal)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={saveDriverWageItems}
-                        disabled={
-                          driverWageItemsMigrationPending ||
-                          currentProfile?.role !== "admin" ||
-                          activeRegionId === ALL_REGIONS_ID
-                        }
-                        className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        保存手動工資项目
-                      </button>
+                      {driverWageItemDrafts.some((draft) => !draft.id || draft.editing) && (
+                        <button
+                          type="button"
+                          onClick={saveDriverWageItems}
+                          disabled={
+                            driverWageItemsMigrationPending ||
+                            currentProfile?.role !== "admin" ||
+                            activeRegionId === ALL_REGIONS_ID
+                          }
+                          className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          保存追加項目
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
               </section>
             </FinanceSummaryPanel>
           )}
+
+          {activeView === "driverPayments" && <DriverPayments key={activeRegionId}
+            month={financeMonth} onMonthChange={month => {
+              if (driverWageItemDrafts.some(draft => draft.editing) &&
+                !window.confirm("給料統計に未保存の手動项目があります。月份を変更して入力を破棄しますか？")) return;
+              setFinanceMonth(month);
+              setDriverFinanceDriverFilter("");
+              setDriverWageItemDrafts([]);
+            }}
+            regionId={activeRegionId === ALL_REGIONS_ID ? null : activeRegionId}
+            rows={buildCompanyDriverFinanceDetails(monthlyFinanceOrders, "")}
+            manualItems={driverWageItems} drivers={driverRecords} companies={companyRecords}
+            canEdit={currentProfile.role === "admin" && !driverWageItemsMigrationPending}
+            pendingSave={pendingSaveCount > 0 || Boolean(persistenceError)}
+            onSaveItem={async item => {
+              if (currentProfile.role !== "admin" || driverWageItemsMigrationPending ||
+                !requireSpecificRegionForNewData() || item.regionId !== activeRegionId) {
+                throw new Error("无权保存当前地域的手動项目。");
+              }
+              if (item.id && !allDriverWageItems.some(record => record.id === item.id &&
+                record.regionId === activeRegionId && record.month === item.month &&
+                record.driver === item.driver && record.companyName === item.companyName)) {
+                throw new Error("项目已变化或不存在，請刷新后重新编辑。");
+              }
+              if (item.id && driverWageItemDrafts.some(draft => draft.id === item.id && draft.editing)) {
+                throw new Error("该项目在給料統計中有未保存的编辑，請先完成保存后再修改。");
+              }
+              const saved = { ...item, id: item.id || createId() };
+              setDriverWageItems(current => item.id
+                ? current.map(record => record.id === item.id ? { ...record, ...saved } : record)
+                : [...current, saved]);
+              const confirmed = await waitForDriverWageItems();
+              if (confirmed && selectedDriverFinanceDriver === item.driver && financeMonth === item.month &&
+                (!driverFinanceCompanyFilter || driverWageItemCompanyName === item.companyName)) {
+                setDriverWageItemDrafts(current => [...current.filter(draft => draft.id !== saved.id), {
+                  id: saved.id, editing: false, companyName: saved.companyName, name: saved.name, amount: String(saved.amount),
+                }]);
+              }
+              return confirmed;
+            }}
+            onDeleteItem={item => {
+              if (currentProfile.role !== "admin") { alert("仅管理员可以削除手動项目。"); return; }
+              deleteDriverWageItem(item);
+            }} />}
 
           {activeView === "vehicleFinance" && canViewVehicleAndBalanceReports && (
             <FinanceSummaryPanel
@@ -5779,7 +6307,7 @@ export default function Home() {
                   onClick={exportVehicleFinance}
                   className="table-action-button table-action-button--export"
                 >
-                  导出車両财务表（A4）
+                  导出車両财务表（PDF）
                 </button>
               }
               trailingHeaderActions={
@@ -5820,12 +6348,12 @@ export default function Home() {
                         停車场費和保险費默认使用車両資料中的固定月额；保存过的月份金額不会随默认值变更。
                       </p>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
                       {([
-                        ["parkingFee", "停車场費用（JPY）"],
-                        ["insuranceFee", "保险費用（JPY）"],
-                        ["inspectionFee", "点检/車检費用（JPY）"],
-                        ["repairFee", "维修費用（JPY）"],
+                        ["parkingFee", "駐車場料金（JPY）"],
+                        ["insuranceFee", "保険料（JPY）"],
+                        ["inspectionFee", "点検/車検（JPY）"],
+                        ["repairFee", "修理代（JPY）"],
                       ] as const).map(([field, label]) => (
                         <label key={field} className="block text-sm font-medium text-gray-700">
                           {label}
@@ -5841,7 +6369,7 @@ export default function Home() {
                                 [field]: event.target.value,
                               })
                             }
-                            className="mt-1 w-full rounded border px-3 py-2"
+                            className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                           />
                         </label>
                       ))}
@@ -5860,7 +6388,7 @@ export default function Home() {
                               ],
                             })
                           }
-                          className="rounded border px-3 py-1.5 text-sm hover:bg-gray-50"
+                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
                         >
                           添加备品
                         </button>
@@ -5922,14 +6450,14 @@ export default function Home() {
                                 }
                                 className="table-action-button table-action-button--delete"
                               >
-                                删除
+                                削除
                               </button>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="mt-5 grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
                       <label className="block text-sm font-medium text-gray-700">
                         月初公里数
                         <input
@@ -5944,7 +6472,7 @@ export default function Home() {
                               startOdometer: event.target.value,
                             })
                           }
-                          className="mt-1 w-full rounded border px-3 py-2"
+                          className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         />
                       </label>
                       <label className="block text-sm font-medium text-gray-700">
@@ -5961,11 +6489,11 @@ export default function Home() {
                               endOdometer: event.target.value,
                             })
                           }
-                          className="mt-1 w-full rounded border px-3 py-2"
+                          className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm tabular-nums text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         />
                       </label>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
                       <p className="text-sm text-gray-600">
                         当月走行公里数：
                         <span className="font-semibold tabular-nums">
@@ -5977,7 +6505,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={saveVehicleMonthlyFinance}
-                        className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                        className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800"
                       >
                         保存月度費用与里程
                       </button>
@@ -6025,12 +6553,12 @@ export default function Home() {
               {!vehicleFinanceVehicleFilter ? (
                 <div>
                   <p className="mb-3 text-sm text-gray-600">
-                    每車一行，包含外注車両（标注“外注”，未登记番号時明确提示）。訂単利润已扣除固定費用与备品。月度費用使用已保存記録；未登记月份使用默认停車场費及保险費。无运营記録的車両也计入固定成本。
+                    每車一行，包含外注車両（标注“外注”，未登记番号時明确提示）。訂単利润已扣除固定費用与备品。月度費用使用已保存記録；未登记月份使用默认停車场費及保险費。无运営記録的車両也计入固定成本。
                   </p>
                   {vehicleSummaryResult.error ? (
                     <p role="alert" className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{vehicleSummaryResult.error}</p>
                   ) : (
-                    <div className="overflow-x-auto border bg-white">
+                    <div className="list-panel overflow-x-auto border bg-white">
                       <table className="management-table w-full min-w-[1350px] table-fixed text-center text-sm" data-table="vehicle-summary">
                         <colgroup>
                           <col style={{ width: "9%" }} /><col style={{ width: "17%" }} />
@@ -6084,7 +6612,7 @@ export default function Home() {
                   )}
                 </div>
               ) : (
-              <div className="overflow-x-auto border bg-white">
+              <div className="list-panel overflow-x-auto border bg-white">
                 <table className="management-table w-full min-w-[1350px] table-fixed text-center text-sm" data-table="vehicle-finance">
                   <colgroup>
                     <col style={{ width: "10%" }} /><col style={{ width: "21%" }} />
@@ -6142,12 +6670,12 @@ export default function Home() {
                     onClick={() => exportBalance()}
                     className="table-action-button table-action-button--export"
                   >
-                    导出收支報表（A4）
+                    导出收支報表（PDF）
                   </button>
                   <button
                     type="button"
                     onClick={() => exportBalance("companyAdvances")}
-                    title="A4 PDF 导出"
+                    title="PDF 导出"
                     className="table-action-button table-action-button--export"
                   >
                     外注運転士出金明細
@@ -6179,7 +6707,7 @@ export default function Home() {
                 </div>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                当月利润＝請求総金額＋手動输入的其他收入－下方手動输入的支出総和。不自動扣除車両費用、運転士工資、立替或其他运营支出。
+                当月利润＝請求総金額＋手動输入的其他收入－下方手動输入的支出総和。不自動扣除車両費用、運転士工資、立替或其他运営支出。
                 整单請求金額（訂単价格及全日期的ETC旅報、運転士立替旅報、会社立替旅報、超時費）按首个服务日所在月份计入，不按天分摊。
                 首个服务日排除休运日；請求按訂単所属会社归集，其他收入和支出按手動项目所属会社及录入月份归集。
                 口座入金、現金入金按訂単入金方式分类，不要求填写入金日期，不代表已实际收款；未设置入金方式另列。
@@ -6242,7 +6770,7 @@ export default function Home() {
                   <p className="mt-1 text-xs text-violet-800">請求総和 + 其他收入 - 支出総和</p>
                 </section>
               </div>
-              <div className="mb-5 overflow-x-auto rounded-lg border bg-white">
+              <div className="list-panel mb-5 overflow-x-auto rounded-lg border bg-white">
                 <table className="management-table w-full min-w-[1400px] table-fixed text-center text-sm" data-table="balance">
                   <colgroup>
                     <col style={{ width: "18%" }} /><col style={{ width: "11%" }} />
@@ -6333,7 +6861,7 @@ export default function Home() {
                     請選択具体所属会社后添加项目或录入金額；全部会社视图仅用于查看汇総。
                   </p>
                 )}
-                <div className="overflow-x-auto">
+                <div className="list-panel overflow-x-auto">
                   <table className="management-table w-full min-w-[800px] table-fixed text-center text-sm" data-table="balance-items">
                     <colgroup>
                       <col style={{ width: "28%" }} /><col style={{ width: "32%" }} />
@@ -6401,7 +6929,7 @@ export default function Home() {
                                   disabled={balanceExpensesMigrationPending}
                                   className="table-action-button table-action-button--delete disabled:cursor-not-allowed"
                                 >
-                                  删除
+                                  削除
                                 </button>
                               </td>
                             </tr>
@@ -6801,10 +7329,45 @@ export default function Home() {
             const defaultOrderCardHeight = (visibleOrders.some(orderHasTripSummaries)
               ? tripSummaryOrderCardHeight
               : baseOrderCardHeight) + executionHeaderHeight;
-            const orderCardHeight = isMobileCalendar
-              ? Math.max(defaultOrderCardHeight, mobileCalendarCardHeights[vehicleRecord.id] ?? 0)
-              : defaultOrderCardHeight;
+            const orderCardHeight = defaultOrderCardHeight;
             const orderCardGap = 4;
+            const orderCardHeights = new Map(
+              visibleOrders.map((order) => [
+                order.id,
+                isMobileCalendar
+                  ? Math.max(
+                      (orderHasTripSummaries(order)
+                        ? tripSummaryOrderCardHeight
+                        : baseOrderCardHeight) +
+                        (driverExecutionByOrder.has(order.id) ? 18 : 0),
+                      mobileCalendarHeights.cards[order.id] ?? 0,
+                    )
+                  : orderCardHeight,
+              ]),
+            );
+            const orderLaneHeights = new Map<number, number>();
+            for (const order of visibleOrders) {
+              const lane = orderLanes.get(order.id) ?? 0;
+              if (
+                isMobileCalendar && mobileCalendarVisibleRange &&
+                (order.date > mobileCalendarVisibleRange.endDate ||
+                  (order.endDate || order.date) < mobileCalendarVisibleRange.startDate)
+              ) {
+                continue;
+              }
+              orderLaneHeights.set(
+                lane,
+                Math.max(orderLaneHeights.get(lane) ?? 0, orderCardHeights.get(order.id) ?? orderCardHeight),
+              );
+            }
+            const orderLaneOffsets = new Map<number, number>();
+            let nextLaneOffset = orderCardGap;
+            for (let lane = 0; lane < laneEndDates.length; lane += 1) {
+              orderLaneOffsets.set(lane, nextLaneOffset);
+              if (orderLaneHeights.has(lane)) {
+                nextLaneOffset += (orderLaneHeights.get(lane) ?? orderCardHeight) + orderCardGap;
+              }
+            }
             const calendarRowMinimumHeight = isMobileCalendar ? 72 : 96;
             const calendarRowBottomSpacing = isMobileCalendar ? 12 : 44;
             const mobileVisibleStackedHeight = isMobileCalendar
@@ -6824,20 +7387,29 @@ export default function Home() {
                       }
                       return Math.max(
                         dayHeight,
-                        ((orderLanes.get(order.id) ?? 0) + 1) *
-                          (orderCardHeight + orderCardGap),
+                        (orderLaneOffsets.get(orderLanes.get(order.id) ?? 0) ?? orderCardGap) +
+                          (orderCardHeights.get(order.id) ?? orderCardHeight),
                       );
                     }, 0),
                   );
                 }, 0)
               : 0;
+            const mobileCalendarVehicleRowHeight = Math.max(
+              calendarRowMinimumHeight,
+              mobileCalendarHeights.vehicles[vehicleRecord.id] ?? 0,
+              mobileVisibleStackedHeight + calendarRowBottomSpacing,
+            );
             const singleDayCellHeights = new Map(
               dates.map((day) => {
                 const stackedHeight = visibleOrders.reduce((height, order) => {
                   if (order.date > day.date || (order.endDate || order.date) < day.date) {
                     return height;
                   }
-                  return Math.max(height, ((orderLanes.get(order.id) ?? 0) + 1) * (orderCardHeight + orderCardGap));
+                  return Math.max(
+                    height,
+                    (orderLaneOffsets.get(orderLanes.get(order.id) ?? 0) ?? orderCardGap) +
+                      (orderCardHeights.get(order.id) ?? orderCardHeight),
+                  );
                 }, 0);
 
                 return [
@@ -6949,6 +7521,9 @@ export default function Home() {
                 }}
                 style={{
                   gridTemplateColumns: `calc(var(--calendar-vehicle-width, 135px) * ${calendarScale}) repeat(${dates.length}, minmax(${130 * calendarScale}px, 1fr))`,
+                  minHeight: isMobileCalendar
+                    ? `${mobileCalendarVehicleRowHeight * calendarScale}px`
+                    : undefined,
                 }}
               >
                 <div
@@ -6984,7 +7559,10 @@ export default function Home() {
                     const notes = vehicleRecord.notes || "-";
                     const status = getVehicleDisplayStatus(vehicleRecord);
                     return (
-                      <div className="calendar-vehicle-content flex w-full min-w-0 flex-col items-center text-center">
+                      <div
+                        data-calendar-vehicle-content={vehicleRecord.id}
+                        className="calendar-vehicle-content flex w-full min-w-0 flex-col items-center text-center"
+                      >
                         <button
                           type="button"
                           onClick={() => copyCalendarVehicleField(plate, "車両番号")}
@@ -7032,8 +7610,11 @@ export default function Home() {
                     style={{
                       gridColumn: index + 2,
                       gridRow: 1,
-                      minHeight: `${Number.parseFloat(singleDayCellHeights.get(d.date) ?? "0") *
-                        (isOutsourced && !isMobileCalendar ? 2 : 1)}px`,
+                      minHeight: `${Math.max(
+                        Number.parseFloat(singleDayCellHeights.get(d.date) ?? "0"),
+                        isMobileCalendar ? mobileCalendarHeights.vehicles[vehicleRecord.id] ?? 0 : 0,
+                      ) *
+                          (isOutsourced && !isMobileCalendar ? 2 : 1)}px`,
                     }}
                     onClick={() => {
                       if (splitSelection && !isCompactCalendar) {
@@ -7094,7 +7675,8 @@ export default function Home() {
                       order.status.length * cardFontSize +
                       8 <= infoSegmentWidth;
                   const orderLane = orderLanes.get(order.id) ?? 0;
-                  const laneOffset = orderLane * (orderCardHeight + orderCardGap) + orderCardGap;
+                  const cardHeight = orderCardHeights.get(order.id) ?? orderCardHeight;
+                  const laneOffset = orderLaneOffsets.get(orderLane) ?? orderCardGap;
                   const isSelectingSplit =
                     !isCompactCalendar && isSplittable && splitSelection?.orderId === order.id;
                   const selectedStartDate = isSelectingSplit ? splitSelection.startDate : null;
@@ -7121,8 +7703,12 @@ export default function Home() {
                       style={{
                         gridColumn: `${startIndex + 2} / ${endIndex + 3}`,
                         gridRow: 1,
+                        display: isMobileCalendar && mobileCalendarVisibleRange &&
+                          (barDates[0].date > mobileCalendarVisibleRange.endDate ||
+                            barDates[barDates.length - 1].date < mobileCalendarVisibleRange.startDate)
+                          ? "none" : undefined,
                         transform: `translateY(${laneOffset * (isMobileCalendar ? calendarScale : 1)}px)`,
-                        height: `${orderCardHeight * (isMobileCalendar ? calendarScale : 1)}px`,
+                        height: `${cardHeight * (isMobileCalendar ? calendarScale : 1)}px`,
                         minHeight: 0,
                         zIndex: 1,
                         backgroundColor: sourceColor || undefined,
@@ -7182,7 +7768,9 @@ export default function Home() {
                         })}
                       </div>
 
-                      {isSplittable && !isCompactCalendar && (
+                      {!isCompactCalendar && (
+                        <div className="absolute right-2 top-0 z-20 flex gap-1">
+                        {isSplittable && (
                         <button
                           type="button"
                           onClick={(event) => {
@@ -7193,10 +7781,22 @@ export default function Home() {
                                 : { orderId: order.id, startDate: null, endDate: null },
                             );
                           }}
-                          className="absolute right-2 top-1 z-20 rounded border border-slate-300 bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-white"
+                          className="inline-flex h-[18px] items-center rounded border border-slate-300 bg-white/90 px-2 py-0 text-[10px] font-semibold leading-4 text-slate-700 hover:bg-white"
                         >
                           {isSelectingSplit ? "取消拆分" : "拆分"}
                         </button>
+                        )}
+                        {mergeableOrderIds.has(order.id) && <button type="button" aria-label={`合并订单：${order.customer}`}
+                          onClick={event => {
+                            event.stopPropagation();
+                            setSplitSelection(null);
+                            setMergeSourceId("");
+                            setMergeOrderId(order.id);
+                          }}
+                          className="inline-flex h-[18px] items-center rounded border border-slate-300 bg-white/90 px-2 py-0 text-[10px] font-semibold leading-4 text-slate-700 hover:bg-white">
+                          合并
+                        </button>}
+                        </div>
                       )}
 
                       {isSelectingSplit && selectedStartDate && selectedEndDate && (
@@ -7222,18 +7822,18 @@ export default function Home() {
                           }}
                           className="absolute bottom-0 z-30 flex h-5 cursor-grab items-center justify-center truncate rounded bg-cyan-800 px-1 text-[10px] font-bold text-white active:cursor-grabbing"
                         >
-                          拖到目标車両拆分
+                          拖到車両行完成拆分
                         </div>
                       )}
 
                       {isCompactCalendar && driverSegments.map(segment => (
                         <div
                           key={segment.start}
-                          data-calendar-card-vehicle={vehicleRecord.id}
+                          data-calendar-card-order={order.id}
                           className="calendar-card-content absolute flex flex-col items-center justify-center break-all px-1 text-center text-xs leading-4"
                           style={{ left: `${segment.start / barDates.length * 100}%`,
                             width: `${(segment.end - segment.start) / barDates.length * 100}%`,
-                            top: (orderCardHeight / 2 - 4) * calendarScale, transform: "translateY(-50%)" }}
+                            top: (cardHeight / 2 - 4) * calendarScale, transform: "translateY(-50%)" }}
                         >
                           <div className="grid w-full min-w-0"
                             style={{ gridTemplateColumns: `repeat(${segment.end - segment.start}, minmax(0, 1fr))` }}>
@@ -7264,10 +7864,10 @@ export default function Home() {
 
                       {isMobileCalendar && !isCompactCalendar && (
                         <div
-                          data-calendar-card-vehicle={vehicleRecord.id}
-                          className={`calendar-card-content relative grid w-full gap-y-1 leading-4 ${isSplittable ? "pt-6" : ""} ${isSelectingSplit ? "pb-6" : ""}`}
+                          data-calendar-card-order={order.id}
+                          className={`calendar-card-content relative grid w-full gap-y-1 leading-4 ${!isCompactCalendar ? "pt-6" : ""} ${isSelectingSplit ? "pb-6" : ""}`}
                           style={{ gridTemplateColumns: `repeat(${barDates.length}, minmax(0, 1fr))`,
-                            paddingTop: executionPadding + (isSplittable ? 24 : 0) }}
+                            paddingTop: executionPadding + (!isCompactCalendar ? 24 : 0) }}
                         >
                           {infoSegmentStart !== -1 && (
                             <div
@@ -7373,7 +7973,23 @@ export default function Home() {
           {activeView === "orders" && (
             <div className="p-3 md:p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-bold">予約管理</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="mr-4 text-lg font-bold">予約管理</h2>
+                  {([["今日", 0], ["明日", 1]] as const).map(([label, offset]) => {
+                    const target = toDateKey(new Date(Date.parse(`${todayDateKey}T00:00:00`) + offset * 86_400_000));
+                    const active = orderDateFilter === target;
+                    return <button key={label} type="button" aria-pressed={active}
+                      onClick={() => {
+                        if (active) { setOrderDateFilter(""); return; }
+                        setOrderMonth(target.slice(0, 7));
+                        setOrderDateFilter(target);
+                      }}
+                      className={`rounded-full border px-3 py-1 text-sm font-semibold transition-colors ${active
+                        ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}>
+                      {label}
+                    </button>;
+                  })}
+                </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm font-medium text-gray-600">日期</span>
                   <button
@@ -7463,6 +8079,46 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
+                  <div ref={reservationFinanceColumnPickerRef} className="relative">
+                    <button
+                      type="button"
+                      aria-label="選択予約表金額項目"
+                      aria-haspopup="true"
+                      aria-expanded={showReservationFinanceColumnPicker}
+                      onClick={() => setShowReservationFinanceColumnPicker(open => !open)}
+                      className="rounded border bg-white px-3 py-2 text-sm"
+                    >
+                      金額項目 {reservationFinanceColumns.length}/6 ▾
+                    </button>
+                    {showReservationFinanceColumnPicker && (
+                      <div
+                        role="group"
+                        aria-label="予約表金額項目"
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") setShowReservationFinanceColumnPicker(false);
+                        }}
+                        className="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-lg border border-slate-200 bg-white p-2 text-left shadow-lg"
+                      >
+                        {reservationFinanceColumnOptions.map(option => (
+                          <label
+                            key={option.key}
+                            className="flex cursor-pointer items-center gap-2 whitespace-nowrap rounded px-2 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={reservationFinanceColumns.includes(option.key)}
+                              onChange={(event) => setReservationFinanceColumns(current =>
+                                event.target.checked
+                                  ? [...current, option.key]
+                                  : current.filter(key => key !== option.key),
+                              )}
+                            />
+                            {option.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <span className="whitespace-nowrap text-sm text-gray-500">
                     共 {monthlyOrders.length} 笔
                   </span>
@@ -7570,16 +8226,19 @@ export default function Home() {
                   })}
                 </div>
               </div>
-              <div className="overflow-x-auto border bg-white">
-                <table className="w-full min-w-[1400px] table-fixed text-center text-sm">
+              <div className="list-panel overflow-x-auto border bg-white">
+                <table className="reservation-list-table w-full min-w-[1400px] table-fixed text-center text-sm" data-table="reservations">
                   <colgroup>
                     <col className="w-[12%]" />
-                    <col className="w-[18%]" />
+                    <col className="w-[17%]" />
                     <col className="w-[11%]" />
                     <col className="w-[13%]" />
-                    <col className="w-[16%]" />
+                    <col className="w-[12%]" />
+                    {selectedReservationFinanceColumns.map(option => (
+                      <col key={option.key} className="w-[11%]" />
+                    ))}
+                    <col className="w-[10%]" />
                     <col className="w-[14%]" />
-                    <col className="w-[16%]" />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
@@ -7588,6 +8247,11 @@ export default function Home() {
                       <th className="px-2 py-3 font-semibold">来源</th>
                       <th className="px-2 py-3 font-semibold">車両</th>
                       <th className="px-2 py-3 font-semibold">運転士</th>
+                      {selectedReservationFinanceColumns.map(option => (
+                        <th key={option.key} className="px-2 py-3 font-semibold">
+                          {option.label}
+                        </th>
+                      ))}
                       <th className="px-2 py-3 font-semibold">請求書状態</th>
                       <th className="px-2 py-3 font-semibold">操作</th>
                     </tr>
@@ -7643,6 +8307,18 @@ export default function Home() {
                               <OrderDriverLabels order={order} />
                             </button>
                           </td>
+                          {selectedReservationFinanceColumns.map(option => (
+                            <td
+                              key={option.key}
+                              data-label={option.label}
+                              className="whitespace-nowrap px-2 py-3 tabular-nums"
+                              title={option.key === "driverPayment"
+                                ? "工資合計（超時・賞与含む）＋運転士立替（社報・旅報）。多日・連単は全体合計。"
+                                : undefined}
+                            >
+                              {formatYen(reservationFinanceValues.get(order.id)?.[option.key] ?? 0)}
+                            </td>
+                          ))}
                           <td className="px-2 py-3">
                             <div className="flex flex-col items-center gap-1">
                               <button
@@ -7677,7 +8353,7 @@ export default function Home() {
                                 onClick={() => requestOrderDeletion(order)}
                                 className="table-action-button table-action-button--delete w-14"
                               >
-                                删除
+                                削除
                               </button>
                             </div>
                           </td>
@@ -7704,7 +8380,7 @@ export default function Home() {
                 aria-modal="true"
                 aria-labelledby="invoice-status-dialog-title"
                 aria-busy={isInvoiceStatusDialogSaving}
-                className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-6"
+                className="editor-dialog editor-dialog--compact w-full overflow-y-auto bg-white p-6"
               >
                 <div className="dialog-floating-header mb-5 flex items-center justify-between gap-3">
                   <div>
@@ -7724,6 +8400,7 @@ export default function Home() {
                   </button>
                 </div>
 
+                <div className="editor-status-fields">
                 <fieldset>
                   <legend className="mb-2 text-sm font-semibold">
                     {invoiceStatusDialog.kind === "invoice" ? "選択請求書状態" : "選択入金状態"}
@@ -7759,7 +8436,7 @@ export default function Home() {
                   </div>
                 </fieldset>
 
-                <fieldset className="mt-5">
+                <fieldset>
                   <legend className="mb-2 text-sm font-semibold">变更范围</legend>
                   <div className="space-y-2">
                     <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-gray-50">
@@ -7813,6 +8490,7 @@ export default function Home() {
                     </label>
                   </div>
                 </fieldset>
+                </div>
 
                 <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600" role="status">
                   将变更 {invoiceStatusDialogChangedCount} 笔訂単为「{
@@ -7850,7 +8528,28 @@ export default function Home() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-bold">運転士列表</h2>
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <span className="text-sm text-gray-500">共 {driverRows.length} 位</span>
+                  <div className="flex items-center gap-1" role="group" aria-label="司机类别筛选">
+                    {(["常勤", "非常勤"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        aria-pressed={driverEmploymentTypeFilter === type}
+                        onClick={() => setDriverEmploymentTypeFilter(type)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+                          driverEmploymentTypeFilter === type
+                            ? "border-blue-600 bg-blue-50 text-blue-700"
+                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-500">共 {visibleDriverRows.length} 位</span>
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input type="checkbox" checked={showDepartedDrivers} onChange={event => setShowDepartedDrivers(event.target.checked)} />
+                    显示離職
+                  </label>
                   <button
                     type="button"
                     onClick={() => openBatchAdd("drivers")}
@@ -7869,30 +8568,29 @@ export default function Home() {
               </div>
               <div className="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-3">
                 <label className="min-w-[min(100%,20rem)] flex-1 text-sm font-medium">
-                  全体标语（運転士端顶部显示）
+                  全体提示（携帯表示）
                   <input
                     type="text"
                     maxLength={100}
                     value={driverGlobalSlogan}
-                    readOnly={currentProfile?.role !== "admin"}
                     disabled={!driverGlobalSloganLoaded || driverGlobalSloganLoading || driverGlobalSloganSaving}
                     onChange={(event) => setDriverGlobalSlogan(event.target.value)}
-                    className="mt-1 w-full rounded border p-2 read-only:bg-gray-50"
+                    className="mt-1 w-full rounded border p-2"
                     placeholder={driverGlobalSloganLoading ? "正在读取…" : driverGlobalSloganError ? "读取失败，无法编辑" : ""}
                   />
                 </label>
-                {currentProfile?.role === "admin" && <button
+                <button
                   type="button"
                   onClick={() => void saveDriverGlobalSlogan()}
                   disabled={!driverGlobalSloganLoaded || driverGlobalSloganLoading || driverGlobalSloganSaving}
                   className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {driverGlobalSloganSaving ? "保存中…" : "保存全体标语"}
-                </button>}
+                  {driverGlobalSloganSaving ? "保存中…" : "保存全体提示"}
+                </button>
                 {driverGlobalSloganError && <p role="alert" className="w-full text-sm text-red-700">{driverGlobalSloganError}</p>}
               </div>
               <div
-                className="driver-table-region border bg-white"
+                className="list-panel driver-table-region border bg-white"
                 role="region"
                 aria-label="運転士列表"
               >
@@ -7907,7 +8605,7 @@ export default function Home() {
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
                       <th className="px-4 py-3 font-semibold">運転士</th>
-                      <th className="px-4 py-3 font-semibold">姓名读音（罗马字）</th>
+                      <th className="px-4 py-3 font-semibold">ローマ字</th>
                       <th className="px-4 py-3 font-semibold">携帯番号</th>
                       <th className="px-4 py-3 font-semibold">微信号</th>
                       <th className="px-4 py-3 font-semibold">WhatsApp</th>
@@ -7916,14 +8614,14 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {driverRows.map((driver) => (
+                    {visibleDriverRows.map((driver) => (
                       <tr key={driver.id} className="border-t">
                         <td data-label="運転士" className={`whitespace-nowrap px-4 py-3 font-medium ${isDriverLicenseExpired(driver) ? "text-red-600" : ""}`}>{driver.name}</td>
                         <td data-label="姓名读音（罗马字）" className="whitespace-nowrap px-4 py-3">{driver.reading || "-"}</td>
-                        <td data-label="携帯番号" className="px-4 py-3">{driver.phone || "-"}</td>
+                        <td data-label="携帯番号" className="px-4 py-3">{formatMobilePhone(driver.phone) || "-"}</td>
                         <td data-label="微信号" className="px-4 py-3">{driver.wechat || "-"}</td>
                         <td data-label="WhatsApp" className="px-4 py-3">{driver.whatsapp || "-"}</td>
-                        <td data-label="免許有効期限" className="whitespace-nowrap px-4 py-3">{driver.licenseExpiry || "-"}</td>
+                        <td data-label="免許有効期限" className="whitespace-nowrap px-4 py-3"><DriverLicenseDate expiry={driver.licenseExpiry} today={vehicleToday} /></td>
                         <td data-label="操作" className="px-4 py-3">
                           <div className="driver-action-buttons">
                             <div className="driver-action-slot">
@@ -7962,7 +8660,7 @@ export default function Home() {
                               onClick={() => deleteDriver(driver)}
                               className="table-action-button table-action-button--delete driver-action-button"
                             >
-                              删除
+                              削除
                             </button>
                             </div>
                           </div>
@@ -8018,7 +8716,7 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <div className="overflow-x-auto border bg-white">
+              <div className="list-panel overflow-x-auto border bg-white">
                 <table className="management-table w-full min-w-[1450px] table-fixed text-center text-sm" data-table="vehicles">
                   <colgroup>
                     <col style={{ width: "10%" }} /><col style={{ width: "12%" }} />
@@ -8046,11 +8744,11 @@ export default function Home() {
                       <tr key={vehicle.id} className="border-t">
                         <td className="whitespace-nowrap px-4 py-3 font-medium">{vehicle.name}</td>
                         <td className="px-4 py-3">{vehicle.plate || "-"}</td>
-                        <td className="px-4 py-3">{vehicle.ownerCompany || "-"}</td>
+                        <td className="px-4 py-3"><VehicleOwnerLabel owner={vehicle.ownerCompany} /></td>
                         <td className="px-4 py-3">{vehicle.seats || "-"}</td>
                         <td className="px-4 py-3">{vehicle.fuelType || "-"}</td>
-                        <td className="whitespace-nowrap px-4 py-3">{vehicle.inspectionExpiry || "-"}</td>
-                        <td className="whitespace-nowrap px-4 py-3">{vehicle.liabilityExpiry || "-"}</td>
+                        <td className="whitespace-nowrap px-4 py-3"><VehicleExpiryDate expiry={vehicle.inspectionExpiry} today={vehicleToday} /></td>
+                        <td className="whitespace-nowrap px-4 py-3"><VehicleExpiryDate expiry={vehicle.liabilityExpiry} today={vehicleToday} /></td>
                         <td className="px-4 py-3">
                           {(() => {
                             const displayStatus = getVehicleDisplayStatus(vehicle);
@@ -8081,7 +8779,7 @@ export default function Home() {
                               onClick={() => deleteVehicle(vehicle)}
                               className="table-action-button table-action-button--delete driver-action-button"
                             >
-                              删除
+                              削除
                             </button>
                             </div>
                           </div>
@@ -8116,16 +8814,14 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <div className="overflow-x-auto border bg-white">
-                <table className="management-table w-full min-w-[1250px] table-fixed text-center text-sm" data-table="sources">
+              <div className="list-panel source-list-panel overflow-x-auto bg-white">
+                <table className="management-table source-management-table w-full table-fixed text-center text-sm" data-table="sources">
                   <colgroup>
-                    <col className="w-[10%]" />
-                    <col className="w-[24%]" />
-                    <col className="w-[9%]" />
-                    <col className="w-[8%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[35%]" />
+                    <col className="w-[18%]" />
                     <col className="w-[15%]" />
-                    <col className="w-[26%]" />
-                    <col className="w-[8%]" />
+                    <col className="w-[18%]" />
                   </colgroup>
                   <thead className="bg-gray-100 text-gray-600">
                     <tr>
@@ -8133,8 +8829,6 @@ export default function Home() {
                       <th className="px-3 py-2 font-semibold">会社全称</th>
                       <th className="px-3 py-2 font-semibold">簡称</th>
                       <th className="px-3 py-2 font-semibold">担当</th>
-                      <th className="px-3 py-2 font-semibold">連絡先</th>
-                      <th className="px-3 py-2 font-semibold">地址</th>
                       <th className="px-3 py-2 font-semibold">操作</th>
                     </tr>
                   </thead>
@@ -8151,8 +8845,6 @@ export default function Home() {
                         <td className="truncate px-3 py-2 font-medium" title={source.companyName}>{source.companyName}</td>
                         <td className="truncate px-3 py-2" title={source.shortName || undefined}>{source.shortName || "-"}</td>
                         <td className="truncate px-3 py-2" title={source.contactName || undefined}>{source.contactName || "-"}</td>
-                        <td className="truncate px-3 py-2" title={source.contactInfo || undefined}>{source.contactInfo || "-"}</td>
-                        <td className="break-words px-3 py-2">{source.address || "-"}</td>
                         <td className="px-3 py-2">
                           <div className="list-action-buttons">
                             <div className="driver-action-slot">
@@ -8170,13 +8862,16 @@ export default function Home() {
                               onClick={() => deleteSource(source)}
                               className="table-action-button table-action-button--delete driver-action-button"
                             >
-                              删除
+                              削除
                             </button>
                             </div>
                           </div>
                         </td>
                       </tr>
                     ))}
+                    {sourceRows.length === 0 && (
+                      <tr><td colSpan={5} className="py-10 text-slate-400">暂无来源，点击“新增来源”添加。</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -8205,7 +8900,7 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <div className="company-table-region border bg-white">
+              <div className="list-panel company-table-region border bg-white">
                 <table className="management-table company-management-table w-full min-w-[1900px] table-fixed text-center text-sm" data-table="companies">
                   <colgroup>
                     <col style={{ width: "13%" }} /><col style={{ width: "6%" }} />
@@ -8220,7 +8915,7 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold">会社印章</th>
                       <th className="px-4 py-3 font-semibold">運行管理者</th>
                       <th className="px-4 py-3 font-semibold">整備管理者</th>
-                      <th className="px-4 py-3 font-semibold">会社电话</th>
+                      <th className="px-4 py-3 font-semibold">会社電話</th>
                       <th className="px-4 py-3 font-semibold">営業所地址</th>
                       <th className="px-4 py-3 font-semibold">車庫位置</th>
                       <th className="px-4 py-3 font-semibold">振込口座</th>
@@ -8243,7 +8938,7 @@ export default function Home() {
                         </td>
                         <td data-label="運行管理者" className="px-4 py-3">{company.operationsManager || "-"}</td>
                         <td data-label="整備管理者" className="px-4 py-3">{company.maintenanceManager || "-"}</td>
-                        <td data-label="会社电话" className="px-4 py-3">{company.phone || "-"}</td>
+                        <td data-label="会社電話" className="px-4 py-3">{company.phone || "-"}</td>
                         <td data-label="営業所地址" className="px-4 py-3">{company.rollCallAddress || "-"}</td>
                         <td data-label="車庫位置" className="px-4 py-3">{company.garageAddress || "-"}</td>
                         <td data-label="振込口座" className="whitespace-pre-wrap px-4 py-3">{company.bankAccount || "-"}</td>
@@ -8265,7 +8960,7 @@ export default function Home() {
                               onClick={() => deleteCompany(company)}
                               className="table-action-button table-action-button--delete driver-action-button"
                             >
-                              删除
+                              削除
                             </button>
                             </div>
                           </div>
@@ -8283,7 +8978,7 @@ export default function Home() {
       {sealCompany && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
           <section role="dialog" aria-modal="true" aria-labelledby="company-seal-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            className="editor-dialog editor-dialog--compact w-full overflow-y-auto bg-white p-6">
             <div className="dialog-floating-header mb-4 flex items-center justify-between gap-3">
               <h2 id="company-seal-title" className="text-xl font-bold">会社印章</h2>
               <button type="button" aria-label="关闭会社印章" onClick={() => setSealCompany(null)}
@@ -8305,9 +9000,10 @@ export default function Home() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         >
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+          <div role="dialog" aria-modal="true" aria-labelledby="batch-order-form-title"
+            className="editor-dialog w-full overflow-y-auto bg-white p-6">
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold">批量导入预约</h2>
+              <h2 id="batch-order-form-title" className="text-xl font-bold">批量导入预约</h2>
               <button
                 type="button"
                 onClick={() => setShowBatchOrderForm(false)}
@@ -8320,7 +9016,7 @@ export default function Home() {
             <p className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
               系统会从每条信息中识别“配車時間、上車地点、下車地点”；以下状態、運転士、来源和所属公司将应用于本批所有訂単。
             </p>
-            <div className="space-y-4">
+            <div className="editor-fields">
               <label className="block text-sm font-medium">
                 用車日期
                 <input
@@ -8440,9 +9136,10 @@ export default function Home() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         >
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+          <div role="dialog" aria-modal="true" aria-labelledby="order-form-title"
+            className="editor-dialog editor-dialog--wide w-full overflow-y-auto bg-white p-6">
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold">
+              <h2 id="order-form-title" className="text-xl font-bold">
                 {editingOrderId === null ? "新建訂単" : "編集訂単"}
                 {editingOrderId !== null && <LastOperation record={orders.find((order) => order.id === editingOrderId)} />}
               </h2>
@@ -8450,13 +9147,14 @@ export default function Home() {
               <button
                 type="button"
                 onClick={closeForm}
+                aria-label="关闭预约编辑"
                 className="text-2xl text-gray-500"
               >
                 ×
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="editor-fields editor-fields--order">
               {/* 訂単名称 */}
               <label className="block text-sm font-medium">
                 訂単名称
@@ -8469,6 +9167,39 @@ export default function Home() {
                     setForm({ ...form, customer: e.target.value })
                   }
                 />
+              </label>
+
+              <div className="block text-sm font-medium">
+                来源
+                <button type="button" aria-haspopup="dialog"
+                  onClick={() => setSourceSelectionOpen("form")}
+                  title={form.orderSource || undefined}
+                  className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50">
+                  {(form.orderSource
+                    ? orderSourceShortNameByRegion.get(`${form.regionId || getRegionForNewRecords()}:${form.orderSource}`) || form.orderSource
+                    : "未填写来源")} · 点击選択
+                </button>
+              </div>
+
+              <label className="block text-sm font-medium">
+                予約状態
+                <select
+                  className="mt-1 w-full rounded border p-2"
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      status: e.target.value as OrderStatus,
+                    })
+                  }
+                >
+                  <option value="仮予約">仮予約</option>
+                  <option value="予約確定">予約確定</option>
+                  {(form.status === "運行中" || form.status === "完了") && (
+                    <option value={form.status} disabled>歴史状態（已停用，保留原記録）</option>
+                  )}
+                  <option value="キャンセル">キャンセル</option>
+                </select>
               </label>
 
               {/* 开始日期 */}
@@ -8576,40 +9307,6 @@ export default function Home() {
                 )}
               </div>
 
-              {/* 来源 */}
-              <div className="block text-sm font-medium">
-                来源
-                <button type="button" aria-haspopup="dialog"
-                  onClick={() => setSourceSelectionOpen("form")}
-                  title={form.orderSource || undefined}
-                  className="mt-1 w-full rounded border p-2 text-left hover:bg-blue-50">
-                  {(form.orderSource
-                    ? orderSourceShortNameByRegion.get(`${form.regionId || getRegionForNewRecords()}:${form.orderSource}`) || form.orderSource
-                    : "未填写来源")} · 点击選択
-                </button>
-              </div>
-
-              {/* 予約状態 */}
-              <label className="block text-sm font-medium">
-                予約状態
-                <select
-                  className="mt-1 w-full rounded border p-2"
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      status: e.target.value as OrderStatus,
-                    })
-                  }
-                >
-                  <option value="仮予約">仮予約</option>
-                  <option value="予約確定">予約確定</option>
-                  {(form.status === "運行中" || form.status === "完了") && (
-                    <option value={form.status} disabled>历史状態（已停用，保留原記録）</option>
-                  )}
-                  <option value="キャンセル">キャンセル</option>
-                </select>
-              </label>
               {/* 車両 */}
               <label className="block text-sm font-medium">
                 車両
@@ -8655,13 +9352,13 @@ export default function Home() {
                 上方为訂単默认車両番号。
               </p>}
 
-              <fieldset className="space-y-3 rounded border border-blue-200 bg-blue-50/40 p-3">
+              <fieldset className="editor-daily-section space-y-3 rounded border border-blue-200 bg-blue-50/40 p-3">
                 <legend className="px-1 text-sm font-semibold">每日行程与車費</legend>
                 <p className="text-xs text-gray-600">請在各用車日選択当日運転士并设置費用类型；運転士工資与外注運転士費用二选一。会社立替費用独立記録。</p>
                 {getOrderDateKeys(form).map((date) => {
                   const finance = getReservationFinance(form)[date] || emptyOrderFinance;
                   return (
-                  <div key={date} className="space-y-2 rounded border bg-white p-3">
+                  <div key={date} className="editor-daily-card space-y-2 rounded border bg-white p-3">
                     <p className="text-sm font-semibold">
                       {date}{form.offDates.includes(date) ? "（休運）" : ""}
                     </p>
@@ -8845,6 +9542,22 @@ export default function Home() {
                 />
               </label>
 
+              <label className="block text-sm font-medium">
+                航班号（可选）
+                <input
+                  type="text"
+                  autoCapitalize="characters"
+                  maxLength={10}
+                  className="mt-1 w-full rounded border p-2 uppercase"
+                  value={form.flightNumber}
+                  onChange={(event) => setForm((current) => ({ ...current, flightNumber: event.target.value.toUpperCase().replace(/\s+/g, "") }))}
+                  placeholder="例如：NH123"
+                />
+                <span className="mt-1 block text-xs font-normal text-gray-500">
+                  系统按配车日作为航班到达日，并根据上车地点识别机场；请注明机场名称或代码（如羽田/HND）。
+                </span>
+              </label>
+
               {/* 予約所属 */}
               <label className="block text-sm font-medium">
                 予約所属
@@ -8907,7 +9620,7 @@ export default function Home() {
                   onClick={deleteOrder}
                   className="table-action-button table-action-button--delete"
                 >
-                  删除予約
+                  削除予約
                 </button>
               </div>
             )}
@@ -8976,21 +9689,29 @@ export default function Home() {
 
       {showDriverForm && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          className="driver-editor-overlay fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
         >
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="driver-form-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            className="driver-editor-dialog w-full overflow-y-auto bg-white p-6"
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
-              <h2 id="driver-form-title" className="text-xl font-bold">
-                {editingDriverName ? "编辑運転士" : "新增運転士"}
-              </h2>
+              <div>
+                <p className="mb-1 text-xs font-semibold tracking-widest text-blue-600">DRIVER MANAGEMENT</p>
+                <h2 id="driver-form-title" className="text-xl font-bold text-slate-900">
+                  {editingDriverName ? "编辑運転士" : "新增運転士"}
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">基本资料 · 银行口座 · 每月休息日</p>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowDriverForm(false)}
+                disabled={dialogSaving || driverRestState.busy}
+                onClick={() => {
+                  if (driverRestState.dirty && !window.confirm("休息日尚未保存，确定关闭并放弃休息日修改？")) return;
+                  setShowDriverForm(false);
+                }}
                 aria-label="关闭"
                 className="text-2xl text-gray-500"
               >
@@ -8998,8 +9719,12 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <label className="block text-sm font-medium">
+            <div className="driver-editor-layout">
+              <div className="min-w-0 space-y-5">
+              <section className="driver-editor-card">
+              <h3 className="driver-editor-section-title">基本资料</h3>
+              <div className="driver-editor-fields">
+              <label className="driver-editor-field">
                 運転士
                 <input
                   type="text"
@@ -9011,8 +9736,8 @@ export default function Home() {
                   }
                 />
               </label>
-              <label className="block text-sm font-medium">
-                姓名读音（罗马字，用于A-Z排序）
+              <label className="driver-editor-field">
+                ローマ字（用于A-Z排序）
                 <input
                   type="text"
                   maxLength={200}
@@ -9022,8 +9747,24 @@ export default function Home() {
                   placeholder="例如：TANAKA TARO"
                 />
               </label>
-              <label className="block text-sm font-medium">
-                个人标语（留空時手机端显示“姓名，你好”）
+              <label className="driver-editor-field">在職状態
+                <select aria-label="運転士在職状態" value={driverForm.employmentStatus ?? "在職"}
+                  onChange={event => setDriverForm(current => ({ ...current, employmentStatus: event.target.value as NonNullable<Driver["employmentStatus"]> }))}
+                  className="mt-1 w-full rounded border bg-white p-2">
+                  <option value="在職">在職</option><option value="休暇">休暇</option><option value="離職">離職</option>
+                </select>
+              </label>
+              <label className="driver-editor-field">常勤/非常勤
+                <select aria-label="運転士常勤/非常勤" value={driverForm.employmentType ?? "常勤"}
+                  onChange={event => setDriverForm(current => ({
+                    ...current, employmentType: event.target.value as NonNullable<Driver["employmentType"]>,
+                  }))}
+                  className="mt-1 w-full rounded border bg-white p-2">
+                  <option value="常勤">常勤</option><option value="非常勤">非常勤</option>
+                </select>
+              </label>
+              <label className="driver-editor-field driver-editor-full">
+                個人提示（携帯表示）
                 <input
                   type="text"
                   maxLength={100}
@@ -9032,18 +9773,38 @@ export default function Home() {
                   onChange={(event) => setDriverForm({ ...driverForm, personalSlogan: event.target.value })}
                 />
               </label>
-              <label className="block text-sm font-medium">
+              <div className="driver-editor-full grid gap-3">
+                <DriverPostalCode key={editingDriverId || editingDriverName || "new"}
+                  value={driverForm.postalCode ?? ""} address={driverForm.address ?? ""}
+                  onChange={postalCode => setDriverForm(current => ({ ...current, postalCode }))}
+                  onAddress={(postalCode, address, previousAddress) => setDriverForm(current =>
+                    driverPostalCodeSchema.safeParse(current.postalCode).data === postalCode &&
+                    (current.address ?? "") === previousAddress ? { ...current, postalCode, address } : current)} />
+                <label className="driver-editor-field">
+                  住所先
+                  <input type="text" maxLength={1000}
+                    className="mt-1 w-full rounded border p-2"
+                    value={driverForm.address ?? ""}
+                    onChange={event => setDriverForm({ ...driverForm, address: event.target.value })} />
+                </label>
+              </div>
+              <DriverCompanySelect value={driverForm.companyName ?? ""}
+                companies={allCompanyRecords.filter(company => company.regionId === (
+                  editingDriverId ? allDriverRecords.find(driver => driver.id === editingDriverId)?.regionId
+                    : getRegionForNewRecords())).map(company => company.name)}
+                onChange={companyName => setDriverForm(current => ({ ...current, companyName }))} />
+              <label className="driver-editor-field">
                 携帯番号
                 <input
                   type="tel"
                   className="mt-1 w-full rounded border p-2"
                   value={driverForm.phone}
                   onChange={(event) =>
-                    setDriverForm({ ...driverForm, phone: event.target.value })
+                    setDriverForm({ ...driverForm, phone: formatDriverPhone(event.target.value) })
                   }
                 />
               </label>
-              <label className="block text-sm font-medium">
+              <label className="driver-editor-field">
                 微信号
                 <input
                   type="text"
@@ -9054,7 +9815,7 @@ export default function Home() {
                   }
                 />
               </label>
-              <label className="block text-sm font-medium">
+              <label className="driver-editor-field">
                 WhatsApp
                 <input
                   type="text"
@@ -9065,7 +9826,7 @@ export default function Home() {
                   }
                 />
               </label>
-              <label className="block text-sm font-medium">
+              <label className="driver-editor-field">
                 免許有効期限
                 <input
                   type="date"
@@ -9076,15 +9837,58 @@ export default function Home() {
                   }
                 />
               </label>
+              </div>
+              </section>
+              <section className="driver-editor-card">
+                <h3 className="driver-editor-section-title">银行口座 <span>振込先</span></h3>
+                <div className="driver-editor-fields">
+                  <label className="driver-editor-field">銀行名
+                    <input type="text" maxLength={200} value={driverForm.bankName ?? ""} placeholder="例：三菱UFJ銀行"
+                      onChange={event => setDriverForm({ ...driverForm, bankName: event.target.value })} />
+                  </label>
+                  <label className="driver-editor-field">支店名
+                    <input type="text" maxLength={200} value={driverForm.bankBranch ?? ""} placeholder="例：新宿支店"
+                      onChange={event => setDriverForm({ ...driverForm, bankBranch: event.target.value })} />
+                  </label>
+                  <label className="driver-editor-field">口座種別
+                    <select value={driverForm.bankAccountType ?? ""}
+                      onChange={event => {
+                        const value = event.target.value;
+                        if (value === "" || value === "普通" || value === "当座" || value === "貯蓄")
+                          setDriverForm({ ...driverForm, bankAccountType: value });
+                      }}>
+                      <option value="">未设置</option><option value="普通">普通</option>
+                      <option value="当座">当座</option><option value="貯蓄">貯蓄</option>
+                    </select>
+                  </label>
+                  <label className="driver-editor-field">口座番号
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={20}
+                      value={driverForm.bankAccountNumber ?? ""} placeholder="半角数字，保留开头的0"
+                      onChange={event => setDriverForm({ ...driverForm, bankAccountNumber: event.target.value })} />
+                  </label>
+                  <label className="driver-editor-field driver-editor-full">口座名義（カナ）
+                    <input type="text" maxLength={200} value={driverForm.bankAccountHolder ?? ""} placeholder="例：タナカ タロウ"
+                      onChange={event => setDriverForm({ ...driverForm, bankAccountHolder: event.target.value })} />
+                  </label>
+                </div>
+              </section>
+              </div>
+              <section className="driver-editor-card driver-editor-rest">
+                <h3 className="driver-editor-section-title">每月休息日 <span>シフト</span></h3>
+                {editingDriverId ? <DriverRestEditor key={editingDriverId} driverId={editingDriverId} onStateChange={setDriverRestState} />
+                  : <p className="rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">请先保存運転士资料，再点击编辑，即可录入休息日。无需先创建司机手机账号。</p>}
+              </section>
             </div>
 
-            <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex justify-end gap-3 border-t bg-white px-6 py-4">
+            <div className="driver-editor-footer sticky bottom-0 -mx-6 -mb-6 mt-6 flex flex-wrap items-center justify-between gap-3 border-t bg-white px-6 py-4">
+              <p className="text-xs text-slate-500">资料及银行口座在此保存；休息日请在右侧单独保存。</p>
               <button
                 type="button"
                 onClick={saveDriver}
-                className="rounded bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800"
+                disabled={dialogSaving || driverRestState.busy}
+                className="driver-editor-primary"
               >
-                保存運転士
+                保存運転士资料
               </button>
             </div>
           </section>
@@ -9099,7 +9903,7 @@ export default function Home() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="vehicle-form-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            className="editor-dialog w-full overflow-y-auto bg-white p-6"
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="vehicle-form-title" className="text-xl font-bold">
@@ -9115,7 +9919,7 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="editor-fields">
               <div>
                 <VehicleNameSelect
                   value={vehicleNameMode}
@@ -9144,42 +9948,6 @@ export default function Home() {
                   }
                 />
               </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm font-medium">
-                  默认停車场月費（JPY）
-                  <input
-                    type="number"
-                    min="0"
-                    max="99999999999999"
-                    step="1"
-                    className="mt-1 w-full rounded border p-2"
-                    value={vehicleForm.defaultParkingFee}
-                    onChange={(event) =>
-                      setVehicleForm({
-                        ...vehicleForm,
-                        defaultParkingFee: Number(event.target.value || 0),
-                      })
-                    }
-                  />
-                </label>
-                <label className="block text-sm font-medium">
-                  默认保险月費（JPY）
-                  <input
-                    type="number"
-                    min="0"
-                    max="99999999999999"
-                    step="1"
-                    className="mt-1 w-full rounded border p-2"
-                    value={vehicleForm.defaultInsuranceFee}
-                    onChange={(event) =>
-                      setVehicleForm({
-                        ...vehicleForm,
-                        defaultInsuranceFee: Number(event.target.value || 0),
-                      })
-                    }
-                  />
-                </label>
-              </div>
               <label className="block text-sm font-medium">
                 車両所属
                 <select
@@ -9199,6 +9967,24 @@ export default function Home() {
                   )}
                 </select>
               </label>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium">
+                  車両状態
+                  <select
+                    className="mt-1 w-full rounded border p-2"
+                    value={vehicleForm.status}
+                    onChange={(event) =>
+                      setVehicleForm({
+                        ...vehicleForm,
+                        status: event.target.value as VehicleStatus,
+                      })
+                    }
+                  >
+                    <option value="运营中">运营中</option>
+                    <option value="停运中">停运中</option>
+                  </select>
+                </label>
+              </div>
               <label className="block text-sm font-medium">
                 車両座位数
                 <select
@@ -9237,43 +10023,64 @@ export default function Home() {
                   )}
                 </select>
               </label>
+              <JapaneseEraDateInput label="車検有効期限" value={vehicleForm.inspectionExpiry}
+                onChange={value => setVehicleForm(current => ({ ...current, inspectionExpiry: value }))}
+                onValidationChange={valid => setVehicleExpiryValidity(current => ({ ...current, inspection: valid }))} />
+              <JapaneseEraDateInput label="自賠責有効期限" value={vehicleForm.liabilityExpiry}
+                onChange={value => setVehicleForm(current => ({ ...current, liabilityExpiry: value }))}
+                onValidationChange={valid => setVehicleExpiryValidity(current => ({ ...current, liability: valid }))} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-medium">
+                  駐車場料金
+                  <input
+                    type="number"
+                    min="0"
+                    max="99999999999999"
+                    step="1"
+                    className="mt-1 w-full rounded border p-2"
+                    value={vehicleForm.defaultParkingFee}
+                    onChange={(event) =>
+                      setVehicleForm({
+                        ...vehicleForm,
+                        defaultParkingFee: Number(event.target.value || 0),
+                      })
+                    }
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  保険料
+                  <input
+                    type="number"
+                    min="0"
+                    max="99999999999999"
+                    step="1"
+                    className="mt-1 w-full rounded border p-2"
+                    value={vehicleForm.defaultInsuranceFee}
+                    onChange={(event) =>
+                      setVehicleForm({
+                        ...vehicleForm,
+                        defaultInsuranceFee: Number(event.target.value || 0),
+                      })
+                    }
+                  />
+                </label>
+              </div>
               <label className="block text-sm font-medium">
-                車検有効期限
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded border p-2"
-                  value={vehicleForm.inspectionExpiry}
-                  onChange={(event) =>
-                    setVehicleForm({ ...vehicleForm, inspectionExpiry: event.target.value })
-                  }
-                />
-              </label>
-              <label className="block text-sm font-medium">
-                自賠責有効期限
-                <input
-                  type="date"
-                  className="mt-1 w-full rounded border p-2"
-                  value={vehicleForm.liabilityExpiry}
-                  onChange={(event) =>
-                    setVehicleForm({ ...vehicleForm, liabilityExpiry: event.target.value })
-                  }
-                />
-              </label>
-              <label className="block text-sm font-medium">
-                車両状態
+                日历显示
                 <select
                   className="mt-1 w-full rounded border p-2"
-                  value={vehicleForm.status}
-                  onChange={(event) =>
-                    setVehicleForm({
-                      ...vehicleForm,
-                      status: event.target.value as VehicleStatus,
-                    })
-                  }
+                  aria-label="日历显示"
+                  value={vehicleForm.showInCalendar !== false ? "显示" : "不显示"}
+                  onChange={event => setVehicleForm(current => ({
+                    ...current, showInCalendar: event.target.value === "显示",
+                  }))}
                 >
-                  <option value="运营中">运营中</option>
-                  <option value="停运中">停运中</option>
+                  <option value="显示">显示</option>
+                  <option value="不显示">不显示</option>
                 </select>
+                <span className="mt-2 block text-xs font-normal text-slate-500">
+                  启用时停运车辆也会显示在日历中。
+                </span>
               </label>
               <label className="block text-sm font-medium">
                 車両備考
@@ -9309,7 +10116,7 @@ export default function Home() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="source-form-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            className="editor-dialog w-full overflow-y-auto bg-white p-6"
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="source-form-title" className="text-xl font-bold">
@@ -9325,7 +10132,7 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="editor-fields">
               <label className="block text-sm font-medium">
                 来源
                 <input
@@ -9424,7 +10231,7 @@ export default function Home() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="company-form-title"
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            className="editor-dialog w-full overflow-y-auto bg-white p-6"
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="company-form-title" className="text-xl font-bold">
@@ -9439,7 +10246,7 @@ export default function Home() {
                 ×
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="editor-fields">
               <label className="block text-sm font-medium">
                 会社名
                 <input
@@ -9475,7 +10282,7 @@ export default function Home() {
                 />
               </label>
               <label className="block text-sm font-medium">
-                会社电话
+                会社電話
                 <input
                   type="tel"
                   className="mt-1 w-full rounded border p-2"
@@ -9545,6 +10352,36 @@ export default function Home() {
                 保存会社
               </button>
             </div>
+          </section>
+        </div>
+      )}
+
+      {mergeOrderId && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="order-merge-title"
+            className="editor-dialog editor-dialog--compact w-full overflow-y-auto bg-white p-6">
+            <div className="dialog-floating-header mb-4 flex items-center justify-between">
+              <h2 id="order-merge-title" className="text-xl font-bold">合并拆分订单</h2>
+              <button type="button" aria-label="关闭订单合并" onClick={() => { setMergeOrderId(null); setMergeSourceId(""); }}>×</button>
+            </div>
+            <p className="mb-3 text-sm text-gray-600">
+              选择日期相邻、基本信息相同的另一段。保留每日车辆、司机、财务及司机执行记录，不覆盖冲突数据；已生成請求書编号的订单不能合并。
+            </p>
+            {mergeTarget ? <>
+              <p className="mb-4 font-semibold">{mergeTarget.customer} · {formatOrderDate(mergeTarget.date)} ～ {formatOrderDate(mergeTarget.endDate)}</p>
+              <div className="space-y-2">
+                {mergeCandidates.map(order => (
+                  <label key={order.id} className="flex items-center gap-3 rounded border p-3">
+                    <input type="radio" name="merge-order" value={order.id} checked={mergeSourceId === order.id}
+                      onChange={() => setMergeSourceId(order.id)} />
+                    <span>{formatOrderDate(order.date)} ～ {formatOrderDate(order.endDate)} · {order.vehicle} {order.vehiclePlate}</span>
+                  </label>
+                ))}
+              </div>
+              {!mergeCandidates.length && <p role="status" className="py-4 text-sm text-amber-700">没有可合并的相邻订单段。请核对日期、基本信息、备注及结算状态是否一致。</p>}
+              <button type="button" disabled={!mergeCandidates.some(order => order.id === mergeSourceId)}
+                onClick={requestOrderMerge} className="mt-5 rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40">确认合并</button>
+            </> : <p role="alert">订单已不存在，请关闭后刷新。</p>}
           </section>
         </div>
       )}
@@ -9623,7 +10460,17 @@ export default function Home() {
       {driverSelectionTarget && (
         <DriverSelectionDialog
           drivers={driverSelectionCandidates}
+          blockedNames={isScheduleDriverSelection
+            ? allDriverRecords
+              .filter((driver) => driver.regionId === driverSelectionRegionId &&
+                driver.employmentType === "非常勤")
+              .map((driver) => driver.name)
+            : []}
           serviceDates={driverSelectionDates}
+          enforceLicense={driverSelectionTarget !== "driver-finance-filter" &&
+            (!(driverSelectionTarget === "accounting-batch" || driverSelectionTarget.startsWith("accounting-finance:")) ||
+              driverSelectionDates.some(date => date >= vehicleToday))}
+          today={vehicleToday}
           selected={driverSelectionTarget === "batch"
               ? batchOrderDriver
               : driverSelectionTarget === "accounting-batch"
@@ -9670,7 +10517,7 @@ export default function Home() {
             aria-modal="true"
             aria-labelledby="batch-add-title"
             onClick={(event) => event.stopPropagation()}
-            className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl"
+            className="editor-dialog w-full overflow-y-auto bg-white p-6"
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="batch-add-title" className="text-xl font-bold">
@@ -9697,12 +10544,12 @@ export default function Home() {
               value={batchInput}
               onChange={(event) => setBatchInput(event.target.value)}
               placeholder={batchAddType === "drivers"
-                ? "姓名,携帯番号（可选）,微信号（可选）,WhatsApp（可选）,免許有効期限（可选）,个人标语（可选）,姓名读音罗马字（可选）"
+                ? "姓名,携帯番号（可选）,微信号（可选）,WhatsApp（可选）,免許有効期限（可选）,个人标语（可选）,ローマ字（可选）"
                 : batchAddType === "vehicles"
                   ? "車名,車両番号,座位数,燃油类型,車検有効期限,自賠責有効期限,備考,車両所属（可选）"
                   : batchAddType === "sources"
                     ? "来源,名（可选）,連絡先（可选）,颜色（可选）"
-                    : "会社名称,運行管理者（可选）,整備管理者（可选）,会社电话（可选）,営業所地址（可选）,車庫位置（可选）"}
+                    : "会社名称,運行管理者（可选）,整備管理者（可选）,会社電話（可选）,営業所地址（可选）,車庫位置（可选）"}
               className="w-full resize-y rounded border p-3 text-sm"
             />
             <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex justify-end gap-3 border-t bg-white px-6 py-4">
@@ -9726,10 +10573,10 @@ export default function Home() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="accounting-preview-title"
-            className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            className="editor-dialog editor-dialog--wide w-full overflow-y-auto bg-white p-6"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="dialog-floating-header mb-5 flex items-center justify-between">
+            <div ref={accountingHeaderRef} className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="accounting-preview-title" className="text-xl font-bold">
                 訂単財務統計
               </h2>
@@ -9809,7 +10656,7 @@ export default function Home() {
                   }
                 }}
               >
-                請求書导出（A4）
+                請求書导出（PDF）
               </button>
               <button
                 type="button"
@@ -9835,6 +10682,7 @@ export default function Home() {
                           driverAdvanceTrip: getOrderFinanceAmount(finance, "driverAdvanceTripReport"),
                           companyAdvanceCompany: getOrderFinanceAmount(finance, "companyAdvanceCompanyReport"),
                           companyAdvanceTrip: getOrderFinanceAmount(finance, "companyAdvanceTripReport"),
+                          externalDriverFee: getOrderFinanceAmount(finance, "externalDriverFee"),
                           overtime: getDriverOvertimeFee(finance),
                           wages: totals.driverWages,
                         };
@@ -9845,7 +10693,7 @@ export default function Home() {
                   }
                 }}
               >
-                一键导出／打印（A4）
+                一键导出／打印（PDF）
               </button>
               <button
                 type="button"
@@ -9931,7 +10779,7 @@ export default function Home() {
                             </option>
                           )}
                           {(common === "運行中" || common === "完了") && (
-                            <option value={common} disabled>历史状態（已停用，保留原記録）</option>
+                            <option value={common} disabled>歴史状態（已停用，保留原記録）</option>
                           )}
                           {field !== "status" && <option value="">{emptyLabel}</option>}
                           {common && field !== "status" && !options.includes(common) && (
@@ -10001,7 +10849,7 @@ export default function Home() {
                     key={financeKey}
                     className={`rounded-lg border bg-white p-4 ${isAccountingBatch && financeOrder.id === accountingPreviewOrder.id ? "border-blue-500 ring-1 ring-blue-300" : ""}`}
                   >
-                    <div className="mb-4 grid grid-cols-1 gap-2 border-b pb-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+                    <div className="accounting-day-header mb-4 grid grid-cols-1 gap-2 border-b pb-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <h3 className="font-semibold">{formatOrderDate(date)}</h3>
                         {isAccountingBatch && financeOrder.time && (
@@ -10246,7 +11094,7 @@ export default function Home() {
                               ? "md:col-start-1 md:row-start-1"
                               : section.title === "超時費用"
                                 ? "md:col-start-1 md:row-start-2"
-                                : "md:col-start-2 md:row-start-1 md:row-span-2 md:flex md:flex-col md:self-stretch"
+                                : "md:col-start-2 md:row-start-1 md:row-span-3 md:flex md:flex-col md:self-stretch"
                           }`}
                         >
                           <legend className="px-1 text-sm font-semibold">{section.title}</legend>
@@ -10339,14 +11187,37 @@ export default function Home() {
                                         ? finance.companyAdvancePaymentNote || "" : ""} />
                                   </label>
                                   <div className="min-w-0 sm:col-span-2">
-                                    <OrderReceipts key={`receipts-${financeOrder.id}-${date}`} orderId={financeOrder.id} date={date} />
+                                    <OrderReceipts key={`receipts-${financeOrder.id}-${date}`} orderId={financeOrder.id} date={date}
+                                      blocked={dialogSaving || pendingSaveCount > 0 || Boolean(persistenceError) ||
+                                        JSON.stringify(accountingForm) !== JSON.stringify(accountingFormBaseline)}
+                                      onSwitching={busy => {
+                                        dialogSavingRef.current = busy; setDialogSaving(busy);
+                                        if (busy) accountingAdvanceSyncFailed.current = true;
+                                      }}
+                                      onChanged={async signal => {
+                                        const before = accountingForm;
+                                        accountingAdvanceSyncFailed.current = true;
+                                        let refreshed: Order[] = [];
+                                        await refreshApprovedOrderFinance(signal, orders => { refreshed = orders; });
+                                        if (signal.aborted) return;
+                                        if (accountingFormCurrent.current !== before)
+                                          throw new Error("财务表单有新的修改，請刷新核对切换结果。");
+                                        const updated = refreshed?.find(order => order.id === financeOrder.id)?.financeByDate?.[date];
+                                        if (!updated) throw new Error("未能读取切换后的当天财务。");
+                                        const next = { ...before, [financeKey]: { ...before[financeKey],
+                                          driverAdvanceCompanyReport: updated.driverAdvanceCompanyReport,
+                                          driverAdvanceTripReport: updated.driverAdvanceTripReport } };
+                                        setAccountingFormBaseline(next);
+                                        accountingAdvanceSyncFailed.current = false;
+                                        setAccountingForm(next);
+                                      }} />
                                   </div>
                                   </div>
                                 )}
                           </div>
                         </fieldset>
                       ))}
-                      <fieldset disabled={finance.driverPaymentType === "company_advance"} className="min-w-0 rounded border p-3 md:col-span-2 md:row-start-3 disabled:opacity-50">
+                      <fieldset disabled={finance.driverPaymentType === "company_advance"} className="min-w-0 rounded border p-3 md:col-start-1 md:row-start-3 disabled:opacity-50">
                         <legend className="px-1 text-sm font-semibold">運転士工資</legend>
                         <div className={`grid gap-3 sm:grid-cols-2 ${finance.driverWageMode === "percentage" ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
                           <label className="block text-sm font-medium">
@@ -10526,7 +11397,7 @@ export default function Home() {
                   {accountingAssignee &&
                     !accountingAccounts.some((account) => account.email === accountingAssignee) && (
                       <option value={accountingAssignee}>
-                        {getAccountingAssigneeName(accountingAssignee, accountingAccounts)}（历史記録）
+                        {getAccountingAssigneeName(accountingAssignee, accountingAccounts)}（歴史記録）
                       </option>
                     )}
                 </select>
@@ -10627,13 +11498,25 @@ export default function Home() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="order-details-title"
-            className={`max-h-[90vh] w-full overflow-y-auto rounded-lg bg-white p-6 shadow-xl ${orderDetailsMode === "itinerary" ? "max-w-4xl" : "max-w-md"}`}
+            className="editor-dialog w-full overflow-y-auto bg-white p-6"
           >
             <div className="dialog-floating-header mb-5 flex items-center justify-between">
               <h2 id="order-details-title" className="text-xl font-bold">
                 {orderDetailsMode === "itinerary" ? "行程指示書" : selectedOrderVehicleRef?.vehicle}
                 <LastOperation record={orders.find((order) => order.id === selectedOrderDetails.id)} />
               </h2>
+              <div className="flex items-center gap-3">
+                {orderDetailsMode !== "itinerary" && <button
+                  type="button"
+                  onClick={async () => {
+                    await copyCalendarVehicleField(orderDetailsCopyText, "車両信息");
+                    setOrderDetailsCopied(true);
+                    window.setTimeout(() => setOrderDetailsCopied(false), 1500);
+                  }}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  {orderDetailsCopied ? "已复制" : "复制信息"}
+                </button>}
               <button
                 type="button"
                 onClick={() => setSelectedOrderDetails(null)}
@@ -10642,18 +11525,23 @@ export default function Home() {
               >
                 ×
               </button>
+              </div>
             </div>
-            <label className="mb-4 block text-sm">服务日
-              <select aria-label="車両信息服务日" className="ml-2 rounded border p-2"
-                value={selectedOrderServiceDate} onChange={event => setOrderDetailsDate(event.target.value)}>
-                {getOrderDateKeys(selectedOrderDetails).map(date => <option key={date} value={date}>
-                  {date} · {getServiceVehicle(selectedOrderDetails, date).vehiclePlate || "未填写"}
-                </option>)}
-              </select>
-            </label>
+            {orderDetailsMode === "itinerary" && <label className="mb-4 block text-sm">配車日
+              {orderDetailDates.length > 1 && (orderDetailsMode !== "itinerary" || !orderDetailDatesDiffer)
+                ? <span className="ml-2 font-medium">{orderDetailDates[0]} ～ {orderDetailDates[orderDetailDates.length - 1]}</span>
+                : <select aria-label="車両信息配車日" className="ml-2 rounded border p-2"
+                  value={selectedOrderServiceDate} onChange={event => setOrderDetailsDate(event.target.value)}>
+                  {orderDetailDates.map(date => <option key={date} value={date}>{date}</option>)}
+                </select>}
+            </label>}
             {orderDetailsMode === "itinerary" ? (
               <div className="grid grid-cols-1 gap-x-10 gap-y-6 text-sm md:grid-cols-2">
                 <dl className="space-y-3">
+                  <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
+                    <dt className="text-gray-500">車名</dt>
+                    <dd className="break-words font-medium">{selectedOrderVehicleRef?.vehicle || "-"}</dd>
+                  </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">車両番号</dt>
                     <dd className="break-words font-medium">{selectedOrderVehicleRef?.vehiclePlate || "未填写"}</dd>
@@ -10664,7 +11552,12 @@ export default function Home() {
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">免許有効期限</dt>
-                    <dd className="break-words font-medium">{selectedOrderDriver?.licenseExpiry || "-"}</dd>
+                    <dd className="break-words font-medium">{selectedOrderDriverRecords.length
+                      ? selectedOrderDriverRecords.map(driver => <div key={driver.id}>
+                          {selectedOrderDriverRecords.length > 1 && <span>{driver.name}： </span>}
+                          <DriverLicenseDate expiry={driver.licenseExpiry} today={vehicleToday} />
+                        </div>)
+                      : "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">携帯番号</dt>
@@ -10716,15 +11609,15 @@ export default function Home() {
                 <dl className="space-y-3">
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">車両所属</dt>
-                    <dd className="break-words font-medium">{selectedOrderVehicle?.ownerCompany || "-"}</dd>
+                    <dd className="break-words font-medium"><VehicleOwnerLabel owner={selectedOrderVehicle?.ownerCompany || ""} /></dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">車検有効期限</dt>
-                    <dd className="break-words font-medium">{selectedOrderVehicle?.inspectionExpiry || "-"}</dd>
+                    <dd className="break-words font-medium"><VehicleExpiryDate expiry={selectedOrderVehicle?.inspectionExpiry || ""} today={vehicleToday} /></dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">自賠責有効期限</dt>
-                    <dd className="break-words font-medium">{selectedOrderVehicle?.liabilityExpiry || "-"}</dd>
+                    <dd className="break-words font-medium"><VehicleExpiryDate expiry={selectedOrderVehicle?.liabilityExpiry || ""} today={vehicleToday} /></dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
                     <dt className="text-gray-500">運行管理者</dt>
@@ -10743,7 +11636,7 @@ export default function Home() {
                     <dd className="break-words whitespace-pre-wrap font-medium">{selectedOrderVehicleCompany?.garageAddress || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[120px_1fr] gap-3">
-                    <dt className="text-gray-500">会社电话</dt>
+                    <dt className="text-gray-500">会社電話</dt>
                     <dd className="break-words font-medium">{selectedOrderVehicleCompany?.phone || "-"}</dd>
                   </div>
                 </dl>
@@ -10756,28 +11649,33 @@ export default function Home() {
                   </div>
                 </dl>
               </div>
+            ) : orderDetailDatesDiffer ? (
+              <div className="space-y-4 text-sm">
+                {orderDetailDailyRows.map(row => <dl key={row.date} className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <dt className="bg-slate-100 px-4 py-2 font-semibold text-slate-800">配車日　{row.date}</dt>
+                  {([["車名", row.vehicle || "-"], ["車両番号", row.plate || "未填写"], ["運転士", row.driverName || "未安排"],
+                    ["携帯番号", row.phone], ["WhatsApp", row.whatsapp], ["微信", row.wechat]] as const).map(([label, value], index) =>
+                    <dd key={label} className={`grid grid-cols-[110px_1fr] items-center gap-4 px-4 py-2.5 ${index % 2 ? "bg-white" : "bg-slate-50/70"}`}>
+                      <span className="text-slate-500">{label}</span><span className="break-words font-semibold text-slate-900">{value}</span>
+                    </dd>)}
+                </dl>)}
+              </div>
             ) : (
-              <dl className="space-y-3 text-sm">
-                <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
-                  <dt className="text-gray-500">車両番号</dt>
-                  <dd className="break-words font-medium">{selectedOrderVehicleRef?.vehiclePlate || "未填写"}</dd>
-                </div>
-                <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
-                  <dt className="text-gray-500">運転士</dt>
-                  <dd className="break-words font-medium">{getOrderDriverLabel(selectedOrderDetails)}</dd>
-                </div>
-                <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
-                  <dt className="text-gray-500">携帯番号</dt>
-                  <dd className="break-words font-medium">{selectedOrderDriver?.phone || "-"}</dd>
-                </div>
-                <div className="grid grid-cols-[120px_1fr] gap-3 border-b pb-3">
-                  <dt className="text-gray-500">WhatsApp</dt>
-                  <dd className="break-words font-medium">{selectedOrderDriver?.whatsapp || "-"}</dd>
-                </div>
-                <div className="grid grid-cols-[120px_1fr] gap-3">
-                  <dt className="text-gray-500">微信</dt>
-                  <dd className="break-words font-medium">{selectedOrderDriver?.wechat || "-"}</dd>
-                </div>
+              <dl className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white text-sm">
+                {([
+                  ["配車日", orderDetailDates.length > 1
+                    ? `${orderDetailDates[0]} ～ ${orderDetailDates[orderDetailDates.length - 1]}` : orderDetailDates[0] || "-"],
+                  ["車名", selectedOrderVehicleRef?.vehicle || "-"],
+                  ["車両番号", selectedOrderVehicleRef?.vehiclePlate || "未填写"],
+                  ["運転士", getOrderDriverLabel(selectedOrderDetails)],
+                  ["携帯番号", selectedOrderDriver?.phone || "-"],
+                  ["WhatsApp", selectedOrderDriver?.whatsapp || "-"],
+                  ["微信", selectedOrderDriver?.wechat || "-"],
+                ] as const).map(([label, value], index) => <div key={label}
+                  className={`grid grid-cols-[110px_1fr] items-center gap-4 px-4 py-3 ${index % 2 ? "bg-white" : "bg-slate-50/70"}`}>
+                  <dt className="text-slate-500">{label}</dt>
+                  <dd className="break-words font-semibold text-slate-900">{value}</dd>
+                </div>)}
               </dl>
             )}
           </section>
@@ -10785,33 +11683,43 @@ export default function Home() {
       )}
       {pendingDelete && (
         <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+          className="confirmation-overlay fixed inset-0 z-[110] flex items-center justify-center p-4"
         >
           <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="action-confirmation-title"
+            aria-describedby="action-confirmation-description"
+            aria-busy={isDeleting}
             onSubmit={(event) => {
               event.preventDefault();
               confirmPendingDelete();
             }}
-            className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"
+            className={`action-confirmation w-full max-w-md ${pendingDelete.kind === "merge" ? "action-confirmation--merge" : ""}`}
           >
-            <div className="dialog-floating-header flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold">确认删除</h2>
+            <div className="confirmation-heading flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span aria-hidden="true" className="confirmation-icon">{pendingDelete.kind === "merge" ? "＋" : "!"}</span>
+                <div>
+                  <h2 id="action-confirmation-title" className="text-lg font-bold">{pendingDelete.kind === "merge" ? "确认合并" : "确认削除"}</h2>
+                  <p className="mt-1 text-xs text-slate-500">{pendingDelete.kind === "merge" ? "保留每日记录，整合订单" : "此操作无法撤销，请仔细核对"}</p>
+                </div>
+              </div>
               <button
                 type="button"
-                aria-label="关闭删除确认"
+                aria-label={pendingDelete.kind === "merge" ? "关闭合并确认" : "关闭削除确认"}
                 onClick={() => {
                   setPendingDelete(null);
                   setDeletePassword("");
                   setDeleteError("");
                 }}
                 disabled={isDeleting}
-                className="text-2xl text-gray-500"
+                className="confirmation-close"
               >×</button>
             </div>
-            {deleteCompleted && <p role="status" className="mt-3 text-sm text-emerald-700">删除已完成，請点右上角 × 关闭。</p>}
-            <p className="mt-3 text-sm text-gray-700">{pendingDelete.message}</p>
-            <label className="mt-4 block text-sm font-medium">
-              删除密码
+            <p id="action-confirmation-description" className="confirmation-description">{pendingDelete.message}</p>
+            {pendingDelete.kind !== "merge" && <label className="mt-5 block text-sm font-semibold text-slate-700">
+              削除密码
               <input
                 autoComplete="current-password"
                 autoFocus
@@ -10820,21 +11728,24 @@ export default function Home() {
                 value={deletePassword}
                 onChange={(event) => setDeletePassword(event.target.value)}
                 disabled={isDeleting || deleteCompleted}
-                className="mt-1 w-full rounded border p-2"
+                placeholder="请输入削除专用密码"
+                className="confirmation-password"
               />
-            </label>
+            </label>}
             {deleteError && (
-              <p role="alert" className="mt-2 text-sm text-rose-700">
+              <p role="alert" className="confirmation-error">
                 {deleteError}
               </p>
             )}
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-6 border-t border-slate-100 pt-4">
               <button
                 type="submit"
-                disabled={isDeleting || deleteCompleted || !deletePassword}
-                className="table-action-button table-action-button--delete"
+                disabled={isDeleting || deleteCompleted || (pendingDelete.kind !== "merge" && !deletePassword)}
+                className="confirmation-submit"
               >
-                {deleteCompleted ? "已删除" : isDeleting ? "正在删除…" : "确认删除"}
+                {pendingDelete.kind === "merge"
+                  ? deleteCompleted ? "已合并" : isDeleting ? "正在合并…" : "确认合并"
+                  : deleteCompleted ? "已削除" : isDeleting ? "正在削除…" : "确认削除"}
               </button>
             </div>
           </form>

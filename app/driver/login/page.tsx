@@ -15,7 +15,7 @@ export default function DriverLogin() {
     const form = new FormData(event.currentTarget);
     setBusy(true); setError("");
     try {
-      const supabase = createClient();
+      const supabase = createClient("driver");
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: String(form.get("email")).trim().toLowerCase(),
         password: String(form.get("password")),

@@ -26,7 +26,11 @@ export const driverLoginDataSchema = z.object({
 }).strict();
 export const driverAccountCreateSchema = z.object({
   driverId: z.uuid(), email: z.email().max(320).transform(value => value.toLowerCase()),
-  password: z.string().min(8).max(128),
+  password: z.string().min(6).max(128),
+}).strict();
+export const driverEmailChangeSchema = z.object({
+  driverId: z.uuid(), userId: z.uuid(), expectedVersion: z.number().int().positive(),
+  email: z.email().max(320).transform(value => value.toLowerCase()),
 }).strict();
 export const driverPasswordSchema = z.object({
   driverId: z.uuid(), userId: z.uuid(), expectedVersion: z.number().int().positive(),

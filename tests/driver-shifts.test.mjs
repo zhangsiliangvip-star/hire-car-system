@@ -20,6 +20,9 @@ function load(relative, mocks = {}, globals = {}) {
       name === "@/app/driver/navigation" ? load("app/driver/navigation.tsx", mocks, globals) :
       name === "@/lib/driver-selection" ? load("lib/driver-selection.ts", mocks, globals) :
       name === "@/lib/order-drivers" ? load("lib/order-drivers.ts", mocks, globals) :
+      name === "@/lib/driver-license" ? load("lib/driver-license.ts", mocks, globals) :
+      name === "@/lib/vehicle-compliance" ? load("lib/vehicle-compliance.ts", mocks, globals) :
+      name === "@/components/vehicle-compliance" ? load("components/vehicle-compliance.tsx", mocks, globals) :
       name.endsWith(".css") ? {} : require(name),
     Request, Response, Headers, URL, Date, Intl, AbortController, process, console: { error() {} }, ...globals,
   });
@@ -259,7 +262,7 @@ test("driver selection dialog prioritizes attendance then recorded romanized rea
   ] });
   assert.ok(h.html.indexOf("田中") < h.html.indexOf("佐藤"));
   assert.ok(h.html.indexOf("佐藤") < h.html.indexOf("鈴木"));
-  assert.ok(h.html.indexOf("sato") < h.html.indexOf("suzuki"));
+  assert.doesNotMatch(h.html, /tanaka|sato|suzuki/);
 });
 test("rest hints fetch all actual service dates, never notes; failures explicitly warn", async () => {
   const calls = [];

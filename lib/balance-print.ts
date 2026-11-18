@@ -1,4 +1,5 @@
 import { printA4Html } from "@/lib/print-a4";
+import { companyExportHtml } from "@/lib/company-export";
 import type { BalanceSummary } from "@/lib/balance-summary";
 
 type BalancePrintData = {
@@ -54,7 +55,7 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   </style></head><body><div class="sheet"><article class="content">
   <header><h1>收支平衡月度報表</h1><div class="meta">
   <span>服务月份：${escapeHtml(data.month)}</span><span>分区：${escapeHtml(data.region)}</span>
-  <span>所属会社：${escapeHtml(data.company)}</span><span>单位：JPY</span></div></header>
+  <span>所属会社：${companyExportHtml(data.company, escapeHtml)}</span><span>单位：JPY</span></div></header>
   <div class="summary"><div>請求総和<strong>${yen(requestAmount)}</strong>
   <p class="request-breakdown">口座入金：${yen(totals.bankRequestAmount)}<br>現金入金：${yen(totals.cashRequestAmount)}<br>未设置入金方式：${yen(totals.unassignedRequestAmount)}</p></div>
   <div>其他收入総和<strong>${yen(incomeTotal)}</strong></div>
@@ -63,23 +64,23 @@ export function buildBalancePrintHtml(data: BalancePrintData) {
   <h2>所属会社收支明細</h2><table class="company-summary"><colgroup>${"<col style=\"width:12.5%\">".repeat(8)}</colgroup>
   <thead><tr><th>所属会社</th><th>請求総和</th><th>口座入金</th><th>現金入金</th><th>未设置入金方式</th><th>其他收入（手動）</th><th>支出総和（手動）</th><th>当月利润／亏损</th></tr></thead>
   <tbody>${rows.length ? rows.map((row) =>
-    `<tr><td>${escapeHtml(row.companyName || "未填写")}</td>${cells(row)}</tr>`).join("")
+    `<tr><td>${companyExportHtml(row.companyName || "未填写", escapeHtml)}</td>${cells(row)}</tr>`).join("")
     : '<tr><td colspan="8">暂无收支記録</td></tr>'}</tbody>
   <tfoot><tr><td>合计</td>${cells(totals)}</tr></tfoot></table>
   <h2>手動其他收入明細</h2><table><colgroup><col style="width:30%"><col style="width:40%"><col style="width:30%"></colgroup>
   <thead><tr><th>所属会社</th><th>收入项目</th><th class="number">金額（JPY）</th></tr></thead>
   <tbody>${incomes.length ? incomes.map((row) =>
-    `<tr><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.name)}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
+    `<tr><td>${companyExportHtml(row.companyName || "未填写", escapeHtml)}</td><td>${escapeHtml(row.name)}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
     : '<tr><td colspan="3">暂无其他收入项目</td></tr>'}</tbody>
   <tfoot><tr><td colspan="2">其他收入合计</td><td class="number">${yen(incomeTotal)}</td></tr></tfoot></table>
   <h2>手動支出明細</h2><table><colgroup><col style="width:30%"><col style="width:40%"><col style="width:30%"></colgroup>
   <thead><tr><th>所属会社</th><th>支出项目</th><th class="number">金額（JPY）</th></tr></thead>
   <tbody>${expenses.length ? expenses.map((row) =>
-    `<tr><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.name)}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
+    `<tr><td>${companyExportHtml(row.companyName || "未填写", escapeHtml)}</td><td>${escapeHtml(row.name)}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
     : '<tr><td colspan="3">暂无支出项目</td></tr>'}</tbody>
   <tfoot><tr><td colspan="2">手動支出合计</td><td class="number">${yen(expenseTotal)}</td></tr></tfoot></table>
   <div class="result ${resultClass}"><span>${resultLabel}</span><span>${yen(net)}</span></div>
-  <p class="notes">当月利润／亏损＝請求総金額＋手動其他收入総和－手動支出総和。不自動扣除車両費用、運転士工資、立替或其他运营支出。<br>
+  <p class="notes">当月利润／亏损＝請求総金額＋手動其他收入総和－手動支出総和。不自動扣除車両費用、運転士工資、立替或其他运営支出。<br>
   整单請求金額＝訂単价格＋全日期ETC旅報＋運転士立替旅報＋会社立替旅報＋超時請求（旅報），全部归首个服务日所在月份（排除休运日），跨月不分摊。<br>
   請求按訂単所属会社归集，手動收入和支出按项目所属会社及录入月份归集；其他统计和工資算法不变。<br>
   請求按訂単入金方式細分为口座入金、現金入金及未设置入金方式，不以入金日期判断实收；三项之和等于請求総和，不重复计入利润。<br>
@@ -117,7 +118,7 @@ export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
   .number { text-align: right; font-variant-numeric: tabular-nums; }
   </style></head><body><div class="sheet"><article class="content fit-page-width">
   <h1>外注運転士出金明細</h1>
-  <p class="meta">服务月份：${escapeHtml(data.month)}　分区：${escapeHtml(data.region)}　所属会社：${escapeHtml(data.company)}　单位：JPY</p>
+  <p class="meta">服务月份：${escapeHtml(data.month)}　分区：${escapeHtml(data.region)}　所属会社：${companyExportHtml(data.company, escapeHtml)}　单位：JPY</p>
   <h2>外注運転士出金方式汇総</h2><table><thead><tr><th>外注運転士出金方式</th><th class="number">総金額（JPY）</th></tr></thead>
   <tbody>${methods.map((method) => `<tr><td>${method || "未设置出金方式"}</td><td class="number">${yen(paymentAmounts[method])}</td></tr>`).join("")}</tbody>
   <tfoot><tr><td>合计</td><td class="number">${yen(paymentTotal)}</td></tr></tfoot></table>
@@ -126,7 +127,7 @@ export function buildCompanyAdvancePrintHtml(data: BalancePrintData) {
     return `<section><h2>${method || "未设置出金方式"}明細</h2><table>
     <thead><tr><th>日期</th><th>訂単名称</th><th>所属会社</th><th>外注運転士出金状態</th><th>外注運転士备注</th><th class="number">金額（JPY）</th></tr></thead>
     <tbody>${entries.length ? entries.map((row) =>
-      `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer)}</td><td>${escapeHtml(row.companyName || "未填写")}</td><td>${escapeHtml(row.status || "未選択")}</td><td style="white-space:pre-wrap">${escapeHtml(row.note || "")}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
+      `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.customer)}</td><td>${companyExportHtml(row.companyName || "未填写", escapeHtml)}</td><td>${escapeHtml(row.status || "未選択")}</td><td style="white-space:pre-wrap">${escapeHtml(row.note || "")}</td><td class="number">${yen(row.amount)}</td></tr>`).join("")
       : '<tr><td colspan="6">暂无出金記録</td></tr>'}</tbody>
     <tfoot><tr><td colspan="5">${method || "未设置出金方式"}合计</td><td class="number">${yen(paymentAmounts[method])}</td></tr></tfoot></table></section>`;
   }).join("")}

@@ -14,13 +14,14 @@ const expectedColumns = {
   "vehicle-finance": 8,
   balance: 8,
   "balance-items": 4,
+  reservations: 7,
   drivers: 7,
   vehicles: 10,
-  sources: 7,
+  sources: 5,
   companies: 10,
 };
 
-test("management views allocate every column explicitly without changing table data", () => {
+test("management and reservation views allocate every column explicitly without changing table data", () => {
   const found = [];
   function visit(node) {
     if (ts.isJsxElement(node) && node.openingElement.tagName.getText(ast) === "table") {
@@ -31,12 +32,33 @@ test("management views allocate every column explicitly without changing table d
         const name = attribute.initializer.text;
         found.push(name);
         const markup = node.getText(ast);
-        assert.match(markup, /management-table .*w-full min-w-\[\d+px\] table-fixed text-center/);
+        const classAttribute = node.openingElement.attributes.properties.find(
+          attr => attr.name?.getText(ast) === "className",
+        );
+        assert.ok(classAttribute && ts.isStringLiteral(classAttribute.initializer), name);
+        const classes = classAttribute.initializer.text.split(/\s+/);
+        for (const required of [
+          name === "reservations" ? "reservation-list-table" : "management-table",
+          "w-full", "table-fixed", "text-center",
+        ]) assert.ok(classes.includes(required), `${name}: ${required}`);
+        if (name === "sources") {
+          assert.ok(classes.includes("source-management-table"));
+          assert.match(css, /\.dashboard \.source-management-table\s*\{[^}]*min-width: 680px;/);
+        } else {
+          assert.ok(classes.some(value => /^min-w-\[\d+px\]$/.test(value)), `${name}: minimum width`);
+        }
         const columns = [...markup.matchAll(/<col (?:style=\{\{ width: "([\d.]+)%" \}\}|className="w-\[([\d.]+)%\]") \/>/g)]
           .map((match) => Number(match[1] ?? match[2]));
         assert.equal(columns.length, expectedColumns[name], name);
-        assert.ok(Math.abs(columns.reduce((sum, width) => sum + width, 0) - 100) < 0.001, name);
+        if (name === "reservations") {
+          assert.deepEqual(columns, [12, 17, 11, 13, 12, 10, 14]);
+          assert.match(markup, /selectedReservationFinanceColumns\.map\(option => \([\s\S]*?<col key=\{option\.key\} className="w-\[11%\]" \/>/);
+          assert.equal(columns.reduce((sum, width) => sum + width, 0) + 11, 100);
+        } else {
+          assert.ok(Math.abs(columns.reduce((sum, width) => sum + width, 0) - 100) < 0.001, name);
+        }
         if (name === "drivers") assert.deepEqual(columns, [12, 12, 12, 14, 14, 17, 19]);
+        if (name === "sources") assert.deepEqual(columns, [14, 35, 18, 15, 18]);
         assert.match(markup, /<tbody>/);
       }
     }
@@ -44,6 +66,15 @@ test("management views allocate every column explicitly without changing table d
   }
   visit(ast);
   assert.deepEqual(found.sort(), Object.keys(expectedColumns).sort());
+});
+
+test("reservation finance columns are selectable and summarize each order batch", () => {
+  for (const label of ["運転士支給", "ETC", "燃油費", "訂単价格", "運転士立替", "会社立替"]) {
+    assert.ok(page.includes(`label: "${label}"`), label);
+  }
+  assert.match(page, /useState<ReservationFinanceColumnKey\[\]>\(\["driverPayment"\]\)/);
+  assert.match(page, /groupOrdersByImportBatch\(monthlyOrders\)[\s\S]*?getReservationFinanceValues\(order\)/);
+  assert.match(page, /selectedReservationFinanceColumns\.map\(option => \([\s\S]*?reservationFinanceValues\.get\(order\.id\)\?\.\[option\.key\]/);
 });
 
 test("vehicle summary displays the vehicle number without a region subtitle", () => {
@@ -87,12 +118,12 @@ test("all management list edit and delete buttons use compact aligned action slo
 });
 
 test("edit, delete and PDF export actions use scoped semantic button styles", () => {
-  for (const variant of ["edit", "delete", "export"]) {
+  for (const variant of ["edit", "delete", "export", "excel"]) {
     assert.match(css, new RegExp(`\\.dashboard \\.table-action-button--${variant}\\s*\\{`));
   }
   assert.match(css, /\.dashboard \.table-action-button:focus-visible\s*\{/);
   assert.match(css, /\.dashboard \.table-action-button:disabled\s*\{/);
-  assert.match(page, /导出财务表（A4）[\s\S]*?className="table-action-button table-action-button--export"/);
+  assert.match(page, /导出财务表（PDF）[\s\S]*?className="table-action-button table-action-button--export"/);
   assert.match(page, /deleteLoginAccount\(account\)[\s\S]*?className="table-action-button table-action-button--delete/);
   const reports = fs.readFileSync(new URL("../components/operations-reports.tsx", import.meta.url), "utf8");
   assert.match(reports, /className="table-action-button table-action-button--edit driver-action-button"[^>]*disabled=\{busy\} onClick=\{\(\) => setEditing\(row\)\}/);
@@ -101,12 +132,49 @@ test("edit, delete and PDF export actions use scoped semantic button styles", ()
   assert.match(page, /onClick=\{deleteOrder\}[\s\S]*?className="table-action-button table-action-button--delete"/);
 });
 
+test("export labels use PDF instead of the A4 paper size", () => {
+  for (const label of [
+    "导出财务表", "导出工資表", "导出車両财务表",
+    "导出收支報表", "請求書导出", "一键导出／打印",
+  ]) {
+    assert.ok(page.includes(`${label}（PDF）`), label);
+  }
+  assert.doesNotMatch(page, /（A4）|title="A4 PDF 导出"/);
+  assert.ok(page.includes("导出工資表（Excel）"));
+  assert.ok(page.includes("会社全员工資総表（Excel）"));
+  assert.ok(!page.includes("会社全员工資総表（PDF）"));
+});
+
+test("PDF exports use pale blue while Excel keeps its green export style", () => {
+  assert.match(css, /\.dashboard \.table-action-button--export\s*\{[^}]*border-color: #bfdbfe;[^}]*background: #eff6ff;[^}]*color: #1d4ed8;/);
+  assert.match(css, /\.dashboard \.table-action-button--export:not\(:disabled\):hover\s*\{[^}]*background: #dbeafe;/);
+  assert.match(css, /\.dashboard \.table-action-button--excel\s*\{[^}]*border-color: #a7f3d0;[^}]*background: #ecfdf5;[^}]*color: #047857;/);
+  assert.match(css, /\.dashboard \.table-action-button--excel:not\(:disabled\):hover\s*\{[^}]*background: #d1fae5;/);
+  const excelButtons = [];
+  function visit(node) {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(ast) === "button") {
+      const markup = node.getText(ast);
+      if (/exportDriverWageExcel|exportCompanyWages/.test(node.openingElement.getText(ast))) {
+        excelButtons.push(markup);
+        assert.match(markup, /table-action-button--excel/);
+        assert.doesNotMatch(markup, /table-action-button--export/);
+      } else if (/PDF|printInvoice|printOrderExpenses|exportCompanyAdvances/.test(markup)) {
+        assert.match(markup, /table-action-button--export/);
+        assert.doesNotMatch(markup, /table-action-button--excel/);
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  assert.equal(excelButtons.length, 2);
+});
+
 test("driver and company lists fit the viewport and use cards on mobile", () => {
   const companyStart = page.indexOf('data-table="companies"');
   const companyEnd = page.indexOf("</table>", companyStart);
   const companyTable = page.slice(page.lastIndexOf("<table", companyStart), companyEnd);
   assert.match(companyTable, /company-management-table/);
-  for (const label of ["会社名称", "会社印章", "運行管理者", "整備管理者", "会社电话",
+  for (const label of ["会社名称", "会社印章", "運行管理者", "整備管理者", "会社電話",
     "営業所地址", "車庫位置", "振込口座", "T番号", "操作"]) {
     assert.match(companyTable, new RegExp(`data-label="${label}"`));
   }

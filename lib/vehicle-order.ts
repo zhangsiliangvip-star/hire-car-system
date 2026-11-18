@@ -43,6 +43,12 @@ export function compareVehicles(
   return compareVehicleNames(first.name, second.name) || first.id.localeCompare(second.id);
 }
 
+export function filterCalendarVisibleVehicles<T extends { showInCalendar?: boolean }>(
+  vehicles: readonly T[],
+) {
+  return vehicles.filter((vehicle) => vehicle.showInCalendar !== false);
+}
+
 function getCalendarVehicleRank(name: string) {
   if (isOutsourcedVehicle(name)) return 7;
   const modelOrder = getVehicleModelOrder(name);

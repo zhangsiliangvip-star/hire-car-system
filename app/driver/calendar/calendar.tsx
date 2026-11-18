@@ -41,7 +41,7 @@ export default function DriverCalendar() {
         ]);
         if (calendar.status === 401 || shifts.status === 401) { location.replace("/driver/login?next=%2Fdriver%2Fcalendar"); return; }
         const result = await calendar.json();
-        if (!calendar.ok) throw new Error(result.error || "无法读取日历，請重试。");
+        if (!calendar.ok) throw new Error(result.error || "无法读取日歴，請重试。");
         const parsed = driverCalendarSchema.parse(result);
         if (parsed.month !== month) throw new Error("月份不一致，請重试。");
         let rest: string[] = [];
@@ -53,12 +53,12 @@ export default function DriverCalendar() {
       } catch (cause) {
         if (controller.signal.aborted || !active) return;
         console.error("Driver calendar load failed.", cause);
-        setError(cause instanceof Error ? cause.message : "无法读取日历。");
+        setError(cause instanceof Error ? cause.message : "无法读取日歴。");
       }
     }
     function visibility() { if (document.visibilityState === "visible") void load(); }
     document.addEventListener("visibilitychange", visibility);
-    const { data: subscription } = createClient().auth.onAuthStateChange(event => {
+    const { data: subscription } = createClient("driver").auth.onAuthStateChange(event => {
       if (event === "SIGNED_OUT") { setData(null); location.replace("/driver/login"); }
     });
     void load();
@@ -98,7 +98,7 @@ export default function DriverCalendar() {
   return <main className="driver-main driver-calendar">
     <DriverNavigation />
     <div className="driver-page-header"><Link className="driver-link" href="/driver">‹ 返回我的行程</Link></div>
-    <h1>我的日历</h1>
+    <h1>我的日歴</h1>
     <div className="driver-calendar-toolbar">
       <button type="button" aria-label="上个月" onClick={() => changeMonth(moveMonth(month, -1))}>‹</button>
       <strong>{month.slice(0, 4)}年{Number(month.slice(5))}月</strong>
@@ -108,7 +108,7 @@ export default function DriverCalendar() {
     </div>
     <p className="driver-muted">只显示分配给你的訂単及使用車両；红色「休」为你提交的希望休。</p>
     {error && <p className="driver-error" role="alert">{error}</p>}
-    {!loaded ? (!error && <p className="driver-empty" role="status">正在读取日历…</p>) : <>
+    {!loaded ? (!error && <p className="driver-empty" role="status">正在读取日歴…</p>) : <>
       <div className="driver-calendar-scroll" ref={scroller}>
         <div className="driver-calendar-grid" style={{ "--calendar-days": dates.length } as CSSProperties}>
           <div className="driver-calendar-row driver-calendar-head">

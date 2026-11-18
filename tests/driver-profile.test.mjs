@@ -127,6 +127,49 @@ test("creating driver auth uses independent account and binds only the selected 
   assert.deepEqual(plain(h.calls.at(-1)), { name: "bind_driver_identity", args: { target_user: userId, target_driver: id } });
   assert.equal(JSON.stringify(await response.json()).includes("password"), false);
 });
+test("driver creation accepts six characters while rejecting shorter passwords and preserving reset rules", async () => {
+  for (const password of ["123456", "1234567", "12345678"]) {
+    const h = api({ admin: true });
+    assert.equal((await h.POST(request({ driverId: id, email: "driver@example.invalid", password }))).status, 201);
+    assert.equal(h.authCalls[0].create.password, password);
+  }
+  for (const password of ["", "1", "12345", "x".repeat(129)]) {
+    const h = api({ admin: true });
+    const response = await h.POST(request({ driverId: id, email: "driver@example.invalid", password }));
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /6至128/);
+    assert.equal(h.authCalls.length, 0);
+  }
+  const reset = api({ admin: true, linked: true });
+  assert.equal((await reset.PUT(request({ driverId: id, userId, expectedVersion: 1, password: "123456" }))).status, 400);
+  assert.equal(reset.authCalls.length, 0);
+  const rejected = api({ admin: true, authError: { code: "weak_password", status: 422 } });
+  const response = await rejected.POST(request({ driverId: id, email: "driver@example.invalid", password: "123456" }));
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /密码强度不足/);
+  assert.equal(rejected.calls.some(call => call.name === "bind_driver_identity"), false);
+});
+
+test("driver account form enables six-character creation but keeps eight-character resets", () => {
+  for (const linked of [false, true]) {
+    for (const password of ["", "12345", "123456", "1234567", "12345678"]) {
+      let index = 0;
+      const state = ["driver@example.invalid", password, false, false, "", ""];
+      const { DriverLoginFields } = load("components/driver-login-fields.tsx", {
+        react: { ...React, useEffect() {}, useRef: value => ({ current: value }),
+          useState: () => [state[index++], () => {}],
+          useContext: () => ({ data: { enabled: true, canManage: true, isAdmin: true,
+            accounts: linked ? [account] : [] }, error: "", reload() {} }) },
+        "@/lib/driver/profile": schemas, "@/lib/supabase/browser": {},
+      });
+      const markup = renderToStaticMarkup(React.createElement(DriverLoginFields, { driverId: id, name: "Driver" }));
+      assert.match(markup, new RegExp(`minLength="${linked ? 8 : 6}"`));
+      const submit = markup.match(/<button[^>]*>[^<]*(?:创建登录|重置密码)<\/button>/)[0];
+      assert.equal(submit.includes('disabled=""'), password.length < (linked ? 8 : 6));
+    }
+  }
+});
+
 test("existing emails are never hijacked, duplicate driver bindings and missing server key do not mutate auth", async () => {
   const command = { driverId: id, email: "driver@example.invalid", password: "Test-only-password-123" };
   const linked = api({ admin: true, linked: true }); assert.equal((await linked.POST(request(command))).status, 409); assert.equal(linked.authCalls.length, 0);
@@ -298,9 +341,10 @@ test("admin password visibility toggles and hidden page clears password", () => 
     return renderToStaticMarkup(React.createElement(DriverLoginFields, { driverId: id, name: "Driver" }));
   }
   render(); const cleanup = effects[0]();
-  assert.equal(inputs[0].type, "password");
+  const passwordInput = () => inputs.find(input => input.type === "password" || input.type === "text");
+  assert.equal(passwordInput().type, "password");
   buttons.find(button => button.children === "显示").onClick();
-  render(); assert.equal(inputs[0].type, "text");
+  render(); assert.equal(passwordInput().type, "text");
   document.visibilityState = "hidden"; events.visibilitychange();
   assert.equal(states[1], ""); assert.equal(states[2], false);
   cleanup();

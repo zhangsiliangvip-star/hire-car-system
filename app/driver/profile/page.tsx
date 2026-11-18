@@ -37,7 +37,7 @@ export default function DriverProfile() {
     }
     function clear() { ++generation.current; controller.abort(); setProfile(null); setSaved(null); setBusy(false); setError(""); lock.current = false; }
     function hide() { if (document.visibilityState === "hidden") clear(); else setRevision(value => value + 1); }
-    const { data: subscription } = createClient().auth.onAuthStateChange(event => {
+    const { data: subscription } = createClient("driver").auth.onAuthStateChange(event => {
       if (event === "SIGNED_OUT") { clear(); router.replace("/driver/login"); }
     });
     document.addEventListener("visibilitychange", hide);

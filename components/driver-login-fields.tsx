@@ -78,6 +78,25 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
       setError(cause instanceof Error ? cause.message : "账号操作失败。");
     } finally { lock.current = false; setBusy(false); }
   }
+  async function changeEmail() {
+    const next = email.trim().toLowerCase();
+    if (lock.current || !account || !next || next === account.email.toLowerCase()) return;
+    if (!window.confirm(`将${name}的登录邮箱改为 ${next}？`)) return;
+    lock.current = true; setBusy(true); setError(""); setNotice("");
+    const current = generation.current;
+    try {
+      const response = await fetch("/api/admin/driver-accounts", { method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId, userId: account.userId, expectedVersion: account.version, email: next }) });
+      const result = await response.json();
+      if (current !== generation.current) return;
+      if (!response.ok) throw new Error(result.error || "邮箱修改未确认。");
+      setEmail(""); setNotice("登录邮箱已更新，請告知運転士。"); reload();
+    } catch (cause) {
+      if (current !== generation.current) return;
+      setError(cause instanceof Error ? cause.message : "邮箱修改失败。");
+    } finally { lock.current = false; setBusy(false); }
+  }
   const canManageDriver = Boolean(data?.canManage && (data.isAdmin ||
     (regionId && data.manageableRegionId === regionId)));
   const disabled = busy || !canManageDriver || Boolean(loadError) || account?.status === "revoked";
@@ -93,6 +112,12 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
       </div>
         : canManageDriver ? <input aria-label={`${name}登录邮箱`} type="email" autoComplete="off" disabled={disabled}
           className="driver-mobile-input" value={email} onChange={event => setEmail(event.target.value)} placeholder="输入運転士登录邮箱" /> : null}
+      {canManageDriver && account && <div className="driver-login-controls">
+        <input aria-label={`${name}新登录邮箱`} type="email" autoComplete="off" disabled={disabled}
+          className="driver-mobile-input" value={email} onChange={event => setEmail(event.target.value)} placeholder="输入新的登录邮箱" />
+        <button type="button" disabled={disabled || !email.trim() || email.trim().toLowerCase() === account.email.toLowerCase()}
+          onClick={() => void changeEmail()} className="driver-mobile-primary-button">修改邮箱</button>
+      </div>}
       {loadError && <p role="alert" className="text-xs text-red-600">{loadError}<button onClick={reload}>重试</button></p>}
       {data && !data.enabled && <p className="text-xs text-gray-500">運転士登录管理尚未开放</p>}
       {data?.enabled && !data.canManage && <p className="max-w-xs text-xs text-amber-700">尚未配置隔离库账号管理密钥，创建／重置暂不可用。</p>}
@@ -102,11 +127,11 @@ export function DriverLoginFields({ driverId, name, regionId }: { driverId: stri
       {canManageDriver && <>
       <div className="driver-login-controls">
         <input aria-label={`${name}${account ? "新密码" : "初始密码"}`} type={visible ? "text" : "password"}
-          autoComplete="new-password" minLength={8} maxLength={128} disabled={disabled}
-          className="driver-mobile-input" value={password} onChange={event => setPassword(event.target.value)} placeholder={account ? "输入新密码（至少 8 位）" : "设置初始密码（至少 8 位）"} />
+          autoComplete="new-password" minLength={account ? 8 : 6} maxLength={128} disabled={disabled}
+          className="driver-mobile-input" value={password} onChange={event => setPassword(event.target.value)} placeholder={account ? "输入新密码（至少 8 位）" : "设置初始密码（至少 6 位）"} />
         <button type="button" disabled={disabled} aria-label={`${name}${visible ? "隐藏密码" : "显示密码"}`}
           onClick={() => setVisible(value => !value)} className="driver-mobile-secondary-button">{visible ? "隐藏" : "显示"}</button>
-        <button type="button" disabled={disabled || password.length < 8 || (!account && !email.trim())}
+        <button type="button" disabled={disabled || password.length < (account ? 8 : 6) || (!account && !email.trim())}
           onClick={() => void save()} className="driver-mobile-primary-button">{busy ? "处理中…" : account ? "重置密码" : "创建登录"}</button>
       </div>
       {error && <p role="alert" className="max-w-xs text-xs text-red-600">{error}</p>}
@@ -142,7 +167,7 @@ export function DriverMobileDialog({ driverId, name, regionId, slogan, onSloganC
     </button>
     {open && <div className="driver-mobile-dialog-backdrop fixed inset-0 z-[80] flex items-center justify-center p-4">
       <section role="dialog" aria-modal="true" aria-labelledby={`driver-mobile-title-${driverId}`}
-        className="driver-mobile-dialog max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        className="driver-mobile-dialog max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div className="driver-mobile-dialog__header">
           <div>
             <p className="driver-mobile-dialog__eyebrow">手机端设置</p>

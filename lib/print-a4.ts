@@ -1,8 +1,17 @@
-export async function printA4Html(html: string, title: string) {
+export async function printA4Html(html: string, title: string, options: {
+  signal?: AbortSignal;
+  imageErrorMessage?: string;
+} = {}) {
+  options.signal?.throwIfAborted();
   const frame = document.createElement("iframe");
   frame.title = title;
   frame.style.cssText = "position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0";
   document.body.appendChild(frame);
+  const remove = () => {
+    frame.remove();
+    options.signal?.removeEventListener("abort", remove);
+  };
+  options.signal?.addEventListener("abort", remove, { once: true });
   try {
     const printDocument = frame.contentDocument;
     const printWindow = frame.contentWindow;
@@ -15,9 +24,10 @@ export async function printA4Html(html: string, title: string) {
       try {
         await image.decode();
       } catch {
-        throw new Error("打印图片载入失败，請检查会社印章后重试。");
+        throw new Error(options.imageErrorMessage ?? "打印图片载入失败，請检查会社印章后重试。");
       }
     }));
+    options.signal?.throwIfAborted();
     const content = printDocument.querySelector<HTMLElement>(".content");
     const sheet = printDocument.querySelector<HTMLElement>(".sheet");
     if (!content || !sheet) throw new Error("打印版型载入失败。");
@@ -51,11 +61,11 @@ export async function printA4Html(html: string, title: string) {
       const scale = Math.min(1, sheet.clientHeight / content.scrollHeight, sheet.clientWidth / content.scrollWidth);
       content.style.transform = `scale(${scale})`;
     }
-    printWindow.addEventListener("afterprint", () => frame.remove(), { once: true });
+    printWindow.addEventListener("afterprint", remove, { once: true });
     printWindow.focus();
     printWindow.print();
   } catch (error) {
-    frame.remove();
+    remove();
     throw error;
   }
 }
