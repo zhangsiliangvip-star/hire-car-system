@@ -8,7 +8,7 @@ import { webcrypto } from "node:crypto";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
-function load(relative, mocks = {}) {
+function load(relative, mocks = {}, env = process.env) {
   const filename = fileURLToPath(new URL(`../${relative}`, import.meta.url));
   const compiled = ts.transpileModule(readFileSync(filename, "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
@@ -19,7 +19,7 @@ function load(relative, mocks = {}) {
     exports: compiledModule.exports,
     module: compiledModule,
     require: (name) => Object.hasOwn(mocks, name) ? mocks[name] : require(name),
-    process,
+    process: { env },
     Request,
     Response,
     Headers,
@@ -35,6 +35,13 @@ function load(relative, mocks = {}) {
 }
 
 const aviationstack = load("lib/aviationstack.ts");
+
+function loadFlightRoute(mocks, env = {}) {
+  return load("app/api/driver/flights/route.ts", {
+    ...mocks,
+    "@/lib/flight-tracking": load("lib/flight-tracking.ts", {}, env),
+  }, env);
+}
 
 function japanToday() {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -150,6 +157,28 @@ test("Aviationstack rejects missing credentials, malformed responses, and provid
   );
 });
 
+test("disabled driver flight endpoint returns 404 without invoking authorization", async () => {
+  const { jsonResponse } = load("lib/api-response.ts");
+  let authorizationCalls = 0;
+  const handler = loadFlightRoute({
+    "@/lib/api-response": { jsonResponse },
+    "@/lib/driver/authorization": {
+      requireDriver: async () => {
+        authorizationCalls++;
+        return { response: jsonResponse({ error: "Denied" }, { status: 401 }) };
+      },
+    },
+    "@/lib/driver/orders": load("lib/driver/orders.ts"),
+    "@/lib/aviationstack": aviationstack,
+  }, { NEXT_PUBLIC_FLIGHT_TRACKING_ENABLED: "false" });
+
+  const response = await handler.GET(new Request(
+    "https://driver.example/api/driver/flights?assignmentId=e6000000-0000-4000-8000-000000000001",
+  ));
+  assert.equal(authorizationCalls, 0);
+  assert.equal(response.status, 404);
+});
+
 test("driver flight endpoint verifies the assigned trip before looking up its flight", async () => {
   const { jsonResponse } = load("lib/api-response.ts");
   const lookup = async (flightNumber, serviceDate, arrivalAirport) => ({
@@ -171,7 +200,7 @@ test("driver flight endpoint verifies the assigned trip before looking up its fl
     flight_number: "NH123",
   }];
   const calls = [];
-  const handler = load("app/api/driver/flights/route.ts", {
+  const handler = loadFlightRoute({
     "@/lib/api-response": { jsonResponse },
     "@/lib/driver/authorization": {
       requireDriver: async () => ({
@@ -202,7 +231,7 @@ test("driver flight endpoint verifies the assigned trip before looking up its fl
 test("flight endpoint rejects invalid selectors and unauthenticated drivers", async () => {
   const { jsonResponse } = load("lib/api-response.ts");
   const calls = [];
-  const handler = load("app/api/driver/flights/route.ts", {
+  const handler = loadFlightRoute({
     "@/lib/api-response": { jsonResponse },
     "@/lib/driver/authorization": {
       requireDriver: async () => ({
@@ -218,7 +247,7 @@ test("flight endpoint rejects invalid selectors and unauthenticated drivers", as
   }
   assert.equal(calls.length, 0);
 
-  const denied = load("app/api/driver/flights/route.ts", {
+  const denied = loadFlightRoute({
     "@/lib/api-response": { jsonResponse },
     "@/lib/driver/authorization": {
       requireDriver: async () => ({ response: jsonResponse({ error: "Denied" }, { status: 401 }) }),
@@ -234,7 +263,7 @@ test("flight endpoint rejects invalid selectors and unauthenticated drivers", as
 test("flight endpoint asks dispatch to correct an unrecognized pickup airport", async () => {
   const { jsonResponse } = load("lib/api-response.ts");
   let lookedUp = false;
-  const handler = load("app/api/driver/flights/route.ts", {
+  const handler = loadFlightRoute({
     "@/lib/api-response": { jsonResponse },
     "@/lib/driver/authorization": {
       requireDriver: async () => ({

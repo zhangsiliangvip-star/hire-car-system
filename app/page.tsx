@@ -43,6 +43,7 @@ import type {
   VehicleStatus,
 } from "@/lib/domain";
 import { buildApiErrorMessage, readJsonSafely } from "@/lib/api-client";
+import { flightTrackingEnabled } from "@/lib/flight-tracking";
 import { usePersistedCollection } from "@/lib/use-persisted-collection";
 import { createClient as createSupabaseClient } from "@/lib/supabase/browser";
 import { printOrderExpenses } from "@/lib/order-expense-print";
@@ -390,6 +391,46 @@ function createSlidingDates(centerDate: Date, dayCount = 11) {
 function getCenteredTodayDate() {
   const today = new Date();
   return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+}
+
+function getOrderUndoValue(order: Order | undefined): string | null {
+  if (!order) return null;
+  const { lastOperation, ...data } = order;
+  void lastOperation;
+  const normalizedData = {
+    ...data,
+    importBatchId: data.importBatchId ?? null,
+    importBatchIndex: data.importBatchIndex ?? null,
+    splitGroupId: data.splitGroupId ?? null,
+    vehiclePlate: data.vehiclePlate ?? "",
+    invoiceSentDate: data.invoiceSentDate || "",
+    depositDate: data.depositDate || "",
+    financeByDate: Object.fromEntries(
+      Object.entries(data.financeByDate).map(([date, finance]) => [
+        date,
+        normalizeOrderFinance(finance),
+      ]),
+    ),
+  };
+  const serialize = (value: unknown): string => {
+    if (Array.isArray(value)) return `[${value.map(serialize).join(",")}]`;
+    if (typeof value === "object" && value !== null) {
+      const record = value as Record<string, unknown>;
+      return `{${Object.keys(record).sort().map((key) =>
+        `${JSON.stringify(key)}:${serialize(record[key])}`,
+      ).join(",")}}`;
+    }
+    return JSON.stringify(value) ?? "undefined";
+  };
+  return serialize(normalizedData);
+}
+
+function getChangedOrderIds(before: Order[], after: Order[]) {
+  const beforeById = new Map(before.map((order) => [order.id, order]));
+  const afterById = new Map(after.map((order) => [order.id, order]));
+  return [...new Set([...beforeById.keys(), ...afterById.keys()])].filter(
+    (id) => getOrderUndoValue(beforeById.get(id)) !== getOrderUndoValue(afterById.get(id)),
+  );
 }
 
 function createMobileCalendarDates(firstMonth: Date) {
@@ -1011,6 +1052,22 @@ export default function Home() {
     return () => document.removeEventListener("wheel", preventNumberInputWheelChange, true);
   }, []);
   const [calendarCenterDate, setCalendarCenterDate] = useState(() => getCenteredTodayDate());
+  const calendarCenterDateRef = useRef(calendarCenterDate);
+  const navigateCalendarCenterDate = useCallback(
+    (nextDate: Date | ((currentDate: Date) => Date)) => {
+      const currentDate = calendarCenterDateRef.current;
+      const requestedDate = typeof nextDate === "function" ? nextDate(currentDate) : nextDate;
+      const resolvedDate = new Date(
+        requestedDate.getFullYear(),
+        requestedDate.getMonth(),
+        requestedDate.getDate(),
+      );
+      if (resolvedDate.getTime() === currentDate.getTime()) return;
+      calendarCenterDateRef.current = resolvedDate;
+      setCalendarCenterDate(resolvedDate);
+    },
+    [],
+  );
   const [yearPickerStart, setYearPickerStart] = useState<number | null>(null);
   const calendarScrollRef = useRef<HTMLDivElement>(null);
   const [isMobileCalendar, setIsMobileCalendar] = useState(false);
@@ -1163,7 +1220,7 @@ export default function Home() {
   }, []);
   const {
     items: allOrders,
-    updateItems: setOrders,
+    updateItems: updateOrders,
     replaceItems: replaceOrders,
     syncItems: syncOrders,
     getChangeVersion: getVersionOrders,
@@ -1330,7 +1387,15 @@ export default function Home() {
   const [batchAddType, setBatchAddType] = useState<BatchAddType | null>(null);
   const [batchInput, setBatchInput] = useState("");
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
+  const draggedOrderIdRef = useRef<string | null>(null);
   const [dragTargetKey, setDragTargetKey] = useState<string | null>(null);
+  const draggedOrderDayOffsetRef = useRef(0);
+  const draggedOrderDurationRef = useRef(0);
+  const [dragOrderPreview, setDragOrderPreview] = useState<{
+    vehicleId: string;
+    startDate: string;
+    endDate: string;
+  } | null>(null);
   const [draggingCalendarVehicleId, setDraggingCalendarVehicleId] = useState<string | null>(null);
   const [calendarVehicleDropTarget, setCalendarVehicleDropTarget] =
     useState<{ id: string; after: boolean } | null>(null);
@@ -1377,6 +1442,51 @@ export default function Home() {
   const [accountingAssignee, setAccountingAssignee] = useState("");
   const [accountingFinanceNote, setAccountingFinanceNote] = useState("");
   const [activeView, setActiveView] = useState<ActiveView>("calendar");
+  const [canUndoCalendarAction, setCanUndoCalendarAction] = useState(false);
+  const [isCalendarUndoing, setIsCalendarUndoing] = useState(false);
+  const calendarUndoRef = useRef<{ before: Order[]; after: Order[] } | null>(null);
+  const calendarUndoInProgressRef = useRef(false);
+  const applyingCalendarUndoUpdateRef = useRef(false);
+  const setOrders = useCallback(
+    (action: Order[] | ((previousOrders: Order[]) => Order[])) => {
+      let nextUndo: { before: Order[]; after: Order[] } | null = null;
+      let clearUndo = false;
+      updateOrders((previousOrders) => {
+        const nextOrders = typeof action === "function" ? action(previousOrders) : action;
+        if (activeView === "calendar" && !applyingCalendarUndoUpdateRef.current) {
+          const changedIds = getChangedOrderIds(previousOrders, nextOrders);
+          const nextOrderIds = new Set(nextOrders.map((order) => order.id));
+          if (changedIds.some((id) => !nextOrderIds.has(id))) {
+            clearUndo = true;
+          } else if (changedIds.length > 0) {
+            nextUndo = { before: previousOrders.slice(), after: nextOrders.slice() };
+          }
+        }
+        return nextOrders;
+      });
+      if (clearUndo) {
+        calendarUndoRef.current = null;
+        setCanUndoCalendarAction(false);
+      } else if (nextUndo) {
+        calendarUndoRef.current = nextUndo;
+        setCanUndoCalendarAction(true);
+        const savedUndo = nextUndo;
+        void waitForOrders().then((saved) => {
+          if (calendarUndoRef.current !== savedUndo || saved) return;
+          calendarUndoRef.current = null;
+          setCanUndoCalendarAction(false);
+        });
+      }
+    },
+    [activeView, updateOrders, waitForOrders],
+  );
+  function changeActiveView(view: ActiveView) {
+    if (view !== "calendar") {
+      calendarUndoRef.current = null;
+      setCanUndoCalendarAction(false);
+    }
+    setActiveView(view);
+  }
   const driverExecution = useDriverExecutionStatus(Boolean(currentProfile) && (activeView === "calendar" || activeView === "orders"));
   const driverRestDays = useDriverRestDays(Boolean(currentProfile) && activeView === "calendar", dates.map(day => day.date));
   const restingDriverNamesByDate = new Map<string, string[]>();
@@ -3298,8 +3408,12 @@ export default function Home() {
         };
       }),
     );
+    draggedOrderIdRef.current = null;
+    draggedOrderDayOffsetRef.current = 0;
+    draggedOrderDurationRef.current = 0;
     setDraggingOrderId(null);
     setDragTargetKey(null);
+    setDragOrderPreview(null);
   }
 
   function moveSplitRangeToVehicle(
@@ -3389,6 +3503,7 @@ export default function Home() {
     setSplitSelection(null);
     setDraggingOrderId(null);
     setDragTargetKey(null);
+    setDragOrderPreview(null);
   }
 
   function selectSplitDate(orderId: string, date: string) {
@@ -4471,6 +4586,51 @@ export default function Home() {
     setShowForm(true);
   }
 
+  function openCopyOrder(order: Order) {
+    if (!requireSpecificRegionForNewData()) return;
+    const firstVehicle = getServiceVehicle(order, order.date);
+    const sourceFinanceByDate = getReservationFinance(order);
+    const financeByDate = Object.fromEntries(
+      Object.entries(sourceFinanceByDate).map(([date, finance]) => [
+        date,
+        {
+          ...emptyOrderFinance,
+          driver: finance.driver || order.driver || "",
+          vehicle: finance.vehicle || order.vehicle,
+          vehiclePlate: finance.vehiclePlate || order.vehiclePlate || "",
+          ...(finance.vehicleOverride === undefined
+            ? {}
+            : { vehicleOverride: finance.vehicleOverride }),
+          tripSummary: finance.tripSummary || "",
+        },
+      ]),
+    );
+    setEditingOrderId(null);
+    setForm({
+      ...createEmptyDraft(firstVehicle.vehicle, order.date, firstVehicle.vehiclePlate),
+      regionId: getRegionForNewRecords() ?? undefined,
+      endDate: order.endDate || order.date,
+      offDates: [...order.offDates],
+      time: order.time,
+      customer: order.customer,
+      phone: order.phone,
+      pickup: order.pickup,
+      destination: order.destination,
+      flightNumber: order.flightNumber || "",
+      status: "仮予約",
+      notes: order.notes,
+      driver: order.driver || "",
+      orderSource: order.orderSource,
+      company: order.company,
+      salesRep: order.salesRep,
+      financeByDate,
+    });
+    setOffDateInput("");
+    setCustomCompanyMode(Boolean(order.company) && !companies.includes(order.company));
+    setSplitSelection(null);
+    setShowForm(true);
+  }
+
   function openAccounting(order: Order) {
     const batchOrders = getAccountingBatchOrders(order, allOrders);
     const form: Record<string, OrderFinance> = {};
@@ -4813,6 +4973,86 @@ export default function Home() {
       },
       "merge",
     );
+  }
+
+  async function applyCalendarOrderUndo(snapshot: { before: Order[]; after: Order[] }) {
+    if (calendarUndoRef.current !== snapshot || calendarUndoInProgressRef.current) return;
+    calendarUndoInProgressRef.current = true;
+    setIsCalendarUndoing(true);
+    try {
+      if (calendarUndoRef.current !== snapshot) {
+        throw new Error("最近操作已变化，未执行撤销。请检查日历后重试。");
+      }
+
+      const changedIds = getChangedOrderIds(snapshot.before, snapshot.after);
+      const beforeById = new Map(snapshot.before.map((order) => [order.id, order]));
+      const afterById = new Map(snapshot.after.map((order) => [order.id, order]));
+      const latestById = new Map(allOrders.map((order) => [order.id, order]));
+      if (changedIds.some((id) =>
+        getOrderUndoValue(latestById.get(id)) !== getOrderUndoValue(afterById.get(id)),
+      )) {
+        calendarUndoRef.current = null;
+        setCanUndoCalendarAction(false);
+        throw new Error("预约已被其他操作修改，无法安全撤销。请刷新后核对数据。");
+      }
+
+      const changedIdSet = new Set(changedIds);
+      const restoredOrders = allOrders.filter((order) => !changedIdSet.has(order.id));
+      for (const id of changedIds) {
+        const previousOrder = beforeById.get(id);
+        if (previousOrder) restoredOrders.push(previousOrder);
+      }
+      if (calendarUndoRef.current !== snapshot) {
+        throw new Error("最近操作已变化，未执行撤销。请检查日历后重试。");
+      }
+
+      applyingCalendarUndoUpdateRef.current = true;
+      try {
+        setOrders(restoredOrders);
+      } finally {
+        applyingCalendarUndoUpdateRef.current = false;
+      }
+      const saved = await waitForOrders();
+      if (!saved) {
+        if (calendarUndoRef.current === snapshot) {
+          calendarUndoRef.current = null;
+          setCanUndoCalendarAction(false);
+        }
+        throw new Error("撤销操作未获服务器确认，请刷新后核对数据。");
+      }
+      if (calendarUndoRef.current === snapshot) {
+        calendarUndoRef.current = null;
+        setCanUndoCalendarAction(false);
+      }
+    } finally {
+      calendarUndoInProgressRef.current = false;
+      setIsCalendarUndoing(false);
+    }
+  }
+
+  function undoCalendarOrderChange() {
+    const snapshot = calendarUndoRef.current;
+    if (!snapshot || calendarUndoInProgressRef.current) return;
+    const beforeIds = new Set(snapshot.before.map((order) => order.id));
+    const afterIds = new Set(snapshot.after.map((order) => order.id));
+    const removesAddedOrders = getChangedOrderIds(snapshot.before, snapshot.after).some(
+      (id) => !beforeIds.has(id) && afterIds.has(id),
+    );
+    if (removesAddedOrders) {
+      requestDelete(
+        "撤销最近操作将永久删除新增的预约及其关联资料。请确认后继续。",
+        async (password) => {
+          deletePasswordRef.current = password;
+          setDeletePassword(password);
+          await applyCalendarOrderUndo(snapshot);
+        },
+      );
+      return;
+    }
+    void applyCalendarOrderUndo(snapshot).catch((error: unknown) => {
+      console.error("Failed to undo the latest calendar order change.", error);
+      setPersistenceError(error instanceof Error ? error.message : "撤销预约操作失败。");
+    });
   }
 
   function deleteOrder() {
@@ -5244,7 +5484,7 @@ export default function Home() {
                       setMobileCalendarFirstMonth(new Date(year, month - 3, 1));
                       setCalendarTodayRequest((request) => request + 1);
                     } else {
-                      setCalendarCenterDate(selectedDate);
+                      navigateCalendarCenterDate(selectedDate);
                     }
                   }}
                 />
@@ -5263,7 +5503,7 @@ export default function Home() {
                     setMobileCalendarFirstMonth(new Date(today.getFullYear(), today.getMonth() - 2, 1));
                     setCalendarTodayRequest((request) => request + 1);
                   } else {
-                    setCalendarCenterDate(today);
+                    navigateCalendarCenterDate(today);
                   }
                 }}
                 className="calendar-today-button mobile-calendar-quick-today-button rounded border border-blue-300 bg-blue-700 px-3 py-1 text-sm font-semibold text-white hover:bg-blue-600"
@@ -5419,7 +5659,7 @@ export default function Home() {
                         setOrderSourceFilter("");
                         setOrderCompanyFilter("");
                       }
-                      setActiveView(item.id as ActiveView);
+                      changeActiveView(item.id as ActiveView);
                     }}
                     aria-current={activeView === item.id ? "page" : undefined}
                     className={`group flex min-h-11 w-full shrink-0 items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${activeView === item.id ? "bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-[0_6px_16px_rgba(15,23,42,0.16)]" : "text-slate-600 hover:translate-x-0.5 hover:bg-slate-100 hover:text-slate-950"}`}
@@ -6374,9 +6614,9 @@ export default function Home() {
                         </label>
                       ))}
                     </div>
-                    <div className="mt-4">
-                      <div className="mb-2 flex items-center justify-between">
-                        <h4 className="text-sm font-semibold">备品費用明細</h4>
+                    <div className="mt-3">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <h4 className="text-sm font-semibold">支出明細</h4>
                         <button
                           type="button"
                           onClick={() =>
@@ -6388,21 +6628,24 @@ export default function Home() {
                               ],
                             })
                           }
-                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                          className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
                         >
-                          添加备品
+                          添加支出
                         </button>
                       </div>
                       {vehicleMonthlyFinanceForm.supplies.length === 0 ? (
-                        <p className="text-sm text-gray-500">尚未添加备品費用。</p>
+                        <p className="text-xs text-gray-500">尚未添加支出。</p>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="grid gap-x-4 gap-y-1.5 lg:grid-cols-2">
                           {vehicleMonthlyFinanceForm.supplies.map((supply, index) => (
-                            <div key={index} className="flex flex-wrap gap-2">
+                            <div
+                              key={index}
+                              className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:items-center"
+                            >
                               <input
                                 type="text"
-                                aria-label={`备品名称 ${index + 1}`}
-                                placeholder="备品名称"
+                                aria-label={`支出名称 ${index + 1}`}
+                                placeholder="支出名称"
                                 value={supply.description}
                                 onChange={(event) =>
                                   setVehicleMonthlyFinanceForm({
@@ -6415,43 +6658,45 @@ export default function Home() {
                                     ),
                                   })
                                 }
-                                className="min-w-[180px] flex-1 rounded border px-3 py-2 text-sm"
+                                className="h-[42px] min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                               />
-                              <input
-                                type="number"
-                                min="0"
-                                max="99999999999999"
-                                step="1"
-                                aria-label={`备品金額 ${index + 1}`}
-                                placeholder="金額（JPY）"
-                                value={supply.amount}
-                                onChange={(event) =>
-                                  setVehicleMonthlyFinanceForm({
-                                    ...vehicleMonthlyFinanceForm,
-                                    supplies: vehicleMonthlyFinanceForm.supplies.map(
-                                      (item, itemIndex) =>
-                                        itemIndex === index
-                                          ? { ...item, amount: event.target.value }
-                                          : item,
-                                    ),
-                                  })
-                                }
-                                className="w-40 rounded border px-3 py-2 text-sm"
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setVehicleMonthlyFinanceForm({
-                                    ...vehicleMonthlyFinanceForm,
-                                    supplies: vehicleMonthlyFinanceForm.supplies.filter(
-                                      (_, itemIndex) => itemIndex !== index,
-                                    ),
-                                  })
-                                }
-                                className="table-action-button table-action-button--delete"
-                              >
-                                削除
-                              </button>
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="99999999999999"
+                                  step="1"
+                                  aria-label={`支出金額 ${index + 1}`}
+                                  placeholder="金額（JPY）"
+                                  value={supply.amount}
+                                  onChange={(event) =>
+                                    setVehicleMonthlyFinanceForm({
+                                      ...vehicleMonthlyFinanceForm,
+                                      supplies: vehicleMonthlyFinanceForm.supplies.map(
+                                        (item, itemIndex) =>
+                                          itemIndex === index
+                                            ? { ...item, amount: event.target.value }
+                                            : item,
+                                      ),
+                                    })
+                                  }
+                                  className="h-[42px] min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setVehicleMonthlyFinanceForm({
+                                      ...vehicleMonthlyFinanceForm,
+                                      supplies: vehicleMonthlyFinanceForm.supplies.filter(
+                                        (_, itemIndex) => itemIndex !== index,
+                                      ),
+                                    })
+                                  }
+                                  className="table-action-button table-action-button--delete h-[42px] shrink-0 px-2.5 text-xs"
+                                >
+                                  削除
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -6985,7 +7230,7 @@ export default function Home() {
         <div className="calendar-date-controls flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-0.5 shadow-sm">
           <button
             type="button"
-            onClick={() => setCalendarCenterDate((date) => new Date(date.getFullYear(), date.getMonth() - 1, date.getDate()))}
+            onClick={() => navigateCalendarCenterDate((date) => new Date(date.getFullYear(), date.getMonth() - 1, date.getDate()))}
             className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
             aria-label="上一月"
           >
@@ -7052,7 +7297,7 @@ export default function Home() {
                           aria-pressed={selected}
                           autoFocus={selected}
                           onClick={() => {
-                            setCalendarCenterDate(
+                            navigateCalendarCenterDate(
                               (date) =>
                                 new Date(
                                   year,
@@ -7079,7 +7324,7 @@ export default function Home() {
               value={calendarCenterDate.getMonth()}
               onChange={(event) => {
                 const nextMonth = Number(event.target.value);
-                setCalendarCenterDate(
+                navigateCalendarCenterDate(
                   (date) =>
                     new Date(
                       date.getFullYear(),
@@ -7107,7 +7352,7 @@ export default function Home() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() =>
-                    setCalendarCenterDate(
+                    navigateCalendarCenterDate(
                       (date) =>
                         new Date(
                           date.getFullYear(),
@@ -7126,7 +7371,7 @@ export default function Home() {
 
           <button
             type="button"
-            onClick={() => setCalendarCenterDate((date) => new Date(date.getFullYear(), date.getMonth() + 1, date.getDate()))}
+            onClick={() => navigateCalendarCenterDate((date) => new Date(date.getFullYear(), date.getMonth() + 1, date.getDate()))}
             className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
             aria-label="下一月"
           >
@@ -7147,7 +7392,7 @@ export default function Home() {
             } as CSSProperties}
             onChange={(event) => {
               const selectedDay = Number(event.target.value);
-              setCalendarCenterDate(
+              navigateCalendarCenterDate(
                 (date) => new Date(date.getFullYear(), date.getMonth(), selectedDay),
               );
             }}
@@ -7199,10 +7444,20 @@ export default function Home() {
         <button
           type="button"
           aria-label="回到今天"
-          onClick={() => setCalendarCenterDate(new Date())}
+          onClick={() => navigateCalendarCenterDate(new Date())}
           className="calendar-today-button rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
         >
           今天
+        </button>
+        <button
+          type="button"
+          aria-label="返回"
+          title="返回"
+          onClick={undoCalendarOrderChange}
+          disabled={!canUndoCalendarAction || isCalendarUndoing || pendingSaveCount > 0}
+          className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ←
         </button>
       </div>
 
@@ -7461,6 +7716,22 @@ export default function Home() {
                       Math.floor((event.clientX - bounds.left - vehicleColumnWidth) / dayWidth),
                     ),
                   );
+                  if (draggedOrderIdRef.current) {
+                    const startDate = shiftDateKey(
+                      dates[dateIndex].date,
+                      -draggedOrderDayOffsetRef.current,
+                    );
+                    const endDate = shiftDateKey(startDate, draggedOrderDurationRef.current);
+                    setDragOrderPreview((current) =>
+                      current?.vehicleId === vehicleRecord.id &&
+                      current.startDate === startDate &&
+                      current.endDate === endDate
+                        ? current
+                        : { vehicleId: vehicleRecord.id, startDate, endDate },
+                    );
+                  } else {
+                    setDragOrderPreview(null);
+                  }
                   setDragTargetKey(`${vehicleRecord.id}::${dates[dateIndex].date}`);
                 }}
                 onDrop={(event) => {
@@ -7516,7 +7787,11 @@ export default function Home() {
                   }
 
                   if (dragData) {
-                    moveOrderToCell(dragData, vehicleTarget, dates[dateIndex].date);
+                    moveOrderToCell(
+                      dragData,
+                      vehicleTarget,
+                      shiftDateKey(dates[dateIndex].date, -draggedOrderDayOffsetRef.current),
+                    );
                   }
                 }}
                 style={{
@@ -7632,7 +7907,7 @@ export default function Home() {
                       }
                       openNewOrder(vehicleRecord, d.date);
                     }}
-                    className={`border-b border-r p-2 transition-colors ${isVehicleAvailable ? "cursor-pointer" : "cursor-not-allowed bg-gray-50"} ${dragTargetKey === `${vehicleRecord.id}::${d.date}` ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : ""}`}
+                    className={`border-b border-r p-2 transition-colors ${isVehicleAvailable ? "cursor-pointer" : "cursor-not-allowed bg-gray-50"} ${dragOrderPreview?.vehicleId === vehicleRecord.id && d.date >= dragOrderPreview.startDate && d.date <= dragOrderPreview.endDate ? "bg-blue-100/70" : ""} ${dragTargetKey === `${vehicleRecord.id}::${d.date}` ? "ring-2 ring-inset ring-blue-400" : ""}`}
                   />
                 ))}
 
@@ -7716,11 +7991,44 @@ export default function Home() {
                       }}
                       draggable={!isSelectingSplit}
                       onDragStart={(event) => {
+                        if ((event.target as HTMLElement).closest("button")) {
+                          event.preventDefault();
+                          return;
+                        }
                         event.dataTransfer.effectAllowed = "move";
                         event.dataTransfer.setData("text/plain", String(order.id));
+                        const cardBounds = event.currentTarget.getBoundingClientRect();
+                        const dayIndex = cardBounds.width > 0
+                          ? Math.max(
+                            0,
+                            Math.min(
+                              barDates.length - 1,
+                              Math.floor(
+                                ((event.clientX - cardBounds.left) / cardBounds.width) * barDates.length,
+                              ),
+                            ),
+                          )
+                          : 0;
+                        draggedOrderDayOffsetRef.current = Math.round(
+                          (new Date(`${barDates[dayIndex]?.date || order.date}T00:00:00`).getTime() -
+                            new Date(`${order.date}T00:00:00`).getTime()) / 86400000,
+                        );
+                        draggedOrderDurationRef.current = Math.max(
+                          0,
+                          Math.round(
+                            (Date.parse(`${order.endDate || order.date}T00:00:00Z`) -
+                              Date.parse(`${order.date}T00:00:00Z`)) / 86400000,
+                          ),
+                        );
+                        draggedOrderIdRef.current = order.id;
+                        setDragOrderPreview(null);
                         setDraggingOrderId(order.id);
                       }}
                       onDragEnd={() => {
+                        draggedOrderIdRef.current = null;
+                        draggedOrderDayOffsetRef.current = 0;
+                        draggedOrderDurationRef.current = 0;
+                        setDragOrderPreview(null);
                         setDraggingOrderId(null);
                         setDragTargetKey(null);
                       }}
@@ -7768,8 +8076,35 @@ export default function Home() {
                         })}
                       </div>
 
+                      {isCompactCalendar && (
+                        <button
+                          type="button"
+                          aria-label={`复制预约：${order.customer}`}
+                          title="复制预约"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openCopyOrder(order);
+                          }}
+                          className="absolute right-1 top-1 z-30 rounded border border-slate-300 bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-slate-700 hover:bg-white"
+                        >
+                          复制
+                        </button>
+                      )}
+
                       {!isCompactCalendar && (
                         <div className="absolute right-2 top-0 z-20 flex gap-1">
+                        <button
+                          type="button"
+                          aria-label={`复制预约：${order.customer}`}
+                          title="复制预约"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openCopyOrder(order);
+                          }}
+                          className="inline-flex h-[18px] items-center rounded border border-slate-300 bg-white/90 px-2 py-0 text-[10px] font-semibold leading-4 text-slate-700 hover:bg-white"
+                        >
+                          复制
+                        </button>
                         {isSplittable && (
                         <button
                           type="button"
@@ -9542,7 +9877,7 @@ export default function Home() {
                 />
               </label>
 
-              <label className="block text-sm font-medium">
+              {flightTrackingEnabled && <label className="block text-sm font-medium">
                 航班号（可选）
                 <input
                   type="text"
@@ -9556,7 +9891,7 @@ export default function Home() {
                 <span className="mt-1 block text-xs font-normal text-gray-500">
                   系统按配车日作为航班到达日，并根据上车地点识别机场；请注明机场名称或代码（如羽田/HND）。
                 </span>
-              </label>
+              </label>}
 
               {/* 予約所属 */}
               <label className="block text-sm font-medium">

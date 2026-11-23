@@ -6,6 +6,7 @@ import DriverTripNotes from "@/components/driver-trip-notes";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { assignmentIdSchema, createDriverRequestId, japanDate, tripActions, tripNavigationUrl, tripPreviousStates, tripStatusLabels, type DriverTrip, type DriverTripItem, type TripState } from "@/lib/driver/orders";
+import { flightTrackingEnabled } from "@/lib/flight-tracking";
 
 type Identity = { name: string; globalSlogan?: string; personalSlogan?: string };
 type FlightTrackingInfo = {
@@ -134,6 +135,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
   }, [date, assignmentId, orderId, detail, revision]);
 
   useEffect(() => {
+    if (!flightTrackingEnabled) return;
     const assignments = JSON.parse(flightTrackingKey) as {
       assignmentId: string;
       flightNumber: string;
@@ -247,7 +249,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
             <p className="driver-daily-summary">{trip.details?.tripSummary || "行程簡概未填写"}</p>
           </div>
           <p className="driver-muted driver-daily-plate">車両番号：{trip.vehicleNumber || "未填写"}</p>
-          {!("historical" in trip) && trip.details?.flightNumber && <FlightInfo
+          {flightTrackingEnabled && !("historical" in trip) && trip.details?.flightNumber && <FlightInfo
             flightNumber={trip.details.flightNumber}
             state={flightTracking[trip.assignmentId]}
             inDailyOverview
@@ -281,7 +283,7 @@ export default function DriverTrips({ assignmentId, orderId }: { assignmentId?: 
           <div className="driver-row"><span>訂単名称</span><strong>{trip.details.orderName || "未填写"}</strong></div>
           <div><p className="driver-muted">行程簡概</p><p className="whitespace-pre-wrap">{trip.details.tripSummary || "未填写"}</p></div>
         </div>}
-        {detail && !("historical" in trip) && trip.details?.flightNumber && <FlightInfo
+        {flightTrackingEnabled && detail && !("historical" in trip) && trip.details?.flightNumber && <FlightInfo
           flightNumber={trip.details.flightNumber}
           state={flightTracking[trip.assignmentId]}
         />}

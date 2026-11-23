@@ -2,8 +2,13 @@ import { jsonResponse } from "@/lib/api-response";
 import { requireDriver } from "@/lib/driver/authorization";
 import { assignmentIdSchema, projectDriverTripDetail } from "@/lib/driver/orders";
 import { AviationstackError, getAviationstackFlightStatus, inferArrivalAirportFromPickup } from "@/lib/aviationstack";
+import { flightTrackingEnabled } from "@/lib/flight-tracking";
 
 export async function GET(request: Request) {
+  if (!flightTrackingEnabled) {
+    return jsonResponse({ error: "航班查询已停用。" }, { status: 404 });
+  }
+
   try {
     const identity = await requireDriver();
     if (identity.response) return identity.response;

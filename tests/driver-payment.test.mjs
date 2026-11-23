@@ -137,6 +137,26 @@ test("invoice combines all wages, keeps each signed manual item and advances sep
   assert.throws(() => payments.buildDriverPaymentInvoiceHtml(makeInvoice({ ...summary, total: 999 })), /明细与支付总额/);
 });
 
+test("invoice hides zero remuneration and advance lines while preserving manual items", () => {
+  const zeroWageRow = { ...row, overtimeHours: 0, overtimeFee: 0, bonusWage: 0,
+    percentageWage: 0, fixedWage: 0, totalWage: 0 };
+  const advanceOnly = payments.summarizeDriverPayments([{ ...zeroWageRow, driverAdvances: 1000 }], [], month)[0];
+  const advanceHtml = payments.buildDriverPaymentInvoiceHtml(makeInvoice(advanceOnly));
+  assert.doesNotMatch(advanceHtml, /<td>業務委託<\/td>/);
+  assert.match(advanceHtml, /<td>立替金<\/td>/);
+
+  const remunerationOnly = payments.summarizeDriverPayments([{ ...row, driverAdvances: 0 }], [], month)[0];
+  const remunerationHtml = payments.buildDriverPaymentInvoiceHtml(makeInvoice(remunerationOnly));
+  assert.match(remunerationHtml, /<td>業務委託<\/td>/);
+  assert.doesNotMatch(remunerationHtml, /<td>立替金<\/td>/);
+
+  const manualOnly = payments.summarizeDriverPayments([{ ...zeroWageRow, driverAdvances: 0 }],
+    [{ ...manual, amount: 500 }], month)[0];
+  const manualHtml = payments.buildDriverPaymentInvoiceHtml(makeInvoice(manualOnly));
+  assert.doesNotMatch(manualHtml, /<td>業務委託<\/td>|<td>立替金<\/td>/);
+  assert.match(manualHtml, /<td>Adjustment<\/td>/);
+});
+
 test("driver affiliation determines payer and merges order companies without changing shared manual records", () => {
   const payer = { ...company, name: "Affiliated Company" };
   const affiliated = { ...driver, companyName: payer.name };

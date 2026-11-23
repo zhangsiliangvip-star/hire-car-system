@@ -108,11 +108,10 @@ export function buildDriverPaymentInvoiceHtml(invoice: DriverPaymentInvoice) {
   validateInvoiceDates(month, issuedDate);
   const amountText = (amount: number) => amount.toLocaleString("ja-JP");
   const contractAmount = sum([summary.percentage, summary.fixed, summary.overtime, summary.bonus]);
-  const lines: [string, number][] = [
-    ["業務委託", contractAmount],
-    ["立替金", summary.advances],
-    ...summary.manualItems.map(item => [item.name, item.amount] as [string, number]),
-  ];
+  const lines: [string, number][] = [];
+  if (contractAmount !== 0) lines.push(["業務委託", contractAmount]);
+  if (summary.advances !== 0) lines.push(["立替金", summary.advances]);
+  lines.push(...summary.manualItems.map(item => [item.name, item.amount] as [string, number]));
   if (sum(lines.map(([, amount]) => amount)) !== summary.total) {
     throw new Error("請求書明细与支付总额不一致，請核对数据后重新生成。");
   }
