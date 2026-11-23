@@ -94,7 +94,7 @@ test("partial splits assign one persistent lineage to every segment, repeated sp
         changeOrderVehicle: (order, target) => ({ ...order, vehicle: target.name }),
         createId: () => `new-${++ids}`, hasDailyFares: () => false, sumDailyFares: () => 0,
         shiftFinanceDates: value => value, shiftDateKey: (value, offset) => new Date(Date.parse(value) + offset * 86400000).toISOString().slice(0, 10),
-        setSplitSelection() {}, setDraggingOrderId() {}, setDragTargetKey() {} };
+        setSplitSelection() {}, setDraggingOrderId() {}, setDragTargetKey() {}, setDragOrderPreview() {} };
       vm.runInNewContext(ts.transpileModule(handler + `\nmoveSplitRangeToVehicle("${targetId}", {name:"New",plate:"123"}, "${from}", "${to}");`,
         { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
       assert.equal(output.length, count);
@@ -135,7 +135,7 @@ test("partial splits on the same vehicle create separate date segments", () => {
     shiftFinanceDates: (financeByDate, _offset, predicate) =>
       Object.fromEntries(Object.entries(financeByDate).filter(([date]) => !predicate || predicate(date))),
     shiftDateKey: (value, offset) => new Date(Date.parse(`${value}T00:00:00Z`) + offset * 86400000).toISOString().slice(0, 10),
-    setSplitSelection() {}, setDraggingOrderId() {}, setDragTargetKey() {},
+    setSplitSelection() {}, setDraggingOrderId() {}, setDragTargetKey() {}, setDragOrderPreview() {},
   };
   vm.runInNewContext(ts.transpileModule(handler +
     `\nmoveSplitRangeToVehicle("${targetId}", {name:"${original.vehicle}",plate:"123"}, "2026-11-02", "2026-11-02");`,

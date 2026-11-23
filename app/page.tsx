@@ -5040,7 +5040,7 @@ export default function Home() {
     );
     if (removesAddedOrders) {
       requestDelete(
-        "撤销最近操作将永久删除新增的预约及其关联资料。请确认后继续。",
+        "撤销最近操作将永久削除新增的预约及其关联资料。请确认后继续。",
         async (password) => {
           deletePasswordRef.current = password;
           setDeletePassword(password);

@@ -21,6 +21,7 @@ function load(relative, mocks = {}, globals = {}) {
     exports: compiledModule.exports, module: compiledModule,
     require: (name) => Object.hasOwn(mocks, name) ? mocks[name] :
       name === "@/components/driver-trip-notes" ? load("components/driver-trip-notes.tsx", { ...mocks, react: React }) :
+      name === "@/lib/flight-tracking" ? load("lib/flight-tracking.ts", mocks) :
       name === "@/app/driver/navigation" ? load("app/driver/navigation.tsx", mocks) : require(name),
     process, Request, Response, Headers, URL, Intl, Date, crypto: webcrypto,
     console: { error() {} }, ...globals,

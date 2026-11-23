@@ -2295,7 +2295,7 @@ test("mobile calendar shows only the region control and calendar without changin
   assert.match(source, /<header className="dashboard-header [^"]*bg-slate-900 px-4 py-2 text-white sm:px-6 sm:py-2">/);
   const header = source.slice(source.indexOf('<header className="dashboard-header'), source.indexOf("</header>"));
   assert.doesNotMatch(header, />\s*当日\s*</);
-  assert.match(header, /type="date"\s+aria-label="日历快速查询日期"[\s\S]*setCalendarCenterDate\(selectedDate\)/);
+  assert.match(header, /type="date"\s+aria-label="日历快速查询日期"[\s\S]*navigateCalendarCenterDate\(selectedDate\)/);
   assert.match(header, /<\/label>\s*<button[\s\S]*aria-label="定位到今日"[\s\S]*calendarTodayRequestedRef\.current = true;[\s\S]*setCalendarTodayRequest/);
   assert.match(css, /\.mobile-calendar-quick-today-button \{\s*display: none;/);
   assert.match(css, /\.mobile-calendar-view \.mobile-calendar-quick-today-button \{\s*display: inline-flex;/);
@@ -2671,7 +2671,7 @@ test("calendar rows use each vehicle record's own plate shown above the name", (
   assert.ok(source.includes("key={vehicleRecord.id}"));
   const label = source.slice(source.indexOf('const plate = vehicleRecord.plate || "未登记番号"'));
   assert.ok(label.indexOf('copyCalendarVehicleField(plate, "車両番号")') < label.indexOf('copyCalendarVehicleField(vehicle, "車名")'));
-  assert.ok(source.includes("moveOrderToCell(dragData, vehicleTarget, dates[dateIndex].date)"));
+  assert.ok(source.includes("shiftDateKey(dates[dateIndex].date, -draggedOrderDayOffsetRef.current)"));
   assert.ok(source.includes("openNewOrder(vehicleRecord, d.date)"));
 });
 

@@ -162,6 +162,7 @@ function render(id, overrides = {}) {
     invoiceStatusDialog: { kind: "invoice", status: "未完成", scope: "single", month: "2026-11" },
     invoiceStatusDialogOrder: form, isInvoiceStatusDialogSaving: false, invoiceStatusDialogSingleTargets: [form],
     invoiceStatusDialogSourceTargets: [form], invoiceStatusDialogChangedCount: 1,
+    flightTrackingEnabled: true,
     LastOperation: () => null,
     JapaneseEraDateInput,
     VehicleNameSelect: () => React.createElement("label", {}, "車名", React.createElement("input", { defaultValue: "Alphard" })),
