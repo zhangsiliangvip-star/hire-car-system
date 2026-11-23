@@ -54,6 +54,15 @@ test("calendar merge/split and execution badges use the same height and top alig
   const start = page.indexOf("{!isCompactCalendar && (", page.indexOf('className={`calendar-order-card'));
   const actions = page.slice(start, page.indexOf("{isSelectingSplit && selectedStartDate && selectedEndDate && (", start));
   assert.match(actions, /absolute right-2 top-0/);
-  assert.equal((actions.match(/h-\[18px\]/g) || []).length, 3);
+  assert.equal((actions.match(/h-\[18px\]/g) || []).length, 2);
   assert.match(read("components/driver-execution-badge.tsx"), /h-\[18px\].*align-top/);
+});
+
+test("calendar cards do not offer reservation copying in either layout", () => {
+  const page = read("app/page.tsx");
+  const start = page.indexOf('className={`calendar-order-card');
+  const card = page.slice(start, page.indexOf("{isSelectingSplit && selectedStartDate && selectedEndDate && (", start));
+  assert.ok(start >= 0);
+  assert.doesNotMatch(card, /复制预约|openCopyOrder/);
+  assert.doesNotMatch(page, /function openCopyOrder/);
 });
