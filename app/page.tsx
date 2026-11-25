@@ -4586,51 +4586,6 @@ export default function Home() {
     setShowForm(true);
   }
 
-  function openCopyOrder(order: Order) {
-    if (!requireSpecificRegionForNewData()) return;
-    const firstVehicle = getServiceVehicle(order, order.date);
-    const sourceFinanceByDate = getReservationFinance(order);
-    const financeByDate = Object.fromEntries(
-      Object.entries(sourceFinanceByDate).map(([date, finance]) => [
-        date,
-        {
-          ...emptyOrderFinance,
-          driver: finance.driver || order.driver || "",
-          vehicle: finance.vehicle || order.vehicle,
-          vehiclePlate: finance.vehiclePlate || order.vehiclePlate || "",
-          ...(finance.vehicleOverride === undefined
-            ? {}
-            : { vehicleOverride: finance.vehicleOverride }),
-          tripSummary: finance.tripSummary || "",
-        },
-      ]),
-    );
-    setEditingOrderId(null);
-    setForm({
-      ...createEmptyDraft(firstVehicle.vehicle, order.date, firstVehicle.vehiclePlate),
-      regionId: getRegionForNewRecords() ?? undefined,
-      endDate: order.endDate || order.date,
-      offDates: [...order.offDates],
-      time: order.time,
-      customer: order.customer,
-      phone: order.phone,
-      pickup: order.pickup,
-      destination: order.destination,
-      flightNumber: order.flightNumber || "",
-      status: "仮予約",
-      notes: order.notes,
-      driver: order.driver || "",
-      orderSource: order.orderSource,
-      company: order.company,
-      salesRep: order.salesRep,
-      financeByDate,
-    });
-    setOffDateInput("");
-    setCustomCompanyMode(Boolean(order.company) && !companies.includes(order.company));
-    setSplitSelection(null);
-    setShowForm(true);
-  }
-
   function openAccounting(order: Order) {
     const batchOrders = getAccountingBatchOrders(order, allOrders);
     const form: Record<string, OrderFinance> = {};
@@ -8076,35 +8031,8 @@ export default function Home() {
                         })}
                       </div>
 
-                      {isCompactCalendar && (
-                        <button
-                          type="button"
-                          aria-label={`复制预约：${order.customer}`}
-                          title="复制预约"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openCopyOrder(order);
-                          }}
-                          className="absolute right-1 top-1 z-30 rounded border border-slate-300 bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-slate-700 hover:bg-white"
-                        >
-                          复制
-                        </button>
-                      )}
-
                       {!isCompactCalendar && (
                         <div className="absolute right-2 top-0 z-20 flex gap-1">
-                        <button
-                          type="button"
-                          aria-label={`复制预约：${order.customer}`}
-                          title="复制预约"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openCopyOrder(order);
-                          }}
-                          className="inline-flex h-[18px] items-center rounded border border-slate-300 bg-white/90 px-2 py-0 text-[10px] font-semibold leading-4 text-slate-700 hover:bg-white"
-                        >
-                          复制
-                        </button>
                         {isSplittable && (
                         <button
                           type="button"
