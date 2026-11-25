@@ -159,25 +159,20 @@ function historyHarness({ fail = "", delay = false } = {}) {
   return { states, effects, requests, pending, render };
 }
 
-test("daily history shows requested amounts and shortcuts, including missing reports", async () => {
+test("daily history is read-only and shows orders and finance without report rows", async () => {
   const h = historyHarness();
   const initialHtml = renderToStaticMarkup(h.render());
   assert.doesNotMatch(initialHtml, /正在读取履歴/);
   const cleanup = h.effects[0]();
   await new Promise(done => setImmediate(done));
   const html = renderToStaticMarkup(h.render());
-  for (const text of ["订单名称", "History order", "立替", "¥1,500", "燃油费", "¥500",
-    "当日工资", "¥1,000", "当日日报", "已归库 · 查看/修改", "日报未完成"])
+  for (const text of ["订单名称", "History order", "Order without report", "立替", "¥1,500", "燃油费", "¥500",
+    "当日工资", "¥1,000"])
     assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /月工資汇总/);
-  assert.match(html, /class="driver-link driver-report-missing" href="\/driver\/report\?date=2026-10-26"/);
-  assert.ok(html.includes(`/driver/finance?date=2026-10-27&amp;assignmentId=${id}`));
-  assert.ok(html.includes("/driver/finance?date=2026-10-27"));
-  assert.match(html, /class="driver-header-button" href="\/driver\/finance\?date=2026-10-27&amp;assignmentId=[^"]+">修改<\/a>/);
-  assert.match(html, /class="driver-header-button" href="\/driver\/finance\?date=2026-10-27">修改<\/a>/);
+  assert.doesNotMatch(html, /当日日报|日报未完成|>修改</);
+  assert.doesNotMatch(html, /href="\/driver\/(?:finance|report)\?/);
   assert.match(html, /当日工资<\/span><strong>¥1,000<\/strong>/);
-  assert.doesNotMatch(html, /当日工资<\/span><a/);
-  assert.ok(html.includes(`/driver/report?reportId=${id}&amp;month=2026-10`));
   assert.match(html, /aria-current="page"[^>]*>履歴/);
   cleanup();
 });
@@ -185,7 +180,7 @@ test("daily history shows requested amounts and shortcuts, including missing rep
 test("month changes cancel old requests and partial failures preserve available history", async () => {
   const h = historyHarness({ delay: true, fail: "/finance?" });
   const tree = h.render(); const cleanup = h.effects[0]();
-  assert.equal(h.requests.length, 3);
+  assert.equal(h.requests.length, 2);
   const walk = node => !React.isValidElement(node) ? [] :
     [node, ...React.Children.toArray(node.props.children).flatMap(walk)];
   walk(tree).find(node => node.type === "input" && node.props.type === "month").props.onChange({ target: { value: "2026-11" } });
@@ -193,10 +188,10 @@ test("month changes cancel old requests and partial failures preserve available 
   assert.ok(h.requests.every(item => item.signal.aborted));
   h.render(); const stopNext = h.effects[0]();
   assert.ok(h.requests.slice(3).every(item => item.url.includes("month=2026-11")));
-  h.pending.slice(0, 3).forEach(resolve => resolve());
+  h.pending.slice(0, 2).forEach(resolve => resolve());
   await new Promise(done => setImmediate(done));
   assert.equal(h.states[1], null);
-  h.pending.slice(3).forEach(resolve => resolve());
+  h.pending.slice(2).forEach(resolve => resolve());
   await new Promise(done => setImmediate(done));
   assert.equal(h.states[1].month, "2026-11");
   stopNext();
@@ -206,15 +201,8 @@ test("month changes cancel old requests and partial failures preserve available 
   const html = renderToStaticMarkup(partial.render());
   assert.doesNotMatch(html, /财务读取失败/);
   assert.match(html, /History order/);
-  assert.match(html, /日報/);
+  assert.match(html, /履歴/);
   assert.doesNotMatch(html, /月工資汇总/);
   stop();
-
-  const reportFailure = historyHarness({ fail: "/report-history?" });
-  reportFailure.render(); const stopReportFailure = reportFailure.effects[0]();
-  await new Promise(done => setImmediate(done));
-  const failedReportHtml = renderToStaticMarkup(reportFailure.render());
-  assert.doesNotMatch(failedReportHtml, /日报读取失败/);
-  assert.doesNotMatch(failedReportHtml, /日报未完成/);
-  stopReportFailure();
+  assert.ok(h.requests.every(item => !item.url.includes("/report-history")));
 });

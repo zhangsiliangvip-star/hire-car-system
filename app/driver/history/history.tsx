@@ -1,21 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { z } from "zod";
 import DriverNavigation from "@/app/driver/navigation";
 import { driverCalendarSchema, type DriverCalendarEntry } from "@/lib/driver/calendar";
 import { financeDataSchema, type FinanceData } from "@/lib/driver/finance";
 import { japanDate } from "@/lib/driver/orders";
-import { reportHistorySchema } from "@/lib/driver/reports";
 import { createClient } from "@/lib/supabase/browser";
 
-type Report = z.infer<typeof reportHistorySchema>[number];
 type MonthData = {
   month: string;
   orders: DriverCalendarEntry[] | null;
   finance: FinanceData | null;
-  reports: Report[] | null;
   errors: string[];
 };
 
@@ -52,22 +47,16 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
             throw new Error("财务月份不一致，請重新打开页面重试。");
           return parsed;
         }),
-        read(`/api/driver/report-history?month=${encodeURIComponent(month)}`, "日報").then(value => {
-          const parsed = z.object({ reports: reportHistorySchema }).strict().parse(value).reports;
-          if (parsed.some(item => !item.serviceDate.startsWith(`${month}-`))) throw new Error("日報月份不一致，請重新打开页面重试。");
-          return parsed;
-        }),
       ]);
       if (!active || controller.signal.aborted || document.visibilityState !== "visible") return;
       const errors = results.flatMap((result, index) => {
         if (result.status === "fulfilled") return [];
         console.error("Driver history load failed.", result.reason);
-        return [`${["訂単", "财务", "日報"][index]}读取失败，請重新打开页面重试。`];
+        return [`${["訂単", "财务"][index]}读取失败，請重新打开页面重试。`];
       });
       setData({ month,
         orders: results[0].status === "fulfilled" ? results[0].value : null,
         finance: results[1].status === "fulfilled" ? results[1].value : null,
-        reports: results[2].status === "fulfilled" ? results[2].value : null,
         errors,
       });
     }
@@ -92,7 +81,6 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
     ...(loaded.finance?.trips ?? []).filter(item => item.claims.length || item.existingOvertimeHours > 0).map(item => item.date),
     ...(loaded.finance?.fuelClaims ?? []).map(item => item.date),
     ...(loaded.finance?.wages ?? []).map(item => item.date),
-    ...(loaded.reports ?? []).map(item => item.serviceDate),
   ])].sort((a, b) => b.localeCompare(a)) : [];
   return <main className="driver-main">
     <DriverNavigation active="history" />
@@ -100,14 +88,13 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
     <label className="driver-field">查询月份<input type="month" value={month} min="0001-01"
       onChange={event => { if (event.target.value) setMonth(event.target.value); }} /></label>
     {!loaded ? null : <>
-      {!dates.length && !loaded.errors.length && <p className="driver-empty">本月暂无訂単、财务或日報記録。</p>}
+      {!dates.length && !loaded.errors.length && <p className="driver-empty">本月暂无訂単或财务記録。</p>}
       {dates.map(date => {
         const orders = loaded.orders?.filter(item => item.date === date) ?? [];
         const trips = loaded.finance?.trips.filter(item => item.date === date &&
           (item.claims.length || item.existingOvertimeHours > 0)) ?? [];
         const fuel = loaded.finance?.fuelClaims.filter(item => item.date === date) ?? [];
         const wages = loaded.finance?.wages.filter(item => item.date === date) ?? [];
-        const reports = loaded.reports?.filter(item => item.serviceDate === date) ?? [];
         const claims = trips.flatMap(trip => trip.claims
           .filter(claim => claim.category === "company" || claim.category === "trip")
           .map(claim => ({ trip, claim })));
@@ -120,29 +107,14 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
           </div>
           {claims.length ? claims.map(({ trip, claim }) => <div className="driver-row driver-history-row" key={`${trip.assignmentId}-${claim.category}`}>
             <span>立替</span>
-            <div className="driver-history-action">
-              <span>{trip.pickup} → {trip.destination} · {yen(claim.expenses.reduce((sum, item) => sum + item.amount, 0))}
-                {" · "}{statusLabels[claim.status]}</span>
-              <Link className="driver-header-button"
-                href={`/driver/finance?date=${date}&assignmentId=${trip.assignmentId}`}>修改</Link>
-            </div>
+            <strong>{trip.pickup} → {trip.destination} · {yen(claim.expenses.reduce((sum, item) => sum + item.amount, 0))}
+              {" · "}{statusLabels[claim.status]}</strong>
           </div>) : <div className="driver-row driver-history-row"><span>立替</span><strong>{yen(0)}</strong></div>}
           <div className="driver-row driver-history-row"><span>燃油费</span>
-            <div className="driver-history-action">
-              <span>{yen(fuelTotal)}</span>
-              <Link className="driver-header-button" href={`/driver/finance?date=${date}`}>修改</Link>
-            </div>
+            <strong>{yen(fuelTotal)}</strong>
           </div>
           <div className="driver-row driver-history-row"><span>当日工资</span>
             <strong>{wages.length ? yen(dailyWage) : "未核算"}</strong>
-          </div>
-          <div className="driver-row driver-history-row"><span>当日日报</span>
-            {loaded.reports !== null && <div className="driver-history-action">
-              {reports.length ? reports.map(report => <Link className="driver-link" key={report.id}
-                href={`/driver/report?reportId=${report.id}&month=${month}`}>
-                {report.returnedAt ? "已归库 · 查看/修改" : "进行中 · 查看/修改"}
-              </Link>) : <Link className="driver-link driver-report-missing" href={`/driver/report?date=${date}`}>日报未完成</Link>}
-            </div>}
           </div>
         </section>;
       })}
