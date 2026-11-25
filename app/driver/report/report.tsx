@@ -29,8 +29,8 @@ function formatManualTimes(root: ParentNode) {
   root.querySelectorAll<HTMLInputElement>("[data-manual-time]").forEach(formatManualTimeInput);
 }
 
-function LocationRows({ locationKey, serviceDate, disabled, save, fields }: {
-  locationKey: string; serviceDate: string; disabled: boolean;
+function LocationRows({ locationKey, serviceDate, depotAddress, disabled, save, fields }: {
+  locationKey: string; serviceDate: string; depotAddress: string; disabled: boolean;
   fields?: Record<string, string>;
   save: (payload: { useDefault: false; address: string; km: number; departedAt: string; force?: boolean }) => Promise<boolean>;
 }) {
@@ -55,7 +55,7 @@ function LocationRows({ locationKey, serviceDate, disabled, save, fields }: {
     <tr className="driver-sheet-location"><th scope="row" className="driver-location-label"><span>開始<br />地点</span></th><td>
       <form id={formId} onSubmit={submit}>
         <input key={locationKey} name="address" aria-label={`${label}地址`} placeholder={`${label}地址`}
-          disabled={disabled} required maxLength={300} autoComplete="off" defaultValue={fields?.[`${formId}/address`] ?? ""} />
+          disabled={disabled} required maxLength={300} autoComplete="off" defaultValue={fields?.[`${formId}/address`] ?? depotAddress} />
       </form>
     </td><td><input form={formId} name="km" aria-label={`${label}公里数`} placeholder="km" type="number" inputMode="decimal" disabled={disabled}
         min="0" max="9999999" step="0.1" required defaultValue={fields?.[`${formId}/km`] ?? ""} /></td>
@@ -65,15 +65,16 @@ function LocationRows({ locationKey, serviceDate, disabled, save, fields }: {
         onBlur={e => formatManualTimeInput(e.currentTarget)} disabled={disabled} required defaultValue={fields?.[`${formId}/departedAt`] ?? ""} /></td></tr>
   </tbody>;
 }
-function ReturnRow({ report, disabled, saveChanges, fields }: {
+function ReturnRow({ report, depotAddress, disabled, saveChanges, fields }: {
   report: DailyReport; disabled: boolean; saveChanges: () => Promise<void>;
+  depotAddress: string;
   fields?: Record<string, string>;
 }) {
   const formId = "report-edit-return";
   return <tbody aria-label="归库記録"><tr className="driver-sheet-location">
     <th scope="row" className="driver-location-label"><span>終了<br />地点</span></th><td><form id={formId} data-return onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
       <input key={report.returnAddress} name="address" aria-label="終了地点地址" maxLength={300}
-        disabled={disabled} defaultValue={fields?.[`${formId}/address`] ?? report.returnAddress ?? ""} />
+        disabled={disabled} defaultValue={fields?.[`${formId}/address`] ?? (report.returnAddress || depotAddress)} />
     </form></td><td><input key={report.returnKm} form={formId} name="km" aria-label="归库公里表" type="number"
       inputMode="decimal" min="0" max="9999999" step="0.1" disabled={disabled} defaultValue={fields?.[`${formId}/km`] ?? report.returnKm ?? ""} /></td>
     <td><input key={report.returnedAt} form={formId} name="returnedAt" aria-label="归库時間" type="text" inputMode="numeric"
@@ -82,15 +83,16 @@ function ReturnRow({ report, disabled, saveChanges, fields }: {
       defaultValue={fields?.[`${formId}/returnedAt`] ?? toJapanInput(report.returnedAt).slice(11, 16)} /></td><td className="driver-time-cell">—</td>
   </tr></tbody>;
 }
-function DepartureRow({ report, disabled, saveChanges, fields }: {
+function DepartureRow({ report, depotAddress, disabled, saveChanges, fields }: {
   report: DailyReport; disabled: boolean; saveChanges: () => Promise<void>;
+  depotAddress: string;
   fields?: Record<string, string>;
 }) {
   const formId = "report-edit-departure";
   return <tbody aria-label="出库記録"><tr className="driver-sheet-location">
     <th scope="row" className="driver-location-label"><span>開始<br />地点</span></th><td><form id={formId} data-departure onSubmit={e => { e.preventDefault(); void saveChanges(); }}>
       <input key={report.departureAddress} name="address" aria-label="開始地点地址" required maxLength={300}
-        disabled={disabled} defaultValue={fields?.[`${formId}/address`] ?? report.departureAddress} />
+        disabled={disabled} defaultValue={fields?.[`${formId}/address`] ?? (report.departureAddress || depotAddress)} />
     </form></td><td><input key={report.departureKm} form={formId} name="km" aria-label="出库公里表" type="number"
       inputMode="decimal" min="0" max="9999999" step="0.1" required disabled={disabled} defaultValue={fields?.[`${formId}/km`] ?? report.departureKm} /></td>
     <td className="driver-time-cell">—</td><td><input key={report.departedAt} form={formId} name="departedAt"
@@ -286,6 +288,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
   const serviceDate = newDate ?? reportTime(new Date(now).toISOString()).slice(0, 10);
   const currentDefaults = defaults?.serviceDate === serviceDate ? defaults : null;
   const selectedOrder = currentDefaults?.orders.find(order => order.assignmentId === assignment);
+  const garageAddress = data?.depot?.address || "車庫";
   const needsOrder = Boolean(currentDefaults?.orders.length && !selectedOrder);
   const canLoadDefaults = !report && (busy || Boolean(data));
   const draftFields = draft?.reportId === (report?.id ?? null) ? draft.fields : undefined;
@@ -551,8 +554,9 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
     {error && <p className="driver-error" role="alert">{error}</p>}
     {dirty && <p className="driver-muted">输入内容作为本机草稿保留，切换回来可继续填写；請点“保存”正式提交。</p>}
     {busy ? <p className="driver-empty">正在读取日報…</p> : data && <>
-      <form id="report-header" ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
-        aria-label="日報基本信息" onInput={() => setDirty(true)} onSubmit={e => { e.preventDefault(); if (report) void saveChanges(); }}>
+      <section className="driver-card driver-stops driver-report-card" aria-label="日報">
+        <form id="report-header" ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
+          aria-label="日報基本信息" onInput={() => setDirty(true)} onSubmit={e => { e.preventDefault(); if (report) void saveChanges(); }}>
         {!report && !currentDefaults && !defaultsError && <p role="status">正在读取当天訂単和車库…</p>}
         {!report && defaultsError && <p className="driver-error" role="alert">{defaultsError}</p>}
         <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
@@ -594,7 +598,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
             </option>)}
           </select>
         </label>}
-        {!report && selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，請手動填写。</p>}
+        {!report && selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到車庫地址，已暂填「車庫」，請按需修改。</p>}
         <label>車両番号<input key={report ? report.header?.vehicleNumber ?? "" : `${serviceDate}-${assignment}`} name="vehicleNumber" aria-label="車両番号"
           maxLength={100} disabled={saving || (!report && (!currentDefaults || needsOrder))}
           defaultValue={draftFields?.["report-header/vehicleNumber"] ?? report?.header?.vehicleNumber ?? selectedOrder?.vehicleNumber ?? ""} /></label>
@@ -603,21 +607,21 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           defaultValue={draftFields?.["report-header/driverName"] ?? report?.header?.driverName ?? currentDefaults?.driverName ?? ""} /></label>
         <label>客数<input key={report?.header?.passengerCount ?? ""} name="passengerCount" aria-label="客数" type="number"
           inputMode="numeric" min="0" max="999" step="1" disabled={saving} defaultValue={draftFields?.["report-header/passengerCount"] ?? report?.header?.passengerCount ?? ""} /></label>
-      </form>
-      <section className="driver-card driver-stops" aria-label="日報"><h2>日報</h2>
+        <DriverReportDutyRows key={`duty-start-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
+          position="start" header={report?.header}
+          disabled={saving} draft={draftFields} />
+        </form>
         <table ref={table} className="driver-stop-table driver-sheet" onInput={e => {
           if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-header" || e.target.form?.id === "report-checkout" ||
             e.target.form?.dataset.stopId || e.target.form?.hasAttribute("data-departure") || e.target.form?.hasAttribute("data-return"))) setDirty(true);
         }}>
-          <caption>{report ? `${report.serviceDate} · ${report.returnedAt ? "已归库" : "出库中"}` : "新日報"}</caption>
+          <caption className="driver-report-caption">乗務記録</caption>
           <colgroup><col className="driver-col-label" /><col className="driver-col-address" /><col className="driver-col-km" />
             <col className="driver-col-time" /><col className="driver-col-time" /></colgroup>
           <thead><tr><th scope="col">项目</th><th scope="col">地址</th><th scope="col">公里数</th>
             <th scope="col">到着</th><th scope="col">出発</th></tr></thead>
-          <DriverReportDutyRows key={`duty-start-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
-            position="start" header={report?.header}
-            disabled={saving} draft={draftFields} />
-          {!report && <LocationRows key={serviceDate} locationKey={assignment} serviceDate={serviceDate} fields={draftFields}
+          {!report && <LocationRows key={serviceDate} locationKey={assignment} serviceDate={serviceDate}
+            depotAddress={selectedOrder?.depot?.address || "車庫"} fields={draftFields}
             disabled={saving || !currentDefaults || needsOrder} save={async p => {
             if (!currentDefaults || needsOrder) { setError("請先读取当天訂単并選択訂単。"); return false; }
             try {
@@ -633,11 +637,13 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
             }
           }} />}
           {report && <>
-          <DepartureRow key={`departure-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} fields={draftFields} />
+          <DepartureRow key={`departure-${report.id}`} report={report} depotAddress={garageAddress}
+            disabled={saving} saveChanges={saveChanges} fields={draftFields} />
           {report.stops.map((stop, i) => <StopRow key={`${report.id}-${stop.id}`} stop={stop} index={i}
             disabled={saving} saveChanges={saveChanges} removeStop={removeStop}
            allowDelete fields={draftFields} />)}
-          <ReturnRow key={`return-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} fields={draftFields} />
+          <ReturnRow key={`return-${report.id}`} report={report} depotAddress={garageAddress}
+            disabled={saving} saveChanges={saveChanges} fields={draftFields} />
           </>}
           <DriverReportDutyRows key={`duty-end-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
             position="end" header={report?.header}

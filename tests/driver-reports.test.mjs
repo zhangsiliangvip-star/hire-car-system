@@ -588,7 +588,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.match(html, /請選択当天訂単/);
   const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
   assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-    ["日期", "关联当天訂単", "車両番号", "運転手", "客数"]);
+    ["日期", "关联当天訂単", "車両番号", "運転手", "客数", "出勤点呼時間"]);
   assert.doesNotMatch(headerMarkup, /driver-card/);
   select.onChange({ target: { value: id } });
   html = render();
@@ -598,12 +598,13 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.doesNotMatch(orderOptions, /09:00|Airport|Hotel|Linked plate/);
   assert.match(html, /value="Linked plate"/);
   assert.match(html, /value="Linked driver"/);
-  assert.doesNotMatch(html, /value="Owner garage"/);
+  assert.match(html, /aria-label="開始地点地址"[^>]*value="Owner garage"/);
   assert.doesNotMatch(html, /Wrong address|Wrong depot/);
   select.onChange({ target: { value: defaultsFixture.orders[1].assignmentId } });
   html = render();
   assert.match(html, /value="Second plate"/);
-  assert.match(html, /請手動填写/);
+  assert.match(html, /aria-label="開始地点地址"[^>]*value="車庫"/);
+  assert.match(html, /未找到車庫地址，已暂填「車庫」/);
   assert.doesNotMatch(html, /value="Owner garage"/);
   assert.equal(await checkoutProps.save({ useDefault: false, address: "Manual garage", km: 100,
     departedAt: fixture.departedAt }), true);
@@ -1125,14 +1126,16 @@ test("mobile report renders departure, stops, rest controls and completed totals
     for (const label of ["日期", "出勤点呼時間", "退勤点呼時間", "車両番号", "運転手", "客数"]) assert.ok(html.includes(`aria-label="${label}"`));
     const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
     assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-      ["日期", "車両番号", "運転手", "客数"]);
+        ["日期", "車両番号", "運転手", "客数", "出勤点呼時間"]);
     assert.doesNotMatch(html, /出勤点呼日期|退勤点呼日期|dutyStartDate|name="dutyEndDate"/);
     assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('aria-label="退勤点呼時間"'));
-    assert.ok(html.indexOf('<tbody aria-label="出勤点呼">') < html.indexOf('<tbody aria-label="出库記録">'));
+      assert.ok(headerMarkup.indexOf('aria-label="客数"') < headerMarkup.indexOf('aria-label="出勤点呼時間"'));
+      assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('<tbody aria-label="出库記録">'));
     assert.ok(html.indexOf('<tbody aria-label="出库記録">') < html.indexOf('<tbody aria-label="归库記録">'));
     assert.ok(html.indexOf('<tbody aria-label="归库記録">') < html.indexOf('<tbody aria-label="退勤点呼">'));
-    assert.match(html, /<tbody aria-label="出勤点呼">[\s\S]*aria-label="出勤点呼時間"/);
-    assert.match(html, /aria-label="日報"><h2>日報<\/h2>/);
+      assert.doesNotMatch(html, /<tbody aria-label="出勤点呼">|<h2>日報<\/h2>/);
+      assert.match(html, /<section class="driver-card driver-stops driver-report-card" aria-label="日報">/);
+      assert.match(html, /<caption class="driver-report-caption">乗務記録<\/caption>/);
     assert.match(html, /<details[^>]*><summary>历史日報<\/summary>/);
     const historyOptions = html.match(/<summary>历史日報<\/summary>[\s\S]*?<select[^>]*>([\s\S]*?)<\/select>/)?.[1];
     assert.ok(historyOptions);
@@ -1199,6 +1202,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
       assert.match(locationHtml, /aria-label="終了地点地址"/);
       assert.match(locationHtml, /aria-label="归库時間" type="text" inputMode="numeric"/);
       assert.match(locationHtml, /data-return/);
+      if (!r.returnAddress) assert.match(locationHtml, /aria-label="終了地点地址"[^>]*value="車庫"/);
       assert.doesNotMatch(locationHtml, /scope="row">時間|>\d{4}-\d{2}-\d{2}/);
     }
     assert.match(html, /scope="col">地址<\/th><th scope="col">公里数<\/th><th scope="col">到着<\/th><th scope="col">出発/);
@@ -1374,7 +1378,8 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   assert.match(html, /aria-label="日報"[\s\S]*<table[\s\S]*id="report-checkout"/);
   assert.equal((html.match(/<table\b/g) ?? []).length, 1);
   assert.match(html, /form="report-checkout"[^>]*name="km"|name="km"[^>]*form="report-checkout"/);
-  assert.doesNotMatch(html, /Vehicle owner|Owner garage/);
+  assert.doesNotMatch(html, /Vehicle owner/);
+  assert.match(html, /aria-label="開始地点地址"[^>]*value="Owner garage"/);
   assert.ok(html.includes('value="Linked driver"'));
   assert.ok(html.includes('value="Linked plate"'));
   assert.doesNotMatch(html, /Synthetic office|Synthetic default|type="checkbox"/);
