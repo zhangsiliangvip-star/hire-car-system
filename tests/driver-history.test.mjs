@@ -31,8 +31,12 @@ const report = { id, serviceDate: "2026-10-27", version: 1, departedAt: "2026-10
   departureAddress: "Depot", departureKm: 100, returnedAt: "2026-10-27T10:00:00+09:00",
   returnAddress: "Depot", returnKm: 110, stops: [], rests: [] };
 const summary = { id, serviceDate: report.serviceDate, returnedAt: report.returnedAt };
-const calendar = { month: "2026-10", entries: [{ orderId: id, date: report.serviceDate, time: "09:00",
-  orderName: "History order", status: "完了", vehicle: "Car", vehicleNumber: "123", tripSummary: "" }] };
+const calendar = { month: "2026-10", entries: [
+  { orderId: id, date: report.serviceDate, time: "09:00",
+    orderName: "History order", status: "完了", vehicle: "Car", vehicleNumber: "123", tripSummary: "" },
+  { orderId: other, date: "2026-10-26", time: "10:00",
+    orderName: "Order without report", status: "完了", vehicle: "Car", vehicleNumber: "123", tripSummary: "" },
+] };
 const claim = { assignmentId: id, version: 1, category: "company", status: "approved",
   expenses: [{ id: other, type: "company", detail: "Parking", amount: 1500, receipts: [] }],
   overtimeHours: 0, reviewNote: "", submittedAt: "2026-10-27T10:00:00Z" };
@@ -155,18 +159,21 @@ function historyHarness({ fail = "", delay = false } = {}) {
   return { states, effects, requests, pending, render };
 }
 
-test("monthly history shows names, finance and report links with the correct date and target", async () => {
+test("daily history shows requested amounts and shortcuts, including missing reports", async () => {
   const h = historyHarness();
   h.render(); const cleanup = h.effects[0]();
   await new Promise(done => setImmediate(done));
   const html = renderToStaticMarkup(h.render());
-  for (const text of ["History order", "社報立替", "¥1,500", "燃油費", "¥500", "当日工資及立替", "月工資汇总", "日報"])
+  for (const text of ["订单名称", "History order", "立替", "¥1,500", "燃油费", "¥500",
+    "当日工资", "¥1,000", "当日日报", "已归库 · 查看/修改", "日报未完成"])
     assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /月工資汇总/);
+  assert.match(html, /class="driver-link driver-report-missing" href="\/driver\/report\?date=2026-10-26"/);
   assert.ok(html.includes(`/driver/finance?date=2026-10-27&amp;assignmentId=${id}`));
   assert.ok(html.includes("/driver/finance?date=2026-10-27"));
-  assert.ok(html.includes("/driver/finance?month=2026-10&amp;view=wages"));
+  assert.ok(html.includes("/driver/finance?date=2026-10-27&amp;view=wages"));
   assert.ok(html.includes(`/driver/report?reportId=${id}&amp;month=2026-10`));
-  assert.match(html, /aria-current="page"[^>]*>日歴/);
+  assert.match(html, /aria-current="page"[^>]*>履歴/);
   cleanup();
 });
 
@@ -197,4 +204,12 @@ test("month changes cancel old requests and partial failures are visible", async
   assert.match(html, /日報/);
   assert.doesNotMatch(html, /月工資汇总/);
   stop();
+
+  const reportFailure = historyHarness({ fail: "/report-history?" });
+  reportFailure.render(); const stopReportFailure = reportFailure.effects[0]();
+  await new Promise(done => setImmediate(done));
+  const failedReportHtml = renderToStaticMarkup(reportFailure.render());
+  assert.match(failedReportHtml, /日报读取失败/);
+  assert.doesNotMatch(failedReportHtml, /日报未完成/);
+  stopReportFailure();
 });
