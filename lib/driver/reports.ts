@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { reportCloudDraftSchema } from "@/lib/driver/report-draft";
 
 const address = z.string().trim().min(1).max(300);
 const odometer = z.number().min(0).max(9999999).multipleOf(0.1);
@@ -84,6 +85,7 @@ export const reportDataSchema = z.object({
   vehicleLinking: z.boolean().optional(),
   reports: z.array(reportSchema).max(31),
   depot: z.object({ name: z.string(), address }).strict().nullable(),
+  drafts: z.array(reportCloudDraftSchema).max(31).optional(),
 }).strict();
 const location = { useDefault: z.boolean(), address: z.string().trim().max(300), km: odometer };
 const locationSchema = z.object(location).strict().refine(v => v.useDefault || v.address.length > 0);

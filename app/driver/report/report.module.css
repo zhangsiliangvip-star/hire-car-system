@@ -39,7 +39,7 @@
 .report :global(.driver-stop-delete){flex:0 0 30px;width:30px;height:34px;padding:0;border:1px solid #d6b7b7;border-radius:4px;background:#fff;color:#a33;font-size:20px;line-height:1}
 .report :global(.driver-stop-delete):disabled{opacity:.45}
 .report :global(.driver-stop-add){display:flex;justify-content:center;width:100%;margin:8px 0}
-.report :global(.driver-stop-add) :global(.driver-button){box-sizing:border-box;min-width:160px;min-height:44px;margin:0;padding:6px 18px;border-radius:8px;font-size:15px}
+.report :global(.driver-stop-add) :global(.driver-button){box-sizing:border-box;width:44px;min-width:44px;height:44px;min-height:44px;margin:0;padding:0;border-radius:50%;font-size:26px;line-height:1}
 .floatingActions{position:fixed;z-index:40;right:24px;bottom:24px;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:8px;padding:10px;border:1px solid #d5e0d8;border-radius:14px;background:rgba(255,255,255,.97);box-shadow:0 4px 16px rgba(24,52,36,.16);backdrop-filter:blur(8px)}
 .floatingActions :global(.driver-button):only-child{grid-column:1/-1}
 .floatingActions :global(.driver-button){min-height:48px;margin:0;border-radius:12px;font-size:16px;font-weight:650}

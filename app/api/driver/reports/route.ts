@@ -9,12 +9,18 @@ export async function GET(request: Request) {
     const identity = await requireDriver();
     if (identity.response) return identity.response;
     if (new URL(request.url).search) return jsonResponse({ error: "不支持该查询参数。" }, { status: 400 });
-    const { data, error } = await identity.supabase.rpc("driver_reports");
-    if (error) {
-      console.error("Driver reports read rejected.", { code: error.code });
+    const [reports, drafts] = await Promise.all([
+      identity.supabase.rpc("driver_reports"),
+      identity.supabase.rpc("driver_report_drafts"),
+    ]);
+    if (reports.error || drafts.error) {
+      console.error("Driver reports read rejected.", {
+        reportsCode: reports.error?.code, draftsCode: drafts.error?.code,
+      });
       return jsonResponse({ error: "无法读取日報，請重试。" }, { status: 503 });
     }
-    return jsonResponse(reportDataSchema.parse(data));
+    const reportData = reportDataSchema.parse(reports.data);
+    return jsonResponse(reportDataSchema.parse({ ...reportData, drafts: drafts.data }));
   } catch (error) {
     console.error("Driver reports read failed.", error);
     return jsonResponse({ error: "无法读取日報。" }, { status: 500 });

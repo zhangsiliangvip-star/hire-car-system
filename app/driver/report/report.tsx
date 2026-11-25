@@ -6,7 +6,7 @@ import { DriverReportDutyRows } from "@/components/driver-report-duty-rows";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { createDriverRequestId } from "@/lib/driver/orders";
-import { captureReportFields, readReportDraft, writeReportDraft, type ReportDraft } from "@/lib/driver/report-draft";
+import { captureReportFields, readReportDraft, reportCloudDraftSchema, writeReportDraft, type ReportDraft } from "@/lib/driver/report-draft";
 import { defaultDutyEndDate, departureFromForm, durationLabel, formatManualClock, fromJapanInput, reportCommandSchema, reportDataSchema, reportDefaultsSchema, reportTime,
   reportHeaderSchema, reportHeaderShapeSchema, reportOnDate, reportSchema, reportTimeOrderError, reportTotals, returnFromForm, stopFromForm, toJapanInput, type DailyReport } from "@/lib/driver/reports";
 import { z } from "zod";
@@ -29,41 +29,65 @@ function formatManualTimes(root: ParentNode) {
   root.querySelectorAll<HTMLInputElement>("[data-manual-time]").forEach(formatManualTimeInput);
 }
 
-function LocationRows({ locationKey, serviceDate, depotAddress, disabled, save, fields }: {
-  locationKey: string; serviceDate: string; depotAddress: string; disabled: boolean;
+function LocationRows({ locationKey, disabled, fields }: {
+  locationKey: string; disabled: boolean;
   fields?: Record<string, string>;
-  save: (payload: { useDefault: false; address: string; km: number; departedAt: string; force?: boolean }) => Promise<boolean>;
 }) {
   const label = "開始地点";
   const formId = "report-checkout";
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    formatManualTimes(form);
-    const data = new FormData(form);
-    const departedAt = fromJapanInput(`${serviceDate}T${String(data.get("departedAt") ?? "")}`);
-    if (!departedAt) {
-      form.reportValidity();
-      return;
-    }
-    if (await save({
-      useDefault: false, address: String(data.get("address") ?? ""),
-      km: Number(data.get("km")), departedAt, force: true,
-    })) form.reset();
-  }
   return <tbody aria-label={label}>
     <tr className="driver-sheet-location"><th scope="row" className="driver-location-label"><span>開始<br />地点</span></th><td>
-      <form id={formId} onSubmit={submit}>
-        <input key={locationKey} name="address" aria-label={`${label}地址`} placeholder={`${label}地址`}
-          disabled={disabled} required maxLength={300} autoComplete="off" defaultValue={fields?.[`${formId}/address`] ?? depotAddress} />
+      <form id={formId} onSubmit={event => event.preventDefault()}>
+        <input key={locationKey} name="address" aria-label={`${label}地址`}
+          disabled={disabled} maxLength={300} autoComplete="off" defaultValue={fields?.[`${formId}/address`] ?? "車庫"} />
       </form>
     </td><td><input form={formId} name="km" aria-label={`${label}公里数`} placeholder="km" type="number" inputMode="decimal" disabled={disabled}
-        min="0" max="9999999" step="0.1" required defaultValue={fields?.[`${formId}/km`] ?? ""} /></td>
+        min="0" max="9999999" step="0.1" defaultValue={fields?.[`${formId}/km`] ?? ""} /></td>
       <td className="driver-time-cell">—</td>
       <td><input form={formId} name="departedAt" aria-label="開始地点出発時間" type="text" inputMode="numeric"
         data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" maxLength={5} placeholder="0900"
-        onBlur={e => formatManualTimeInput(e.currentTarget)} disabled={disabled} required defaultValue={fields?.[`${formId}/departedAt`] ?? ""} /></td></tr>
+        onBlur={e => formatManualTimeInput(e.currentTarget)} disabled={disabled} defaultValue={fields?.[`${formId}/departedAt`] ?? ""} /></td></tr>
   </tbody>;
+}
+function NewReturnRow({ disabled, fields }: { disabled: boolean; fields?: Record<string, string> }) {
+  const formId = "report-edit-return";
+  return <tbody aria-label="归库記録"><tr className="driver-sheet-location">
+    <th scope="row" className="driver-location-label"><span>終了<br />地点</span></th><td><form id={formId} data-return onSubmit={event => event.preventDefault()}>
+      <input name="address" aria-label="終了地点地址" maxLength={300} disabled={disabled}
+        defaultValue={fields?.[`${formId}/address`] ?? "車庫"} />
+    </form></td><td><input form={formId} name="km" aria-label="归库公里表" type="number"
+      inputMode="decimal" min="0" max="9999999" step="0.1" disabled={disabled}
+      defaultValue={fields?.[`${formId}/km`] ?? ""} /></td>
+    <td><input form={formId} name="returnedAt" aria-label="归库時間" type="text" inputMode="numeric"
+      data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" maxLength={5} placeholder="0900"
+      onBlur={e => formatManualTimeInput(e.currentTarget)} disabled={disabled}
+      defaultValue={fields?.[`${formId}/returnedAt`] ?? ""} /></td><td className="driver-time-cell">—</td>
+  </tr></tbody>;
+}
+function DraftStopRow({ stopId, index, disabled, fields, remove }: {
+  stopId: string; index: number; disabled: boolean; fields?: Record<string, string>;
+  remove: (stopId: string) => Promise<void>;
+}) {
+  const formId = `report-stop-${stopId}`;
+  return <tbody aria-label={`经由地 ${index + 1}`}><tr className="driver-sheet-location">
+    <th scope="row">经由{index + 1}</th><td><div className="driver-stop-address">
+      <form id={formId} data-stop-id={stopId}>
+        <input name="address" aria-label={`经由地 ${index + 1} 地址`} maxLength={300} disabled={disabled}
+          defaultValue={fields?.[`${formId}/address`] ?? ""} />
+      </form>
+      <button type="button" className="driver-stop-delete" aria-label={`削除经由地 ${index + 1}`}
+        disabled={disabled} onClick={() => void remove(stopId)}>×</button>
+    </div></td>
+    <td><input form={formId} name="km" aria-label={`经由地 ${index + 1} 公里数`} type="number" inputMode="decimal"
+      min="0" max="9999999" step="0.1" placeholder="km" disabled={disabled}
+      defaultValue={fields?.[`${formId}/km`] ?? ""} /></td>
+    {(["arrivedAt", "departedAt"] as const).map(name => <td key={name}>
+      <input form={formId} name={name} aria-label={`经由地 ${index + 1} ${name === "arrivedAt" ? "到着" : "出発"}時間`}
+        type="text" inputMode="numeric" data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]" maxLength={5}
+        placeholder="0900" onBlur={e => formatManualTimeInput(e.currentTarget)} disabled={disabled}
+        defaultValue={fields?.[`${formId}/${name}`] ?? ""} />
+    </td>)}
+  </tr></tbody>;
 }
 function ReturnRow({ report, depotAddress, disabled, saveChanges, fields }: {
   report: DailyReport; disabled: boolean; saveChanges: () => Promise<void>;
@@ -98,17 +122,17 @@ function DepartureRow({ report, depotAddress, disabled, saveChanges, fields }: {
     <td className="driver-time-cell">—</td><td><input key={report.departedAt} form={formId} name="departedAt"
       aria-label="出库時間" type="text" inputMode="numeric" data-manual-time pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]"
       maxLength={5} placeholder="0900" onBlur={e => formatManualTimeInput(e.currentTarget)}
-      required disabled={disabled} defaultValue={fields?.[`${formId}/departedAt`] ?? toJapanInput(report.departedAt).slice(11, 16)} /></td>
+      disabled={disabled} defaultValue={fields?.[`${formId}/departedAt`] ?? toJapanInput(report.departedAt).slice(11, 16)} /></td>
   </tr></tbody>;
 }
 function AddStopForm({ disabled, save }: {
   disabled: boolean; save: Save;
 }) {
-  return <div className="driver-stop-add">
+  return <tbody aria-label="添加经由地"><tr><td colSpan={5}><div className="driver-stop-add">
     <button type="button" className="driver-button" aria-label="追加空白经由地" disabled={disabled} onClick={async () => {
       await save("add_stop", { address: "", arrivedAt: null, departedAt: null });
-    }}>＋ 追加经由地</button>
-  </div>;
+    }}>＋</button>
+  </div></td></tr></tbody>;
 }
 function StopRow({ stop, index, disabled, saveChanges, removeStop, allowDelete, fields }: {
   stop: DailyReport["stops"][number]; index: number; disabled: boolean;
@@ -170,8 +194,11 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
   const [assignment, setAssignment] = useState("");
   const [defaultsError, setDefaultsError] = useState("");
   const [draft, setDraft] = useState<ReportDraft | null>(null);
+  const [draftStopIds, setDraftStopIds] = useState<string[]>([]);
+  const [savingDraft, setSavingDraft] = useState(false);
   const table = useRef<HTMLTableElement>(null);
   const headerForm = useRef<HTMLFormElement>(null);
+  const lastSavedReport = useRef<DailyReport | null>(null);
   const lock = useRef(false);
   const pending = useRef<{ key: string; requestId: string } | null>(null);
   const dirtyRef = useRef(dirty);
@@ -221,17 +248,35 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
             if (saved) result.reports.push(saved);
           }
           if (!active || controller.signal.aborted || document.visibilityState !== "visible") return;
+          let restoredFromCloud = false;
           if (stored && (stored.reportId ? saved?.version !== stored.version : result.reports.some(item => !item.returnedAt))) {
             setError("服务器日報已有更新，未自动套用本机草稿。請核对最新内容后继续填写。");
           } else restored = stored;
+          if (!restored) {
+            const today = reportTime(new Date().toISOString()).slice(0, 10);
+            const targetReport = initialReportId
+              ? result.reports.find(item => item.id === initialReportId)
+              : initialDate
+                ? result.reports.find(item => item.serviceDate === initialDate && !item.returnedAt)
+                : result.reports.find(item => !item.returnedAt);
+            const cloudDraft = result.drafts?.find(item => targetReport
+              ? item.reportId === targetReport.id && item.version === targetReport.version
+              : item.reportId === null && item.serviceDate === (initialDate ?? today));
+            if (cloudDraft) {
+              restored = { ...cloudDraft, starting: cloudDraft.reportId === null };
+              restoredFromCloud = true;
+            }
+          }
           setDraft(restored);
+          setDraftStopIds(restored?.stopIds ?? []);
           defaultsDraft.current = restored?.reportId === null ? restored : null;
           if (restored) {
             setSelected(restored.reportId); setStarting(restored.starting);
             setNewDate(restored.serviceDate); setAssignment(restored.assignment);
             setNotice(initialReportId && restored.reportId !== initialReportId
               ? "已恢复另一份本机草稿，請先保存或放弃修改，再選択历史日報。"
-              : "已恢复本机草稿，請继续填写并点“保存”提交。");
+              : restoredFromCloud ? "已恢复线上未完成日报，可在其他设备继续填写。"
+                : "已恢复本机草稿，請继续填写并点“保存”提交。");
           } else if (initialDate && !initialReportId) {
             const dateReport = result.reports.find(item => item.serviceDate === initialDate);
             const unfinished = result.reports.find(item => !item.returnedAt);
@@ -271,7 +316,13 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
     window.addEventListener("beforeunload", beforeUnload);
     const { data: subscription } = createClient("driver").auth.onAuthStateChange(event => {
       if (event === "SIGNED_OUT") {
-        discardDraft(); draftOwner.current = null; setDirty(false); setData(null); location.replace("/driver/login");
+        try {
+          if (draftOwner.current) writeReportDraft(sessionStorage, draftOwner.current, null);
+          setDraft(null); setDraftStopIds([]);
+        } catch (cause) {
+          console.error("Driver report draft removal failed during sign-out.", cause);
+        }
+        draftOwner.current = null; setDirty(false); setData(null); location.replace("/driver/login");
       }
     });
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -288,14 +339,23 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
   const serviceDate = newDate ?? reportTime(new Date(now).toISOString()).slice(0, 10);
   const currentDefaults = defaults?.serviceDate === serviceDate ? defaults : null;
   const selectedOrder = currentDefaults?.orders.find(order => order.assignmentId === assignment);
-  const garageAddress = data?.depot?.address || "車庫";
+  const garageAddress = "車庫";
   const needsOrder = Boolean(currentDefaults?.orders.length && !selectedOrder);
   const canLoadDefaults = !report && (busy || Boolean(data));
   const draftFields = draft?.reportId === (report?.id ?? null) ? draft.fields : undefined;
-  function discardDraft() {
+  async function discardDraft(removeCloud = true) {
     try {
+      if (removeCloud && draft && data?.drafts?.some(item => item.serviceDate === draft.serviceDate)) {
+        const response = await fetch(`/api/driver/report-drafts?date=${encodeURIComponent(draft.serviceDate)}`,
+          { method: "DELETE" });
+        if (response.status === 401) { location.replace("/driver/login"); throw new Error("登录状态已失效，請重新登录。"); }
+        if (!response.ok) throw new Error("无法删除线上草稿，請重试。");
+        setData(current => current ? { ...current, drafts: (current.drafts ?? [])
+          .filter(item => item.serviceDate !== draft.serviceDate) } : current);
+      }
       if (draftOwner.current) writeReportDraft(sessionStorage, draftOwner.current, null);
       setDraft(null);
+      setDraftStopIds([]);
       defaultsDraft.current = null;
       return true;
     } catch (cause) {
@@ -308,15 +368,37 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
     return {
       reportId: report?.id ?? null, version: report?.version ?? 0,
       serviceDate: validDate(serviceDate) ? serviceDate : reportTime(new Date().toISOString()).slice(0, 10),
-      starting: !report, assignment,
+      starting: !report, assignment, stopIds: draftStopIds,
       fields: captureReportFields(headerForm.current, table.current),
     };
+  }
+  async function persistCloudDraft(value: ReportDraft) {
+    const candidate = reportCloudDraftSchema.parse({
+      reportId: value.reportId, version: value.version, serviceDate: value.serviceDate,
+      assignment: value.assignment, fields: value.fields, stopIds: value.stopIds ?? [],
+    });
+    const response = await fetch("/api/driver/report-drafts", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(candidate),
+    });
+    const result = await response.json();
+    if (response.status === 401) { location.replace("/driver/login"); throw new Error("登录状态已失效，請重新登录。"); }
+    if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "线上草稿保存失败，請重试。");
+    const saved = reportCloudDraftSchema.parse(result.draft);
+    setData(current => current ? { ...current, drafts: [saved,
+      ...(current.drafts ?? []).filter(item => item.serviceDate !== saved.serviceDate)] } : current);
+    return saved;
+  }
+  function persistLocalDraft(value: ReportDraft) {
+    if (!draftOwner.current) throw new Error("Draft account is unavailable.");
+    writeReportDraft(sessionStorage, draftOwner.current, value);
   }
   function persistDraft() {
     if (!dirtyRef.current || !data || busy || !headerForm.current || !table.current) return true;
     try {
       if (!draftOwner.current) throw new Error("Draft account is unavailable.");
-      writeReportDraft(sessionStorage, draftOwner.current, captureDraft());
+      const currentDraft = captureDraft();
+      writeReportDraft(sessionStorage, draftOwner.current, currentDraft);
+      setDraft(currentDraft);
       return true;
     } catch (cause) {
       console.error("Driver report draft save failed.", cause);
@@ -324,17 +406,17 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
       return false;
     }
   }
-  persistRef.current = persistDraft;
   function queueDraft() { queueMicrotask(() => persistRef.current()); }
-  function startNewReport() {
+  async function startNewReport() {
     if (open || saving) return;
     if (dirty && !window.confirm("开始新日報会放弃尚未保存的修改，是否继续？")) return;
-    if (!discardDraft()) return;
+    if (!await discardDraft()) return;
     const today = reportTime(new Date().toISOString()).slice(0, 10);
     setDirty(false); setSelected(null); setStarting(true); setNewDate(today);
     if (serviceDate !== today) setDefaults(null);
     if (serviceDate !== today || report) setDefaultsError("");
     setAssignment(serviceDate === today && currentDefaults?.orders.length === 1 ? currentDefaults.orders[0].assignmentId : "");
+    setDraftStopIds([]);
     setError(""); setNotice("");
   }
   useEffect(() => {
@@ -399,6 +481,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
     void loadDefaults();
     return () => { active = false; controller.abort(); };
   }, [canLoadDefaults, serviceDate, revision]);
+  useEffect(() => { persistRef.current = persistDraft; });
   function readHeader(force = false) {
     if (!headerForm.current || (!force && !headerForm.current.reportValidity())) throw new Error("請检查日期、点呼時間、車両番号、運転手和客数。");
     const fields = new FormData(headerForm.current);
@@ -450,7 +533,10 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
       }
       pending.current = null;
       const updated = reportSchema.parse(result.report);
-      if (action === "add_stop" || action === "remove_stop") {
+      lastSavedReport.current = updated;
+      if (action === "checkout") {
+        setDirty(false);
+      } else if (action === "add_stop" || action === "remove_stop") {
         if (dirtyRef.current) {
           const retained = { ...captureDraft(), reportId: updated.id, version: updated.version };
           if (action === "remove_stop" && typeof payload === "object" && payload && "stopId" in payload) {
@@ -467,7 +553,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           }
         }
       } else {
-        setDirty(false); discardDraft();
+        setDirty(false); void discardDraft(false);
       }
       setSelected(updated.id);
       setStarting(false);
@@ -486,13 +572,119 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
       return false;
     } finally { lock.current = false; setSaving(false); }
   }
+  async function syncCloudDraftForReport(updated: DailyReport, preservePendingStops = false) {
+    if (updated.returnedAt) {
+      setDraft(null);
+      setDraftStopIds([]);
+      return;
+    }
+    if (!headerForm.current || !table.current) {
+      setError("日报表格不可用，請刷新后重试。");
+      return;
+    }
+    const headerFields = new FormData(headerForm.current);
+    const stopIds = preservePendingStops
+      ? draftStopIds.filter(id => !updated.stops.some(stop => stop.id === id)) : [];
+    const value: ReportDraft = {
+      reportId: updated.id, version: updated.version, serviceDate: updated.serviceDate,
+      starting: false, assignment: String(headerFields.get("assignmentId") ?? ""),
+      fields: captureReportFields(headerForm.current, table.current), stopIds,
+    };
+    setDraft(value);
+    setDraftStopIds(stopIds);
+    try {
+      await persistCloudDraft(value);
+      persistLocalDraft(value);
+    } catch (cause) {
+      console.error("Driver report cloud draft synchronization failed.", cause);
+      setError("日报已保存，但未完成内容未能同步到线上；請再次保存。");
+    }
+  }
+  async function saveNewReport() {
+    if (!headerForm.current || !table.current || !data || saving || savingDraft) return;
+    setSavingDraft(true);
+    try {
+      formatManualTimes(table.current);
+      const localDraft = captureDraft();
+      await persistCloudDraft(localDraft);
+      setDraft(localDraft);
+      setDirty(false);
+      try { persistLocalDraft(localDraft); }
+      catch (cause) {
+        console.error("Driver report local draft save failed.", cause);
+        setNotice("线上草稿已保存；本机草稿同步失败。");
+      }
+
+      const departureForm = table.current.querySelector<HTMLFormElement>("#report-checkout");
+      if (!departureForm) throw new Error("开始地点表格不可用，請刷新重试。");
+      const fields = new FormData(departureForm);
+      const address = String(fields.get("address") ?? "").trim();
+      const kmText = String(fields.get("km") ?? "").trim();
+      const km = kmText ? Number(kmText) : null;
+      const clock = formatManualClock(String(fields.get("departedAt") ?? ""));
+      const departedAt = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(clock)
+        ? fromJapanInput(`${localDraft.serviceDate}T${clock}`) : null;
+      if (!address || km === null || !Number.isFinite(km) || km < 0 || km > 9999999 ||
+        Math.round(km * 10) !== km * 10 || !departedAt) {
+        setNotice("未完成日报已保存到线上，可稍后继续填写。");
+        return;
+      }
+      if (!currentDefaults || needsOrder) {
+        setNotice("日报草稿已保存到线上；選択当天订单后可继续保存。");
+        return;
+      }
+
+      const header = readHeader(true);
+      const saved = await save("checkout", {
+        useDefault: false, address, km, departedAt, header, force: true,
+      });
+      if (!saved) return;
+      const created = lastSavedReport.current;
+      if (!created) throw new Error("日报已提交，但未能确认保存结果；請刷新核对。");
+      const linkedFields = { ...localDraft.fields };
+      for (const [key, value] of Object.entries(linkedFields)) {
+        if (key.startsWith("report-checkout/")) {
+          linkedFields[`report-edit-departure/${key.slice("report-checkout/".length)}`] = value;
+          delete linkedFields[key];
+        }
+      }
+      const linkedDraft: ReportDraft = { ...localDraft, reportId: created.id, version: created.version,
+        starting: false, fields: linkedFields };
+      setDraft(linkedDraft);
+      setDraftStopIds(linkedDraft.stopIds ?? []);
+      try { persistLocalDraft(linkedDraft); }
+      catch (cause) {
+        console.error("Driver report local draft link failed.", cause);
+        setError("日报已保存到线上，但本机草稿同步失败。");
+      }
+      try { await persistCloudDraft(linkedDraft); }
+      catch (cause) {
+        console.error("Driver report cloud draft link failed.", cause);
+        setError("日报已保存，但未完成内容无法同步到线上；請勿离开页面并立即重试保存。");
+      }
+    } catch (cause) {
+      console.error("Driver report draft save failed.", cause);
+      setError(cause instanceof Error ? cause.message : "日报草稿保存失败。");
+    } finally { setSavingDraft(false); }
+  }
+  const addDraftStop: Save = async action => {
+    if (action !== "add_stop" || draftStopIds.length >= 100) return false;
+    setDraftStopIds(current => [...current, createDriverRequestId()]);
+    setDirty(true);
+    return true;
+  };
+  async function removeDraftStop(stopId: string) {
+    setDraftStopIds(current => current.filter(id => id !== stopId));
+    setDirty(true);
+  }
   const totals = report ? reportTotals(report, now) : null;
   async function removeStop(stopId: string) {
     if (!report || !table.current || lock.current) return;
     try {
       const stop = report.stops.find(item => item.id === stopId);
       if (!stop) throw new Error("经由地不存在，請刷新后核对。");
-      await save("remove_stop", { stopId: stop.id });
+      if (await save("remove_stop", { stopId: stop.id }) && lastSavedReport.current)
+        await syncCloudDraftForReport(lastSavedReport.current, true);
     } catch (cause) {
       console.error("Driver report stop removal failed.", cause);
       setError(cause instanceof Error ? cause.message : "无法削除经由地。");
@@ -508,7 +700,10 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
       const dated = reportOnDate(report, header.serviceDate);
       const departure = departureFromForm(dated, new FormData(departureForm), force);
       let previous = departure.departedAt;
-      const stops = dated.stops.map(stop => {
+      const pendingStops = draftStopIds.filter(id => !dated.stops.some(stop => stop.id === id)).map(id => ({
+        id, address: "", arrivedAt: null, arrivedKm: null, departedAt: null, departedKm: null, plannedKm: null,
+      }));
+      const stops = [...dated.stops, ...pendingStops].map(stop => {
         const form = table.current?.querySelector<HTMLFormElement>(`form[data-stop-id="${stop.id}"]`);
         if (!form) throw new Error("表格内容不完整，請刷新后核对。");
         if (!force && !form.reportValidity()) throw new Error("請检查表格中的地点、公里数和日期時間。");
@@ -524,15 +719,20 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
         header, departedAt: departure.departedAt, returnedAt: returned?.returnedAt ?? dated.returnedAt,
       });
       if (timeError && !force) throw new Error(timeError);
-      await save("edit_stops", { stops, departure, header, ...(returned ? { return: returned } : {}),
+      const saved = await save("edit_stops", { stops, departure, header, ...(returned ? { return: returned } : {}),
         ...(force ? { force: true } : {}) });
+      if (saved && lastSavedReport.current) await syncCloudDraftForReport(lastSavedReport.current);
     } catch (cause) {
       console.error("Report table validation failed.", cause);
       setError(cause instanceof Error ? cause.message : "表格内容无效，請检查日期時間。");
     }
   }
-  const addStop = report ? <AddStopForm key={report.id}
-    disabled={saving || report.stops.length >= 100} save={save} /> : null;
+  const saveStopAction: Save = async (action, payload) => {
+    const saved = await save(action, payload);
+    if (saved && (action === "add_stop" || action === "remove_stop") && lastSavedReport.current)
+      await syncCloudDraftForReport(lastSavedReport.current, true);
+    return saved;
+  };
   return <main className={`driver-main ${styles.report}`} onInput={queueDraft} onChange={queueDraft} onBlur={queueDraft}>
     <DriverNavigation active="report" busy={saving}
       canLeave={persistDraft} />
@@ -541,15 +741,17 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
     <div className="driver-toolbar">
       <button className="driver-link" disabled={saving} onClick={() => {
         if (dirty && !window.confirm("刷新会放弃尚未保存的修改，是否继续？")) return;
-        if (!discardDraft()) return;
-        setDirty(false);
-        setData(null); setDefaults(null); setAssignment(""); setDefaultsError(""); setBusy(true); setError(""); setRevision(v => v + 1);
+        void (async () => {
+          if (!await discardDraft()) return;
+          setDirty(false);
+          setData(null); setDefaults(null); setAssignment(""); setDefaultsError(""); setBusy(true); setError(""); setRevision(v => v + 1);
+        })();
       }}>刷新日報</button>
       <button className="driver-link" disabled={saving || busy || !data || Boolean(open)}
         title={busy || !data ? "日报加载完成后可新建" : open ? "请先完成当前出库中的日报" : undefined}
         aria-label={busy || !data ? "新建日报（日报加载完成后可新建）" :
           open ? "新建日报（请先完成当前出库中的日报）" : "新建日报"}
-        onClick={startNewReport}>＋ 新建日报</button>
+        onClick={() => { void startNewReport(); }}>＋ 新建日报</button>
     </div>
     {error && <p className="driver-error" role="alert">{error}</p>}
     {dirty && <p className="driver-muted">输入内容作为本机草稿保留，切换回来可继续填写；請点“保存”正式提交。</p>}
@@ -560,7 +762,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
         {!report && !currentDefaults && !defaultsError && <p role="status">正在读取当天訂単和車库…</p>}
         {!report && defaultsError && <p className="driver-error" role="alert">{defaultsError}</p>}
         <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
-          disabled={saving} defaultValue={draftFields?.["report-header/serviceDate"] ?? report?.serviceDate ?? serviceDate} onChange={e => {
+          disabled={saving || savingDraft} defaultValue={draftFields?.["report-header/serviceDate"] ?? report?.serviceDate ?? serviceDate} onChange={e => {
             if (!report) { setDraft(null); defaultsDraft.current = null; setNewDate(e.target.value); setDefaults(null); setAssignment(""); setDefaultsError(""); }
             else {
               const link = headerForm.current?.elements.namedItem("assignmentId");
@@ -568,7 +770,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
             }
           }} /></label>
         {report && data.vehicleLinking && <label className="driver-report-order-link">关联当天订单
-          <select name="assignmentId" aria-label="日報关联訂単" disabled={saving}
+          <select name="assignmentId" aria-label="日報关联訂単" disabled={saving || savingDraft}
             defaultValue={draftFields?.["report-header/assignmentId"] ?? report.header?.assignmentId ?? ""} onChange={event => {
               const option = report.orderOptions?.find(item => item.assignmentId === event.target.value);
               const plate = headerForm.current?.elements.namedItem("vehicleNumber");
@@ -588,7 +790,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           <input name="vehicleBaseline" type="hidden" defaultValue={draftFields?.["report-header/vehicleBaseline"] ?? report.header?.vehicleNumber ?? ""} />
         </label>}
         {!report && currentDefaults && <label className="driver-report-order-link">关联当天订单
-          <select aria-label="关联当天訂単" value={assignment} disabled={saving || !currentDefaults.orders.length} onChange={e => {
+          <select aria-label="关联当天訂単" value={assignment} disabled={saving || savingDraft || !currentDefaults.orders.length} onChange={e => {
             if (dirty && !window.confirm("更换訂単会重新带入車両番号及車库地址，是否继续？")) return;
             setDraft(null); defaultsDraft.current = null; setAssignment(e.target.value); setDirty(true);
           }}>
@@ -599,20 +801,20 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           </select>
         </label>}
         {!report && selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到車庫地址，已暂填「車庫」，請按需修改。</p>}
-        <label>車両番号<input key={report ? report.header?.vehicleNumber ?? "" : `${serviceDate}-${assignment}`} name="vehicleNumber" aria-label="車両番号"
-          maxLength={100} disabled={saving || (!report && (!currentDefaults || needsOrder))}
+        <label>車両番号        <input key={report ? report.header?.vehicleNumber ?? "" : `${serviceDate}-${assignment}`} name="vehicleNumber" aria-label="車両番号"
+        maxLength={100} disabled={saving || savingDraft}
           defaultValue={draftFields?.["report-header/vehicleNumber"] ?? report?.header?.vehicleNumber ?? selectedOrder?.vehicleNumber ?? ""} /></label>
         <label>運転手<input key={report ? report.header?.driverName ?? "" : `${serviceDate}-${currentDefaults?.driverName ?? ""}`} name="driverName" aria-label="運転手"
-          maxLength={100} disabled={saving || (!report && !currentDefaults)}
+          maxLength={100} disabled={saving || savingDraft}
           defaultValue={draftFields?.["report-header/driverName"] ?? report?.header?.driverName ?? currentDefaults?.driverName ?? ""} /></label>
         <label>客数<input key={report?.header?.passengerCount ?? ""} name="passengerCount" aria-label="客数" type="number"
-          inputMode="numeric" min="0" max="999" step="1" disabled={saving} defaultValue={draftFields?.["report-header/passengerCount"] ?? report?.header?.passengerCount ?? ""} /></label>
+          inputMode="numeric" min="0" max="999" step="1" disabled={saving || savingDraft} defaultValue={draftFields?.["report-header/passengerCount"] ?? report?.header?.passengerCount ?? ""} /></label>
         <DriverReportDutyRows key={`duty-start-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
           position="start" header={report?.header}
-          disabled={saving} draft={draftFields} />
+          disabled={saving || savingDraft} draft={draftFields} />
         <DriverReportDutyRows key={`duty-end-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
           position="end" header={report?.header}
-          disabled={saving} draft={draftFields} />
+          disabled={saving || savingDraft} draft={draftFields} />
         </form>
         <table ref={table} className="driver-stop-table driver-sheet" onInput={e => {
           if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-header" || e.target.form?.id === "report-checkout" ||
@@ -623,22 +825,12 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
             <col className="driver-col-time" /><col className="driver-col-time" /></colgroup>
           <thead><tr><th scope="col">项目</th><th scope="col">地址</th><th scope="col">公里数</th>
             <th scope="col">到着</th><th scope="col">出発</th></tr></thead>
-          {!report && <LocationRows key={serviceDate} locationKey={assignment} serviceDate={serviceDate}
-            depotAddress={selectedOrder?.depot?.address || "車庫"} fields={draftFields}
-            disabled={saving || !currentDefaults || needsOrder} save={async p => {
-            if (!currentDefaults || needsOrder) { setError("請先读取当天訂単并選択訂単。"); return false; }
-            try {
-              const header = readHeader(Boolean(p.force));
-              const timeError = reportTimeOrderError({ header, departedAt: p.departedAt, returnedAt: null });
-              if (timeError && !p.force) throw new Error(timeError);
-              return await save("checkout", { ...p, header });
-            }
-            catch (cause) {
-              console.error("Invalid manual report checkout.", cause);
-              setError(cause instanceof Error ? cause.message : "請检查开始地点、公里数、時間和日報基本信息。");
-              return false;
-            }
-          }} />}
+          {!report && <LocationRows key={`${serviceDate}-${assignment}`} locationKey={`${serviceDate}-${assignment}`}
+            fields={draftFields} disabled={saving || savingDraft} />}
+          {draftStopIds.filter(stopId => !report?.stops.some(stop => stop.id === stopId))
+            .map((stopId, index) => <DraftStopRow key={stopId} stopId={stopId}
+              index={index + (report?.stops.length ?? 0)} disabled={saving || savingDraft} fields={draftFields} remove={removeDraftStop} />)}
+          {!report && <NewReturnRow disabled={saving || savingDraft} fields={draftFields} />}
           {report && <>
           <DepartureRow key={`departure-${report.id}`} report={report} depotAddress={garageAddress}
             disabled={saving} saveChanges={saveChanges} fields={draftFields} />
@@ -647,9 +839,12 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
            allowDelete fields={draftFields} />)}
           <ReturnRow key={`return-${report.id}`} report={report} depotAddress={garageAddress}
             disabled={saving} saveChanges={saveChanges} fields={draftFields} />
+          <AddStopForm key={`add-stop-${report.id}`}
+            disabled={saving || savingDraft || report.stops.length + draftStopIds.length >= 100} save={saveStopAction} />
           </>}
+          {!report && <AddStopForm key={`add-draft-stop-${serviceDate}`}
+            disabled={saving || savingDraft || draftStopIds.length >= 100} save={addDraftStop} />}
         </table>
-        {addStop}
       </section>
       {notice && <p className="driver-muted" role="status">{notice}</p>}
       {report && <>
@@ -661,9 +856,9 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
         </section>
       </>}
       {data.reports.length > 0 && <details className="driver-card"><summary>历史日報</summary><label className="driver-field">最近及所选日報
-        <select value={report?.id ?? ""} disabled={saving} onChange={e => {
+        <select value={report?.id ?? ""} disabled={saving} onChange={async e => {
           if (dirty && !window.confirm("切换日報会放弃尚未保存的修改，是否继续？")) return;
-          if (!discardDraft()) return;
+          if (!await discardDraft()) return;
           setDirty(false); setStarting(false); setSelected(e.target.value); setError(""); setNotice("");
         }}>
           {!report && <option value="">新日報 · 待出库</option>}
@@ -672,10 +867,9 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
             return <option key={r.id} value={r.id}>{r.serviceDate}{orderName ? ` · ${orderName}` : ""}</option>;
           })}
         </select></label></details>}
-        {data && !busy && !report && <div className={styles.floatingActions} role="group" aria-label="開始地点保存">
-          <button type="submit" form="report-checkout" className="driver-button"
-            disabled={saving || !currentDefaults || needsOrder}>
-            {saving ? "保存中…" : "保存開始地点"}
+        {data && !busy && !report && <div className={styles.floatingActions} role="group" aria-label="日報保存">
+          <button type="button" className="driver-button" disabled={saving || savingDraft} onClick={() => saveNewReport()}>
+            {saving || savingDraft ? "保存中…" : "保存"}
           </button>
         </div>}
         {report && <div className={styles.floatingActions} role="group" aria-label="日報修改和保存">

@@ -31,6 +31,7 @@ function load(relative, mocks = {}, globals = {}) {
 }
 const reports = load("lib/driver/reports.ts");
 const { jsonResponse } = load("lib/api-response.ts");
+const reportDrafts = load("lib/driver/report-draft.ts");
 const id = "c6000000-0000-4000-8000-000000000001";
 const fixture = {
   id, serviceDate: "2026-10-27", version: 1,
@@ -63,10 +64,11 @@ const walkElements = node => !React.isValidElement(node) ? [] :
   [node, ...React.Children.toArray(node.props.children).flatMap(walkElements)];
 
 function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, savedReports, details = [],
-  initialReportId, initialDate, status = 200 } = {}) {
+  cloudDrafts = [], createdReport, initialReportId, initialDate, status = 200 } = {}) {
   const states = [], refs = [], effects = [], events = new Map();
   const headerInputs = [], tableInputs = [];
   let stateCursor = 0, refCursor = 0, authChange, cleanup;
+  const requests = [];
   const document = { visibilityState: "visible",
     addEventListener: (name, callback) => events.set(name, callback),
     removeEventListener: name => events.delete(name) };
@@ -101,21 +103,32 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
       constructor(form) { this.get = name => form.querySelectorAll().find(input => input.name === name)?.value ?? ""; }
     },
     fetch: async (url, options) => {
-      if (options?.method === "POST")
+      if (options?.method) requests.push({ url, options });
+      if (options?.method === "POST") {
+        if (url === "/api/driver/report-drafts") return Response.json({ draft: JSON.parse(options.body) });
+        if (createdReport && JSON.parse(options.body).action === "checkout")
+          return Response.json({ report: createdReport });
         return Response.json(status === 200 ? { report: { ...saved, version: saved.version + 1 } } : { error: "Save failed." }, { status });
+      }
       if (url.startsWith("/api/driver/report-history?reportId=")) {
         const report = details.find(item => item.id === new URL(`https://driver.example${url}`).searchParams.get("reportId"));
         return Response.json(report ? { report } : { error: "Not found" }, { status: report ? 200 : 404 });
       }
       return Response.json(url.startsWith("/api/driver/report-defaults") ? defaultsFixture
-        : { reports: savedReports ?? (saved ? [saved] : []), depot: null });
+        : { reports: savedReports ?? (saved ? [saved] : []), depot: null, drafts: cloudDrafts });
     },
   }).default;
   function render() {
     stateCursor = 0; refCursor = 0; effects.length = 0;
     const tree = Component({ initialReportId, initialDate });
-    refs[0].current = { querySelectorAll: () => tableInputs };
+    refs[0].current = {
+      querySelectorAll: selector => selector === "[data-manual-time]" ? [] : tableInputs,
+      querySelector: selector => selector === "#report-checkout" ? {
+        id: "report-checkout", querySelectorAll: () => tableInputs.filter(input => input.form.id === "report-checkout"),
+      } : null,
+    };
     refs[1].current = { querySelectorAll: () => headerInputs, reportValidity: () => true };
+    effects[3]?.();
     return tree;
   }
   async function loadPage() {
@@ -141,12 +154,12 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
     await new Promise(done => setImmediate(done));
     return render();
   }
-  function selectReport(reportId) {
+  async function selectReport(reportId) {
     const select = walkElements(render()).find(node => node.type === "select" &&
       React.Children.toArray(node.props.children).some(option => option.props.value === reportId));
-    select.props.onChange({ target: { value: reportId } });
+    await select.props.onChange({ target: { value: reportId } });
   }
-  return { states, refs, storage, field, edit, render, loadPage, loadDefaults, selectReport,
+  return { states, refs, storage, requests, field, edit, render, loadPage, loadDefaults, selectReport,
     signOut: () => authChange("SIGNED_OUT"),
     visibility: value => { document.visibilityState = value; events.get("visibilitychange")(); },
     pageHide: () => events.get("pagehide")(),
@@ -159,7 +172,7 @@ test("opening reports starts fresh after completed history and still permits vie
   assert.match(html, /新日報/);
   assert.doesNotMatch(html, /日本時間/);
   assert.doesNotMatch(html, /value="Synthetic depot"/);
-  h.selectReport(id);
+  await h.selectReport(id);
   html = renderToStaticMarkup(h.render());
   assert.match(html, /value="Synthetic depot"/);
   const reopened = draftHarness({ storage: h.storage });
@@ -173,7 +186,7 @@ test("opening reports resumes an unfinished report even when newer history comes
   let html = renderToStaticMarkup(await h.loadPage());
   assert.match(html, /value="Active depot"/);
   assert.match(html, /请先完成当前出库中的日报/);
-  h.selectReport(id);
+  await h.selectReport(id);
   html = renderToStaticMarkup(h.render());
   assert.match(html, /value="Synthetic depot"/);
   const reopened = draftHarness({ savedReports: [fixture, active] });
@@ -197,6 +210,130 @@ test("calendar date opens a report for that date unless another report is still 
   assert.match(html, /请先完成 2026-10-26 的未归库日報，再填写 2026-10-25 的日報/);
 });
 
+test("new daily report shows editable garage start/end and a floating save button", async () => {
+  const h = draftHarness({ saved: null, savedReports: [] });
+  const html = renderToStaticMarkup(await h.loadPage());
+  assert.equal((html.match(/value="車庫"/g) ?? []).length, 2);
+  assert.match(html, /aria-label="日報保存"[\s\S]*?>保存<\/button>/);
+  assert.match(html, /aria-label="追加空白经由地"/);
+  assert.doesNotMatch(html, /保存開始地点/);
+});
+
+test("cloud draft schema is strict and preserves linked report version and stop IDs", () => {
+  const cloudDraft = {
+    reportId: id, version: 3, serviceDate: fixture.serviceDate, assignment: "",
+    fields: { "report-edit-return/address": "車庫" }, stopIds: [id],
+  };
+  assert.deepEqual(JSON.parse(JSON.stringify(reportDrafts.reportCloudDraftSchema.parse(cloudDraft))), cloudDraft);
+  assert.equal(reportDrafts.reportCloudDraftSchema.safeParse({ ...cloudDraft, starting: false }).success, false);
+  assert.equal(reportDrafts.reportCloudDraftSchema.safeParse({ ...cloudDraft, stopIds: ["invalid"] }).success, false);
+  const migration = readFileSync(new URL("../supabase/migrations/20261215000000_driver_report_cloud_drafts.sql", import.meta.url), "utf8");
+  assert.match(migration, /driver_report_draft_save/);
+  assert.match(migration, /driver_report_draft_delete/);
+  assert.match(migration, /clear_driver_report_draft_on_return/);
+});
+
+test("cloud draft migration scopes draft saves and removes linked drafts after return", async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role authenticated;
+      create role anon;
+      create schema auth;
+      create table auth.users(id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as $$
+        select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+      $$;
+      create table public.drivers(id uuid, region_id uuid, primary key(id, region_id));
+      create function public.driver_identity() returns table(driver_id uuid, region_id uuid)
+        language sql stable as $$
+          select current_setting('app.driver_id')::uuid, current_setting('app.region_id')::uuid
+        $$;
+      create table public.driver_daily_reports(
+        id uuid primary key, driver_id uuid not null, region_id uuid not null, service_date date not null,
+        version bigint not null, returned_at timestamptz,
+        foreign key(driver_id, region_id) references public.drivers(id, region_id)
+      );
+    `);
+    await db.exec(readFileSync(new URL("../supabase/migrations/20261215000000_driver_report_cloud_drafts.sql", import.meta.url), "utf8"));
+    const regionId = id.replace(/1$/, "9");
+    await db.query("insert into auth.users(id) values ($1)", [id]);
+    await db.query("insert into public.drivers(id, region_id) values ($1, $2)", [id, regionId]);
+    await db.query("select set_config('app.driver_id', $1, false), set_config('app.region_id', $2, false), set_config('request.jwt.claim.sub', $1, false)", [id, regionId]);
+    const date = fixture.serviceDate;
+    await db.query("select public.driver_report_draft_save($1, null, 0, '', '{\"address\":\"partial\"}'::jsonb, '[]'::jsonb)", [date]);
+    const draftId = id.replace(/1$/, "8");
+    await db.query("insert into public.driver_daily_reports(id, driver_id, region_id, service_date, version) values ($1,$2,$3,$4,1)",
+      [draftId, id, regionId, date]);
+    await db.query("select public.driver_report_draft_save($1, $2, 1, '', '{}'::jsonb, '[]'::jsonb)", [date, draftId]);
+    assert.equal((await db.query("select jsonb_array_length(public.driver_report_drafts()) as count")).rows[0].count, 1);
+    await assert.rejects(db.query("select public.driver_report_draft_save($1, $2, 2, '', '{}'::jsonb, '[]'::jsonb)", [date, draftId]),
+      error => error.code === "40001");
+    await db.query("update public.driver_daily_reports set returned_at=now() where id=$1", [draftId]);
+    assert.equal((await db.query("select jsonb_array_length(public.driver_report_drafts()) as count")).rows[0].count, 0);
+    await db.query("select public.driver_report_draft_delete($1)", [date]);
+  } finally {
+    await db.close();
+  }
+});
+
+test("new daily report restores an incomplete cloud draft on another device", async () => {
+  const date = "2026-10-25";
+  const stopId = id.replace(/1$/, "2");
+  const h = draftHarness({ saved: null, savedReports: [], initialDate: date, cloudDrafts: [{
+    reportId: null, version: 0, serviceDate: date, assignment: "",
+    fields: { "report-checkout/address": "Online depot", "report-edit-return/address": "Online return",
+      [`report-stop-${stopId}/address`]: "Online stop" }, stopIds: [stopId],
+  }] });
+  const html = renderToStaticMarkup(await h.loadPage());
+  assert.match(html, /已恢复线上未完成日报/);
+  assert.match(html, /value="Online depot"/);
+  assert.match(html, /value="Online return"/);
+  assert.match(html, /value="Online stop"/);
+});
+
+test("saving an incomplete new report persists the cloud draft without creating a formal report", async () => {
+  const h = draftHarness({ saved: null, savedReports: [] });
+  await h.loadPage();
+  h.field("report-checkout", "address", "Partial departure");
+  await h.edit();
+  const button = walkElements(h.render()).find(node => node.type === "button" &&
+    node.props["aria-label"] === undefined && node.props.children === "保存");
+  await button.props.onClick();
+  assert.deepEqual(h.requests.map(request => request.url), ["/api/driver/report-drafts"]);
+  const body = JSON.parse(h.requests[0].options.body);
+  assert.equal(body.reportId, null);
+  assert.equal(body.fields["report-checkout/address"], "Partial departure");
+  assert.match(renderToStaticMarkup(h.render()), /未完成日报已保存到线上/);
+});
+
+test("completed departure links the saved cloud draft to the new report version", async () => {
+  const date = fixture.serviceDate;
+  const createdReport = { ...fixture, serviceDate: date, version: 1, returnedAt: null, returnAddress: null,
+    returnKm: null, departureAddress: "車庫", departureKm: 100,
+    header: { assignmentId: id, vehicleNumber: "Linked plate", driverName: "Linked driver", passengerCount: null } };
+  const h = draftHarness({ saved: null, savedReports: [], createdReport });
+  await h.loadPage();
+  h.states[10] = date;
+  await h.loadDefaults();
+  h.states[12] = id;
+  for (const [form, name, value] of [
+    ["report-header", "serviceDate", date], ["report-header", "vehicleNumber", "Linked plate"],
+    ["report-header", "driverName", "Linked driver"], ["report-header", "passengerCount", ""],
+    ["report-header", "assignmentId", id], ["report-checkout", "address", "車庫"],
+    ["report-checkout", "km", "100"], ["report-checkout", "departedAt", "0900"],
+  ]) h.field(form, name, value);
+  const button = walkElements(h.render()).find(node => node.type === "button" && node.props.children === "保存");
+  await button.props.onClick();
+  assert.deepEqual(h.requests.map(request => request.url),
+    ["/api/driver/report-drafts", "/api/driver/reports", "/api/driver/report-drafts"]);
+  const linkedDraft = JSON.parse(h.requests[2].options.body);
+  assert.equal(linkedDraft.reportId, createdReport.id);
+  assert.equal(linkedDraft.version, createdReport.version);
+  assert.equal(linkedDraft.fields["report-edit-departure/address"], "車庫");
+  assert.equal(linkedDraft.fields["report-checkout/address"], undefined);
+});
+
 test("resetting a new report on the same day retains loaded defaults", async () => {
   const h = draftHarness({ saved: null });
   await h.loadPage();
@@ -204,7 +341,7 @@ test("resetting a new report on the same day retains loaded defaults", async () 
   h.states[11] = { ...defaultsFixture, serviceDate: today, orders: [defaultsFixture.orders[0]] };
   h.states[12] = id;
   const button = walkElements(h.render()).find(node => node.type === "button" && node.props.children === "＋ 新建日报");
-  button.props.onClick();
+  await button.props.onClick();
   assert.equal(h.states[11].serviceDate, today);
   assert.equal(h.states[12], id);
 });
@@ -248,7 +385,7 @@ test("missing history report shows an error rather than another report", async (
 test("incomplete report fields survive app switches, navigation and reload without submitting", async () => {
   const h = draftHarness();
   await h.loadPage();
-  h.selectReport(id);
+  await h.selectReport(id);
   h.field("report-header", "serviceDate", fixture.serviceDate);
   h.field("report-header", "vehicleNumber", "Draft plate");
   h.field("report-header", "passengerCount", "");
@@ -280,7 +417,7 @@ test("incomplete report fields survive app switches, navigation and reload witho
 test("draft storage is account-isolated, rejects stale versions and is cleared on sign-out", async () => {
   const h = draftHarness();
   await h.loadPage();
-  h.selectReport(id);
+  await h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Private draft");
   await h.edit();
   const other = draftHarness({ storage: h.storage, user: id.replace(/1$/, "2") });
@@ -318,7 +455,7 @@ for (const status of [200, 409])
 test(`report save ${status === 200 ? "clears" : "retains"} the local draft`, async () => {
   const h = draftHarness({ status });
   await h.loadPage();
-  h.selectReport(id);
+  await h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Draft");
   const tree = await h.edit();
   const save = walkElements(tree).find(node => node.type?.name === "AddStopForm").props.save;
@@ -329,7 +466,7 @@ test(`report save ${status === 200 ? "clears" : "retains"} the local draft`, asy
 test("stop mutations rebase the draft without losing other unfinished fields", async () => {
   const h = draftHarness();
   await h.loadPage();
-  h.selectReport(id);
+  await h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Unfinished plate");
   h.field(`report-stop-${id}`, "address", "Removed draft stop");
   const tree = await h.edit();
@@ -346,7 +483,7 @@ test("storage errors are visible and prevent navigation from discarding edits", 
   storage.setItem = () => { throw new Error("Storage blocked"); };
   const h = draftHarness({ storage });
   await h.loadPage();
-  h.selectReport(id);
+  await h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Keep live");
   const tree = await h.edit();
   assert.equal(walkElements(tree).find(node => node.type?.name === "DriverNavigation").props.canLeave(), false);
@@ -373,7 +510,7 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
       orderOptions: [{ assignmentId: id, label: "Synthetic order", vehicleNumber: "BASE" }],
     }], depot: null };
     const states = [data, id, "", "", false, mode === "saving", 0, Date.now(),
-      false, mode === "dirty", fixture.serviceDate, null, "", ""];
+      false, mode === "dirty", fixture.serviceDate, null, "", "", null, [], false];
     let cursor = 0; const effects = []; let tick; let resolve; let signal; let cleared = false;
     const Component = load("app/driver/report/report.tsx", {
       react: { ...React, useEffect: effect => effects.push(effect), useRef: value => ({ current: value }),
@@ -413,7 +550,7 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
 test("polling keeps the selected historical report outside the recent list", async () => {
   const old = { ...fixture, id: id.replace(/1$/, "2"), departureAddress: "Old depot" };
   const states = [{ reports: [fixture, old], depot: null }, old.id, "", "", false, false, 0, Date.now(),
-    false, false, fixture.serviceDate, null, "", ""];
+    false, false, fixture.serviceDate, null, "", "", null, [], false];
   const effects = [];
   let cursor = 0, tick;
   const Component = load("app/driver/report/report.tsx", {
@@ -442,7 +579,7 @@ test("report action buttons remain fixed above the viewport", () => {
 
 test("new report shortcut stays visible while report data is loading", () => {
   const states = [null, null, "", "", true, false, 0, Date.now(), false, false,
-    fixture.serviceDate, null, "", ""];
+    fixture.serviceDate, null, "", "", null, [], false];
   let cursor = 0;
   const Component = load("app/driver/report/report.tsx", {
     react: { ...React, useEffect() {}, useRef: value => ({ current: value }),
@@ -555,11 +692,11 @@ test("report defaults API validates date and identity and exposes only minimal n
   assert.equal((await defaultsHandler({ error: { code: "XX000" } }).GET(new Request("https://driver.example?date=2026-10-27"))).status, 503);
 });
 
-test("new report requires order selection, permits manual defaults and clears wrong-date defaults", async () => {
+test("incomplete new report stays editable before order selection and uses garage labels", () => {
   const states = [{ reports: [], depot: { name: "Wrong depot", address: "Wrong address" } },
-    null, "", "", false, false, 0, Date.now(), false, false, fixture.serviceDate, defaultsFixture, "", ""];
+    null, "", "", false, false, 0, Date.now(), false, false, fixture.serviceDate, defaultsFixture, "", "", null, [], false];
   const runtime = require("react/jsx-runtime");
-  let cursor; let refCursor; let select; let date; let checkoutProps; let sent;
+  let cursor; let refCursor; let select; let date; let checkoutProps;
   const header = { reportValidity: () => true, fields: { serviceDate: fixture.serviceDate,
     vehicleNumber: "Manual plate", driverName: "Manual name", passengerCount: "" } };
   function capture(create) {
@@ -580,11 +717,10 @@ test("new report requires order selection, permits manual defaults and clears wr
   }, {
     window: { confirm: () => true },
     FormData: class { constructor(form) { this.get = name => form.fields[name] ?? ""; } },
-    fetch: async (_url, options) => { sent = JSON.parse(options.body); return Response.json({ report: fixture }); },
   }).default;
   function render() { cursor = 0; refCursor = 0; return renderToStaticMarkup(React.createElement(Component)); }
   let html = render();
-  assert.equal(checkoutProps.disabled, true);
+  assert.equal(checkoutProps.disabled, false);
   assert.match(html, /請選択当天訂単/);
   const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
   assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
@@ -598,7 +734,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.doesNotMatch(orderOptions, /09:00|Airport|Hotel|Linked plate/);
   assert.match(html, /value="Linked plate"/);
   assert.match(html, /value="Linked driver"/);
-  assert.match(html, /aria-label="開始地点地址"[^>]*value="Owner garage"/);
+  assert.match(html, /aria-label="開始地点地址"[^>]*value="車庫"/);
   assert.doesNotMatch(html, /Wrong address|Wrong depot/);
   select.onChange({ target: { value: defaultsFixture.orders[1].assignmentId } });
   html = render();
@@ -606,19 +742,13 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.match(html, /aria-label="開始地点地址"[^>]*value="車庫"/);
   assert.match(html, /未找到車庫地址，已暂填「車庫」/);
   assert.doesNotMatch(html, /value="Owner garage"/);
-  assert.equal(await checkoutProps.save({ useDefault: false, address: "Manual garage", km: 100,
-    departedAt: fixture.departedAt }), true);
-  assert.equal(sent.payload.useDefault, false);
-  assert.equal(sent.payload.address, "Manual garage");
-  assert.equal(sent.payload.header.vehicleNumber, "Manual plate");
-  assert.equal(sent.payload.header.driverName, "Manual name");
   states[0] = { reports: [], depot: null };
   render();
   date.onChange({ target: { value: "2026-10-28" } });
   html = render();
   assert.equal(states[11], null);
   assert.equal(states[12], "");
-  assert.equal(checkoutProps.disabled, true);
+  assert.equal(checkoutProps.disabled, false);
   assert.doesNotMatch(html, /value="Linked plate"|value="Second plate"|value="Owner garage"/);
   states[11] = { serviceDate: "2026-10-28", driverName: "Linked driver", orders: [] };
   html = render();
@@ -665,7 +795,7 @@ test("report order selectors display only names after database projections are m
 test("defaults loader ignores late dates, auto-selects a single order and surfaces failures", async () => {
   for (const mode of ["cancelled", "single", "wrong-date", "failed"]) {
     const states = [{ reports: [], depot: null }, null, "", "", false, false, 0, Date.now(),
-      false, false, fixture.serviceDate, null, "", ""];
+      false, false, fixture.serviceDate, null, "", "", null, [], false];
     let cursor = 0; const effects = []; let resolve; let signal;
     const Component = load("app/driver/report/report.tsx", {
       react: { ...React, useEffect: effect => effects.push(effect), useRef: v => ({ current: v }),
@@ -828,10 +958,50 @@ function handler({ deny, data = { reports: [], depot: null }, error = null } = {
     "@/lib/driver/test-runtime": { isDriverPwaEnabled: () => true },
     "@/lib/driver/authorization": { requireDriver: async () => deny ?
       { response: jsonResponse({ error: "Denied" }, { status: deny }) } :
-      { response: null, supabase: { rpc: async (name, args) => { calls.push({ name, args }); return { data, error }; } } } },
+      { response: null, supabase: { rpc: async (name, args) => {
+        calls.push({ name, args });
+        return { data: name === "driver_reports" ? data :
+          name === "driver_report_drafts" ? data.drafts ?? [] : data, error };
+      } } } },
   });
   return { ...route, calls };
 }
+function reportDraftHandler({ deny, data, error = null } = {}) {
+  const calls = [];
+  const route = load("app/api/driver/report-drafts/route.ts", {
+    "@/lib/api-response": { jsonResponse },
+    "@/lib/driver/report-draft": reportDrafts,
+    "@/lib/driver/assignment-action": { isDriverActionOrigin: r => r.headers.get("origin") === "https://driver.example" },
+    "@/lib/driver/test-runtime": { isDriverPwaTestMode: () => false },
+    "@/lib/driver/authorization": { requireDriver: async () => deny ?
+      { response: jsonResponse({ error: "Denied" }, { status: deny }) } :
+      { response: null, supabase: { rpc: async (name, args) => {
+        calls.push({ name, args });
+        return { data: data ?? args, error };
+      } } } },
+  });
+  return { ...route, calls };
+}
+test("cloud draft API validates ownership, origin, shape and explicit RPC outcomes", async () => {
+  const draft = { reportId: null, version: 0, serviceDate: fixture.serviceDate, assignment: "",
+    fields: { "report-checkout/address": "Partial" }, stopIds: [] };
+  const request = (method, url, body) => new Request(url, { method,
+    headers: { Origin: "https://driver.example", "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  assert.equal((await reportDraftHandler({ deny: 401 }).POST(request("POST", "https://driver.example/api/driver/report-drafts", draft))).status, 401);
+  const invalid = reportDraftHandler();
+  assert.equal((await invalid.POST(request("POST", "https://driver.example/api/driver/report-drafts", { ...draft, starting: true }))).status, 400);
+  assert.equal(invalid.calls.length, 0);
+  assert.equal((await reportDraftHandler().DELETE(request("DELETE", "https://driver.example/api/driver/report-drafts?date=2026-02-30"))).status, 400);
+  assert.equal((await reportDraftHandler().DELETE(request("DELETE", "https://driver.example/api/driver/report-drafts?date=2026-10-27", undefined))).status, 200);
+  const saved = reportDraftHandler({ data: draft });
+  assert.equal((await saved.POST(request("POST", "https://driver.example/api/driver/report-drafts", draft))).status, 200);
+  assert.equal(saved.calls[0].name, "driver_report_draft_save");
+  assert.equal((await saved.DELETE(request("DELETE", `https://driver.example/api/driver/report-drafts?date=${fixture.serviceDate}`))).status, 200);
+  assert.equal(saved.calls.at(-1).name, "driver_report_draft_delete");
+  assert.equal((await reportDraftHandler({ error: { code: "40001" } }).POST(
+    request("POST", "https://driver.example/api/driver/report-drafts", draft))).status, 409);
+});
 test("duty order uses Japanese dates, permits future/equal/unfinished times and never tightens historical reads", () => {
   const valid = { departedAt: "2099-12-31T23:30:00+09:00", returnedAt: "2100-01-01T00:10:00+09:00",
     header: { dutyStartDate: "2099-12-31", dutyStartTime: "23:20",
@@ -1023,8 +1193,8 @@ test("reports GET rejects ownership selectors and uses strict minimal no-store o
   const response = await h.GET(new Request("https://driver.example/api/driver/reports"));
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Cache-Control"), /no-store/);
-  assert.deepEqual(await response.json(), { reports: [fixture], depot: null });
-  assert.equal(h.calls[0].name, "driver_reports");
+  assert.deepEqual(await response.json(), { reports: [fixture], depot: null, drafts: [] });
+  assert.deepEqual(h.calls.map(call => call.name).sort(), ["driver_report_drafts", "driver_reports"]);
   assert.equal((await handler({ data: { reports: [{ ...fixture, profit: 10 }], depot: null } })
     .GET(new Request("https://driver.example/api/driver/reports"))).status, 500);
 });
@@ -1107,7 +1277,8 @@ test("mobile report renders departure, stops, rest controls and completed totals
       departedAt: closed ? "2026-10-28T00:15:00+09:00" : null, departedKm: closed ? 120 : null }],
       returnedAt: closed ? fixture.returnedAt : null,
       returnAddress: closed ? fixture.returnAddress : null, returnKm: closed ? fixture.returnKm : null };
-    const values = [{ reports: [r], depot: null }, r.id, "", "", false, false, 0, Date.parse(fixture.returnedAt), false, false];
+    const values = [{ reports: [r], depot: null }, r.id, "", "", false, false, 0, Date.parse(fixture.returnedAt),
+      false, false, fixture.serviceDate, null, "", "", null, [], false];
     const runtime = require("react/jsx-runtime");
     const checkKeys = create => (type, props, ...rest) => {
       const children = [props?.children].flat(Infinity).filter(React.isValidElement);
@@ -1252,7 +1423,8 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
     ...(mode === "manual_return" ? { returnedAt: fixture.returnedAt, returnAddress: "Return depot", returnKm: 150 } : {}),
     version: 2, stops: action === "remove_stop" ? stops.filter((_, i) => i !== 0) : action === "add_stop" ? [...stops, blank] :
     dated.stops.map(s => ({ ...s, address: `${s.address} updated` })) };
-  const states = [{ reports: [before], depot: null }, null, "", "", false, false, 0, Date.now(), false, true];
+  const states = [{ reports: [before], depot: null }, null, "", "", false, false, 0, Date.now(), false, true,
+    fixture.serviceDate, null, "", "", null, [], false];
   let cursor = 0; let refCursor = 0; let toolbar; let bottomSave; let calls = 0;
   const stopRows = new Map();
   const forms = stops.map((s, i) => ({ reportValidity: () => mode !== "force_edit_stops", checkValidity: () => true, fields: {
@@ -1293,6 +1465,8 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
     FormData: class { constructor(form) { this.get = name => form.fields[name] ?? ""; } },
     window: { confirm: () => true },
     fetch: async (url, options) => {
+      if (url === "/api/driver/report-drafts")
+        return Response.json({ draft: JSON.parse(options.body) });
       calls++;
       assert.equal(url, "/api/driver/reports");
       const body = JSON.parse(options.body);
@@ -1367,7 +1541,7 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   const values = [{ reports: history ? [fixture] : [], depot: { name: "Synthetic office", address: "Synthetic default" } },
     null, "", "", false, false, 0, Date.now(), history, true, fixture.serviceDate,
     { serviceDate: fixture.serviceDate, driverName: "Linked driver", orders: [{ assignmentId: id, time: "09:00",
-      pickup: "Airport", destination: "Hotel", vehicleNumber: "Linked plate", depot: { name: "Vehicle owner", address: "Owner garage" } }] }, id, ""];
+      pickup: "Airport", destination: "Hotel", vehicleNumber: "Linked plate", depot: { name: "Vehicle owner", address: "Owner garage" } }] }, id, "", null, [], false];
   const Component = load("app/driver/report/report.tsx", {
     react: { ...React, useEffect() {}, useRef: v => ({ current: v }), useState: () => [values[cursor++], () => {}] },
     "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
@@ -1377,19 +1551,19 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   assert.match(html, /aria-label="日報"[\s\S]*<table[\s\S]*id="report-checkout"/);
   assert.equal((html.match(/<table\b/g) ?? []).length, 1);
   assert.match(html, /form="report-checkout"[^>]*name="km"|name="km"[^>]*form="report-checkout"/);
-  assert.doesNotMatch(html, /Vehicle owner/);
-  assert.match(html, /aria-label="開始地点地址"[^>]*value="Owner garage"/);
+  assert.doesNotMatch(html, /Vehicle owner|Owner garage/);
+  assert.match(html, /aria-label="開始地点地址"[^>]*value="車庫"/);
   assert.ok(html.includes('value="Linked driver"'));
   assert.ok(html.includes('value="Linked plate"'));
   assert.doesNotMatch(html, /Synthetic office|Synthetic default|type="checkbox"/);
-  assert.match(html, /class="driver-report-actions" role="group" aria-label="開始地点保存"[\s\S]*form="report-checkout"[^>]*>保存開始地点<\/button>/);
+  assert.match(html, /class="driver-report-actions" role="group" aria-label="日報保存"[\s\S]*>保存<\/button>/);
   assert.doesNotMatch(html, /强制保存|name="force"/);
   const checkoutHtml = html.match(/<tbody aria-label="開始地点">[\s\S]*?<\/tbody>/)?.[0];
   assert.ok(checkoutHtml);
   assert.doesNotMatch(checkoutHtml, /<button/);
   assert.doesNotMatch(html, /保存开始地点后，可在表格内继续添加经由地。|日本時間/);
   assert.match(html, /aria-label="開始地点"[\s\S]*aria-label="開始地点地址"[\s\S]*aria-label="開始地点公里数"[\s\S]*aria-label="開始地点出発時間"/);
-  assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*data-manual-time)(?=[^>]*required="")[^>]*>/);
+  assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*data-manual-time)[^>]*>/);
   assert.doesNotMatch(html, /出库打卡|打卡|出库記録|新经由地地址/);
   if (history) assert.ok(html.includes("新日報 · 待出库"));
   if (!history && process.env.DRIVER_REPORT_DEFAULTS_LAYOUT_FILE) {
@@ -1402,14 +1576,14 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   }
 });
 
-test("append stop is below the table and each open stop has its own delete control", () => {
+test("append stop stays inside the table and each open stop has its own delete control", () => {
   for (const count of [0, 1, 3]) {
     let cursor = 0;
     const stops = Array.from({ length: count }, (_, i) => ({ id: id.replace(/1$/, String(i + 2)),
       address: `Synthetic stop ${i}`, arrivedAt: fixture.departedAt, arrivedKm: 100,
       departedAt: fixture.returnedAt, departedKm: 100 }));
     const values = [{ reports: [{ ...fixture, returnedAt: null, stops }], depot: null },
-      null, "", "", false, false, 0, Date.now(), false];
+      null, "", "", false, false, 0, Date.now(), false, false, fixture.serviceDate, null, "", "", null, [], false];
     const Component = load("app/driver/report/report.tsx", {
       react: { ...React, useEffect() {}, useRef: v => ({ current: v }), useState: () => [values[cursor++], () => {}] },
       "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
@@ -1419,8 +1593,8 @@ test("append stop is below the table and each open stop has its own delete contr
     assert.equal((html.match(/class="driver-stop-add"/g) ?? []).length, 1);
     assert.doesNotMatch(html, /<dialog|aria-modal/);
     assert.ok(!html.includes('aria-label="新经由地公里数"'));
-    assert.match(html, /aria-label="追加空白经由地"[^>]*>＋ 追加经由地<\/button>/);
-    assert.match(html, /<\/table><div class="driver-stop-add">/);
+    assert.match(html, /aria-label="追加空白经由地"[^>]*>＋<\/button>/);
+    assert.match(html, /<\/tbody><tbody aria-label="添加经由地">/);
     assert.doesNotMatch(html, /保存修改/);
     assert.equal((html.match(/<table\b/g) ?? []).length, 1);
     if (count) {
@@ -1448,7 +1622,7 @@ test("filled stop can be deleted after explicit confirmation", async () => {
   const filled = { id, address: "Saved stop", arrivedAt: fixture.departedAt, arrivedKm: 100,
     departedAt: fixture.returnedAt, departedKm: 110 };
   const values = [{ reports: [{ ...fixture, returnedAt: null, stops: [filled] }], depot: null },
-    null, "", "", false, false, 0, Date.now(), false, false];
+    null, "", "", false, false, 0, Date.now(), false, false, fixture.serviceDate, null, "", "", null, [], false];
   let cursor = 0;
   const Component = load("app/driver/report/report.tsx", {
     react: { ...React, useEffect() {}, useRef: value => ({ current: value }), useState: () => [values[cursor++], () => {}] },
@@ -1480,7 +1654,7 @@ test("compact stop form uses shared save and preserves seconds and distinct odom
   const stop = { id, address: "Synthetic stop", arrivedAt: "2026-10-28T00:00:42.123456+09:00",
     arrivedKm: 120, departedAt: null, departedKm: null };
   const values = [{ reports: [{ ...fixture, stops: [stop], returnedAt: null }], depot: null },
-    null, "", "", false, false, 0, Date.parse(fixture.returnedAt), false];
+    null, "", "", false, false, 0, Date.parse(fixture.returnedAt), false, false, fixture.serviceDate, null, "", "", null, [], false];
   function capture(create) {
     return (type, props, ...rest) => {
       if (typeof type === "function" && type.name === "StopRow") { stopComponent = type; stopProps = props; }
@@ -1560,7 +1734,7 @@ test("append button immediately saves an empty row without a second confirmation
   let Add;
   let cursor = 0;
   const values = [{ reports: [{ ...fixture, returnedAt: null }], depot: null },
-    null, "", "", false, false, 0, Date.now(), false];
+    null, "", "", false, false, 0, Date.now(), false, false, fixture.serviceDate, null, "", "", null, [], false];
   const capture = create => (type, props, ...rest) => {
     if (typeof type === "function" && type.name === "AddStopForm") Add = type;
     return create(type, props, ...rest);
@@ -1584,7 +1758,7 @@ test("append button immediately saves an empty row without a second confirmation
   }
   const element = render();
   const button = find(element, node => node.type === "button" && node.props["aria-label"] === "追加空白经由地");
-  assert.equal(button.props.children, "＋ 追加经由地");
+  assert.equal(button.props.children, "＋");
   const locked = render(undefined, true);
   assert.equal(find(locked, node => node.type === "button" && node.props["aria-label"] === "追加空白经由地").props.disabled, true);
   await button.props.onClick();

@@ -276,6 +276,21 @@ export type Database = {
         Args: Record<string, never>;
         Returns: Json;
       };
+      driver_report_drafts: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      driver_report_draft_save: {
+        Args: {
+          target_service_date: string; target_report: string | null; target_version: number;
+          target_assignment: string; target_fields: Json; target_stop_ids: Json;
+        };
+        Returns: Json;
+      };
+      driver_report_draft_delete: {
+        Args: { target_service_date: string };
+        Returns: undefined;
+      };
       driver_report_history: { Args: { target_month: string }; Returns: Json };
       driver_report_detail: { Args: { target_report: string }; Returns: Json };
       driver_report_defaults: {

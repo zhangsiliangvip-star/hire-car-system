@@ -8,8 +8,20 @@ export const reportDraftSchema = z.object({
   starting: z.boolean(),
   assignment: z.string().max(100),
   fields: z.record(z.string().max(150), z.string().max(400)),
+  stopIds: z.array(z.uuid()).max(100).optional(),
 }).strict();
 export type ReportDraft = z.infer<typeof reportDraftSchema>;
+
+export const reportCloudDraftSchema = z.object({
+  reportId: z.uuid().nullable(),
+  version: z.number().int().nonnegative(),
+  serviceDate: z.iso.date(),
+  assignment: z.string().max(100),
+  fields: z.record(z.string().max(150), z.string().max(400))
+    .refine(fields => Object.keys(fields).length <= 800),
+  stopIds: z.array(z.uuid()).max(100),
+}).strict();
+export type ReportCloudDraft = z.infer<typeof reportCloudDraftSchema>;
 
 export function readReportDraft(storage: Storage, userId: string): ReportDraft | null {
   const raw = storage.getItem(`${prefix}${userId}`);
