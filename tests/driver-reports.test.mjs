@@ -24,7 +24,9 @@ function load(relative, mocks = {}, globals = {}) {
       name === "@/components/report-duty-fields" ? load("components/report-duty-fields.tsx", { "@/lib/driver/reports": reports }) :
       name === "@/components/driver-report-duty-rows" ? load("components/driver-report-duty-rows.tsx", { "@/lib/driver/reports": reports }) :
       name === "@/lib/driver/report-draft" ? load("lib/driver/report-draft.ts") :
-      name === "./report.module.css" ? { default: { report: "driver-report", floatingActions: "driver-report-actions" } } : require(name),
+      name === "./report.module.css" ? { default: { report: "driver-report", floatingActions: "driver-report-actions",
+        dateAndPassengers: "driver-report-date-passengers", driverFields: "driver-report-driver-fields",
+        dutyTimes: "driver-report-duty-times" } } : require(name),
     Request, Response, Headers, URL, Date, Intl, process, queueMicrotask, console: { error() {} }, ...globals,
   });
   return compiled.exports;
@@ -114,8 +116,19 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
         const report = details.find(item => item.id === new URL(`https://driver.example${url}`).searchParams.get("reportId"));
         return Response.json(report ? { report } : { error: "Not found" }, { status: report ? 200 : 404 });
       }
-      return Response.json(url.startsWith("/api/driver/report-defaults") ? defaultsFixture
-        : { reports: savedReports ?? (saved ? [saved] : []), depot: null, drafts: cloudDrafts });
+      if (url.startsWith("/api/driver/report-history?month=")) {
+        const month = new URL(`https://driver.example${url}`).searchParams.get("month");
+        const reports = [...(savedReports ?? (saved ? [saved] : [])), ...details]
+          .filter((item, index, list) => item.serviceDate.startsWith(`${month}-`) &&
+            list.findIndex(other => other.id === item.id) === index)
+          .map(({ id: reportId, serviceDate, returnedAt }) => ({ id: reportId, serviceDate, returnedAt }));
+        return Response.json({ reports });
+      }
+      if (url.startsWith("/api/driver/report-defaults")) {
+        const date = new URL(`https://driver.example${url}`).searchParams.get("date");
+        return Response.json({ ...defaultsFixture, serviceDate: date });
+      }
+      return Response.json({ reports: savedReports ?? (saved ? [saved] : []), depot: null, drafts: cloudDrafts });
     },
   }).default;
   function render() {
@@ -155,42 +168,75 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
     return render();
   }
   async function selectReport(reportId) {
-    const select = walkElements(render()).find(node => node.type === "select" &&
-      React.Children.toArray(node.props.children).some(option => option.props.value === reportId));
-    await select.props.onChange({ target: { value: reportId } });
+    const report = [...(savedReports ?? (saved ? [saved] : [])), ...details].find(item => item.id === reportId);
+    if (!report) throw new Error(`Unknown test report: ${reportId}`);
+    await selectDate(report.serviceDate);
   }
-  return { states, refs, storage, requests, field, edit, render, loadPage, loadDefaults, selectReport,
+  async function selectDate(date) {
+    const input = walkElements(render()).find(node => node.props.name === "serviceDate");
+    await input.props.onChange({ target: { value: date } });
+  }
+  return { states, refs, storage, requests, field, edit, render, loadPage, loadDefaults, selectReport, selectDate,
     signOut: () => authChange("SIGNED_OUT"),
     visibility: value => { document.visibilityState = value; events.get("visibilitychange")(); },
     pageHide: () => events.get("pagehide")(),
   };
 }
 
-test("opening reports starts fresh after completed history and still permits viewing it", async () => {
+test("opening reports defaults to the latest report while keeping other history selectable by date", async () => {
   const h = draftHarness();
   let html = renderToStaticMarkup(await h.loadPage());
-  assert.match(html, /新日報/);
+  assert.equal(h.states[1], fixture.id);
+  assert.match(html, /value="Synthetic depot"/);
   assert.doesNotMatch(html, /日本時間/);
-  assert.doesNotMatch(html, /value="Synthetic depot"/);
   await h.selectReport(id);
   html = renderToStaticMarkup(h.render());
   assert.match(html, /value="Synthetic depot"/);
   const reopened = draftHarness({ storage: h.storage });
-  assert.match(renderToStaticMarkup(await reopened.loadPage()), /新日報/);
+  html = renderToStaticMarkup(await reopened.loadPage());
+  assert.equal(reopened.states[1], fixture.id);
+  assert.match(html, /value="Synthetic depot"/);
 });
 
-test("opening reports resumes an unfinished report even when newer history comes first", async () => {
+test("opening reports selects the latest service date even when another older report is unfinished", async () => {
   const active = { ...fixture, id: id.replace(/1$/, "2"), serviceDate: "2026-10-26",
     returnedAt: null, returnAddress: null, returnKm: null, departureAddress: "Active depot" };
-  const h = draftHarness({ savedReports: [fixture, active] });
+  const h = draftHarness({ savedReports: [active, fixture] });
   let html = renderToStaticMarkup(await h.loadPage());
-  assert.match(html, /value="Active depot"/);
-  assert.match(html, /请先完成当前出库中的日报/);
-  await h.selectReport(id);
-  html = renderToStaticMarkup(h.render());
   assert.match(html, /value="Synthetic depot"/);
-  const reopened = draftHarness({ savedReports: [fixture, active] });
-  assert.match(renderToStaticMarkup(await reopened.loadPage()), /value="Active depot"/);
+  assert.equal(h.states[1], fixture.id);
+  h.visibility("hidden");
+  h.visibility("visible");
+  html = renderToStaticMarkup(await h.loadPage());
+  assert.equal(h.states[1], fixture.id);
+  assert.match(html, /value="Synthetic depot"/);
+  const reopened = draftHarness({ savedReports: [active, fixture] });
+  assert.match(renderToStaticMarkup(await reopened.loadPage()), /value="Synthetic depot"/);
+});
+
+test("date selection loads the matching report even when it is outside the recent report list", async () => {
+  const old = { ...fixture, id: id.replace(/1$/, "2"), serviceDate: "2026-10-12",
+    departedAt: "2026-10-12T09:00:00+09:00", departureAddress: "Older depot" };
+  const h = draftHarness({ savedReports: [fixture], details: [old] });
+  let html = renderToStaticMarkup(await h.loadPage());
+  assert.equal(h.states[1], fixture.id);
+  await h.selectDate(old.serviceDate);
+  html = renderToStaticMarkup(h.render());
+  assert.equal(h.states[1], old.id);
+  assert.match(html, /value="2026-10-12"/);
+  assert.match(html, /value="Older depot"/);
+  assert.ok(h.states[0].reports.some(item => item.id === old.id));
+});
+
+test("date selection opens a new report when the selected date has no saved report", async () => {
+  const h = draftHarness();
+  await h.loadPage();
+  await h.selectDate("2026-10-28");
+  const html = renderToStaticMarkup(h.render());
+  assert.equal(h.states[1], null);
+  assert.equal(h.states[10], "2026-10-28");
+  assert.match(html, /aria-label="日報保存"/);
+  assert.match(html, /name="serviceDate"[^>]*value="2026-10-28"/);
 });
 
 test("calendar date opens a report for that date unless another report is still open", async () => {
@@ -359,7 +405,7 @@ test("history link opens and saves a report beyond the recent list", async () =>
   assert.equal(h.states[0].reports.find(report => report.id === old.id).version, 2);
 });
 
-test("opening history preserves a draft for a different old report", async () => {
+test("opening an explicit report does not override it with a local draft for another report", async () => {
   const target = { ...fixture, id: id.replace(/1$/, "2"), departureAddress: "Target depot" };
   const oldDraft = { ...fixture, id: id.replace(/1$/, "3"), departureAddress: "Draft report" };
   const storage = memoryStorage();
@@ -369,9 +415,9 @@ test("opening history preserves a draft for a different old report", async () =>
   }));
   const h = draftHarness({ storage, initialReportId: target.id, savedReports: [fixture], details: [target, oldDraft] });
   const html = renderToStaticMarkup(await h.loadPage());
-  assert.match(html, /value="Unsaved depot"/);
-  assert.match(html, /已恢复另一份本机草稿/);
-  assert.equal(h.states[1], oldDraft.id);
+  assert.match(html, /value="Target depot"/);
+  assert.match(html, /本机草稿仍已保留/);
+  assert.equal(h.states[1], target.id);
   assert.notEqual(storage.length, 0);
 });
 
@@ -696,13 +742,12 @@ test("incomplete new report stays editable before order selection and uses garag
   const states = [{ reports: [], depot: { name: "Wrong depot", address: "Wrong address" } },
     null, "", "", false, false, 0, Date.now(), false, false, fixture.serviceDate, defaultsFixture, "", "", null, [], false];
   const runtime = require("react/jsx-runtime");
-  let cursor; let refCursor; let select; let date; let checkoutProps;
+  let cursor; let refCursor; let select; let checkoutProps;
   const header = { reportValidity: () => true, fields: { serviceDate: fixture.serviceDate,
     vehicleNumber: "Manual plate", driverName: "Manual name", passengerCount: "" } };
   function capture(create) {
     return (type, props, ...rest) => {
       if (props?.["aria-label"] === "关联当天訂単") select = props;
-      if (props?.name === "serviceDate") date = props;
       if (typeof type === "function" && type.name === "LocationRows") checkoutProps = props;
       return create(type, props, ...rest);
     };
@@ -716,6 +761,7 @@ test("incomplete new report stays editable before order selection and uses garag
     "@/lib/supabase/browser": {}, "@/lib/driver/orders": { createDriverRequestId: () => id }, "@/lib/driver/reports": reports,
   }, {
     window: { confirm: () => true },
+    fetch: async () => Response.json({ reports: [] }),
     FormData: class { constructor(form) { this.get = name => form.fields[name] ?? ""; } },
   }).default;
   function render() { cursor = 0; refCursor = 0; return renderToStaticMarkup(React.createElement(Component)); }
@@ -724,7 +770,7 @@ test("incomplete new report stays editable before order selection and uses garag
   assert.match(html, /請選択当天訂単/);
   const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
   assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-    ["日期", "关联当天訂単", "車両番号", "運転手", "客数", "出勤点呼時間", "退勤点呼時間"]);
+    ["日期", "客数", "关联当天訂単", "車両番号", "運転手", "出勤点呼時間", "退勤点呼時間"]);
   assert.doesNotMatch(headerMarkup, /driver-card/);
   select.onChange({ target: { value: id } });
   html = render();
@@ -742,18 +788,6 @@ test("incomplete new report stays editable before order selection and uses garag
   assert.match(html, /aria-label="開始地点地址"[^>]*value="車庫"/);
   assert.match(html, /未找到車庫地址，已暂填「車庫」/);
   assert.doesNotMatch(html, /value="Owner garage"/);
-  states[0] = { reports: [], depot: null };
-  render();
-  date.onChange({ target: { value: "2026-10-28" } });
-  html = render();
-  assert.equal(states[11], null);
-  assert.equal(states[12], "");
-  assert.equal(checkoutProps.disabled, false);
-  assert.doesNotMatch(html, /value="Linked plate"|value="Second plate"|value="Owner garage"/);
-  states[11] = { serviceDate: "2026-10-28", driverName: "Linked driver", orders: [] };
-  html = render();
-  assert.equal(checkoutProps.disabled, false);
-  assert.match(html, /暂无可关联订单/);
   states[0] = { reports: [{ ...fixture, header: { vehicleNumber: "Saved plate", driverName: "Saved name", passengerCount: null } }], depot: null };
   states[1] = fixture.id;
   html = render();
@@ -1297,7 +1331,12 @@ test("mobile report renders departure, stops, rest controls and completed totals
     for (const label of ["日期", "出勤点呼時間", "退勤点呼時間", "車両番号", "運転手", "客数"]) assert.ok(html.includes(`aria-label="${label}"`));
     const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
     assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-      ["日期", "車両番号", "運転手", "客数", "出勤点呼時間", "退勤点呼時間"]);
+      ["日期", "客数", "車両番号", "運転手", "出勤点呼時間", "退勤点呼時間"]);
+    assert.match(headerMarkup, /class="driver-report-date-passengers"[^>]*>[\s\S]*aria-label="日期"[\s\S]*aria-label="客数"/);
+    assert.match(headerMarkup, /class="driver-report-driver-fields"[^>]*>[\s\S]*aria-label="車両番号"[\s\S]*aria-label="運転手"/);
+    assert.match(headerMarkup, /class="driver-report-duty-times"[^>]*>[\s\S]*aria-label="出勤点呼時間"[\s\S]*aria-label="退勤点呼時間"/);
+    const reportCss = readFileSync(new URL("../app/driver/report/report.module.css", import.meta.url), "utf8");
+    assert.match(reportCss, /\.dateAndPassengers,.driverFields,.dutyTimes\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
     assert.doesNotMatch(html, /出勤点呼日期|退勤点呼日期|dutyStartDate|name="dutyEndDate"/);
     assert.ok(headerMarkup.indexOf('aria-label="客数"') < headerMarkup.indexOf('aria-label="出勤点呼時間"'));
     assert.ok(headerMarkup.indexOf('aria-label="出勤点呼時間"') < headerMarkup.indexOf('aria-label="退勤点呼時間"'));
@@ -1306,13 +1345,8 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.doesNotMatch(html, /<tbody aria-label="出勤点呼">|<tbody aria-label="退勤点呼">|<h2>日報<\/h2>/);
     assert.match(html, /<section class="driver-card driver-stops driver-report-card" aria-label="日報">/);
     assert.match(html, /<caption class="driver-report-caption">乗務記録<\/caption>/);
-    assert.match(html, /<details[^>]*><summary>历史日報<\/summary>/);
-    const historyOptions = html.match(/<summary>历史日報<\/summary>[\s\S]*?<select[^>]*>([\s\S]*?)<\/select>/)?.[1];
-    assert.ok(historyOptions);
-    assert.match(historyOptions, new RegExp(`<option value="${fixture.id}"(?: selected="")?>${fixture.serviceDate} · Synthetic order name</option>`));
-    assert.doesNotMatch(historyOptions, /已归库|出库中|\d{2}:\d{2}/);
+    assert.doesNotMatch(html, /历史日報|最近及所选日報/);
     assert.ok(html.indexOf('aria-label="日報基本信息"') < html.indexOf('<table'));
-    assert.ok(html.indexOf('<summary>历史日報') > html.indexOf('</table>'));
     assert.ok(html.includes('class="driver-main driver-report"'));
     assert.match(html, /aria-label="日報修改和保存"/);
     assert.match(html, /class="driver-report-actions" role="group" aria-label="日報修改和保存"/);
@@ -1405,7 +1439,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
   }
 });
 
-for (const mode of ["edit_stops", "force_edit_stops", "manual_return", "change_date", "add_stop", "remove_stop"]) for (const success of [true, false])
+for (const mode of ["edit_stops", "force_edit_stops", "manual_return", "add_stop", "remove_stop"]) for (const success of [true, false])
 test(`${mode} ${success ? "updates report" : "retains failed edits"} without reload`, async () => {
   const action = ["add_stop", "remove_stop"].includes(mode) ? mode : "edit_stops";
   const runtime = require("react/jsx-runtime");
@@ -1415,7 +1449,7 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
   const blank = { id, address: "", plannedKm: null, arrivedAt: null, departedAt: null, arrivedKm: null, departedKm: null };
   if (mode === "remove_stop") stops.push({ ...blank, id: id.replace(/1$/, "4") }, { ...blank, id: id.replace(/1$/, "5") });
   const before = { ...fixture, stops, returnedAt: null, returnAddress: null, returnKm: null };
-  const header = { serviceDate: mode === "change_date" ? "2026-10-25" : fixture.serviceDate,
+  const header = { serviceDate: fixture.serviceDate,
     vehicleNumber: "品川 123", driverName: "Manual driver", passengerCount: 3,
     dutyStartTime: null, dutyEndTime: null, dutyStartDate: null, dutyEndDate: null };
   const dated = reports.reportOnDate(before, header.serviceDate);
@@ -1478,15 +1512,11 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
         assert.deepEqual(body.payload.departure, mode === "force_edit_stops"
           ? { address: fixture.departureAddress, km: fixture.departureKm, departedAt: fixture.departedAt }
           : { address: "Updated depot", km: 99,
-            departedAt: mode === "change_date" ? "2026-10-25T13:30:00.000Z" : "2026-10-27T13:30:00.000Z" });
+            departedAt: "2026-10-27T13:30:00.000Z" });
         if (mode === "force_edit_stops") {
           assert.equal(body.payload.stops[0].address, "Stop 0 updated");
           assert.equal(body.payload.stops[0].arrivedAt, stops[0].arrivedAt);
           assert.equal(body.payload.stops[0].arrivedKm, stops[0].arrivedKm);
-        }
-        if (mode === "change_date") {
-          assert.equal(reports.toJapanInput(body.payload.stops[0].arrivedAt).slice(0, 10), "2026-10-25");
-          assert.equal(reports.toJapanInput(body.payload.stops[1].departedAt).slice(0, 10), "2026-10-26");
         }
         if (mode === "manual_return") {
           assert.equal(body.payload.return.address, "Return depot");
@@ -1509,7 +1539,6 @@ test(`${mode} ${success ? "updates report" : "retains failed edits"} without rel
   else await toolbar.save("add_stop", { address: "", arrivedAt: null, departedAt: null });
   assert.equal(calls, 1);
   assert.equal(states[0].reports[0].version, success ? 2 : 1);
-  if (mode === "change_date") assert.equal(states[0].reports[0].serviceDate, success ? header.serviceDate : fixture.serviceDate);
   if (mode === "manual_return") assert.equal(states[0].reports[0].returnedAt, success ? fixture.returnedAt : null);
   assert.equal(states[0].reports[0].stops[1].address, success && action === "edit_stops" ? "Stop 1 updated" :
     success && action === "remove_stop" ? "" : "Stop 1");
@@ -1565,7 +1594,7 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   assert.match(html, /aria-label="開始地点"[\s\S]*aria-label="開始地点地址"[\s\S]*aria-label="開始地点公里数"[\s\S]*aria-label="開始地点出発時間"/);
   assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*data-manual-time)[^>]*>/);
   assert.doesNotMatch(html, /出库打卡|打卡|出库記録|新经由地地址/);
-  if (history) assert.ok(html.includes("新日報 · 待出库"));
+  assert.doesNotMatch(html, /历史日報|最近及所选日報/);
   if (!history && process.env.DRIVER_REPORT_DEFAULTS_LAYOUT_FILE) {
     const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8").replace('@import "tailwindcss";', "");
     const reportCss = readFileSync(new URL("../app/driver/report/report.module.css", import.meta.url), "utf8")
