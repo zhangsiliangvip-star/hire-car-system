@@ -113,12 +113,12 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
           .map(claim => ({ trip, claim })));
         const fuelTotal = fuel.reduce((sum, claim) => sum + claim.amount, 0);
         const dailyWage = wages.reduce((sum, wage) => sum + wage.base + wage.bonus + wage.overtime, 0);
-        return <section className="driver-card" key={date} aria-label={`${date}履歴`}>
+        return <section className="driver-card driver-history-card" key={date} aria-label={`${date}履歴`}>
           <h2>{date}</h2>
-          <div className="driver-row"><span>订单名称</span>
+          <div className="driver-row driver-history-row"><span>订单名称</span>
             <strong>{orders.length ? orders.map(order => order.orderName || "訂単内容未填写").join("、") : "当日无订单"}</strong>
           </div>
-          {claims.length ? claims.map(({ trip, claim }) => <div className="driver-row" key={`${trip.assignmentId}-${claim.category}`}>
+          {claims.length ? claims.map(({ trip, claim }) => <div className="driver-row driver-history-row" key={`${trip.assignmentId}-${claim.category}`}>
             <span>立替</span>
             <div className="driver-history-action">
               <span>{trip.pickup} → {trip.destination} · {yen(claim.expenses.reduce((sum, item) => sum + item.amount, 0))}
@@ -126,21 +126,23 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
               <Link className="driver-header-button"
                 href={`/driver/finance?date=${date}&assignmentId=${trip.assignmentId}`}>修改</Link>
             </div>
-          </div>) : <div className="driver-row"><span>立替</span><strong>{yen(0)}</strong></div>}
-          <div className="driver-row"><span>燃油费</span>
+          </div>) : <div className="driver-row driver-history-row"><span>立替</span><strong>{yen(0)}</strong></div>}
+          <div className="driver-row driver-history-row"><span>燃油费</span>
             <div className="driver-history-action">
               <span>{yen(fuelTotal)}</span>
               <Link className="driver-header-button" href={`/driver/finance?date=${date}`}>修改</Link>
             </div>
           </div>
-          <div className="driver-row"><span>当日工资</span>
+          <div className="driver-row driver-history-row"><span>当日工资</span>
             <strong>{wages.length ? yen(dailyWage) : "未核算"}</strong>
           </div>
-          <div className="driver-row"><span>当日日报</span>
-            {loaded.reports !== null && (reports.length ? reports.map(report => <Link className="driver-link" key={report.id}
-              href={`/driver/report?reportId=${report.id}&month=${month}`}>
-              {report.returnedAt ? "已归库 · 查看/修改" : "进行中 · 查看/修改"}
-            </Link>) : <Link className="driver-link driver-report-missing" href={`/driver/report?date=${date}`}>日报未完成</Link>)}
+          <div className="driver-row driver-history-row"><span>当日日报</span>
+            {loaded.reports !== null && <div className="driver-history-action">
+              {reports.length ? reports.map(report => <Link className="driver-link" key={report.id}
+                href={`/driver/report?reportId=${report.id}&month=${month}`}>
+                {report.returnedAt ? "已归库 · 查看/修改" : "进行中 · 查看/修改"}
+              </Link>) : <Link className="driver-link driver-report-missing" href={`/driver/report?date=${date}`}>日报未完成</Link>}
+            </div>}
           </div>
         </section>;
       })}

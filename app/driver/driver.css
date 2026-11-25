@@ -9,9 +9,15 @@
 .driver-navigation a[aria-current=page]{background:var(--driver-green);border-color:var(--driver-green);color:#fff;font-weight:700}
 .driver-navigation a[aria-disabled=true]:not([aria-current=page]){opacity:.5;cursor:wait}
 .driver-report-missing{color:#b42318!important;font-weight:700}
-.driver-history-action{display:flex;flex:1;min-width:0;align-items:center;justify-content:flex-end;gap:8px}
-.driver-history-action>span{min-width:0;text-align:right;overflow-wrap:anywhere}
-.driver-history-action .driver-header-button{flex-shrink:0;min-height:34px;padding:5px 10px;font-size:12px}
+.driver-history-card{padding:14px 16px}
+.driver-history-card h2{margin-bottom:7px;font-size:16px}
+.driver-history-row{display:grid;grid-template-columns:74px minmax(0,1fr);align-items:center;gap:8px;min-height:40px;padding:4px 0;line-height:1.2}
+.driver-history-row>span{font-size:12px;white-space:nowrap}
+.driver-history-row>strong{min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.driver-history-action{display:flex;min-width:0;align-items:center;justify-content:flex-end;gap:8px;overflow:hidden}
+.driver-history-action>span{min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.driver-history-action .driver-header-button{flex-shrink:0;min-height:30px;padding:3px 9px;font-size:11px}
+.driver-history-action .driver-link{flex-shrink:0;padding:4px 0;white-space:nowrap}
 .driver-trip-dates{flex-wrap:wrap;align-items:center}
 .driver-trip-dates input[type=date]{min-width:0;max-width:100%;min-height:44px;padding:8px;border:1px solid #dce5de;border-radius:9px;background:#fff;color:#416c55;font-size:14px}
 .driver-page-header{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin:0 0 8px}
