@@ -150,7 +150,9 @@ function StopRow({ stop, index, disabled, saveChanges, removeStop, allowDelete, 
     </tbody>;
 }
 
-export default function DriverReport({ initialReportId, returnMonth }: { initialReportId?: string; returnMonth?: string } = {}) {
+export default function DriverReport({ initialReportId, initialDate, returnMonth }: {
+  initialReportId?: string; initialDate?: string; returnMonth?: string;
+} = {}) {
   const [data, setData] = useState<z.infer<typeof reportDataSchema> | null>(null);
   const [selected, setSelected] = useState<string | null>(initialReportId ?? null);
   const [error, setError] = useState("");
@@ -161,7 +163,7 @@ export default function DriverReport({ initialReportId, returnMonth }: { initial
   const [now, setNow] = useState(Date.now);
   const [starting, setStarting] = useState(false);
   const [dirty, setDirtyState] = useState(false);
-  const [newDate, setNewDate] = useState(() => reportTime(new Date().toISOString()).slice(0, 10));
+  const [newDate, setNewDate] = useState(() => initialDate ?? reportTime(new Date().toISOString()).slice(0, 10));
   const [defaults, setDefaults] = useState<z.infer<typeof reportDefaultsSchema> | null>(null);
   const [assignment, setAssignment] = useState("");
   const [defaultsError, setDefaultsError] = useState("");
@@ -228,6 +230,17 @@ export default function DriverReport({ initialReportId, returnMonth }: { initial
             setNotice(initialReportId && restored.reportId !== initialReportId
               ? "已恢复另一份本机草稿，請先保存或放弃修改，再選択历史日報。"
               : "已恢复本机草稿，請继续填写并点“保存”提交。");
+          } else if (initialDate && !initialReportId) {
+            const dateReport = result.reports.find(item => item.serviceDate === initialDate);
+            const unfinished = result.reports.find(item => !item.returnedAt);
+            if (dateReport) {
+              setSelected(dateReport.id); setNewDate(dateReport.serviceDate);
+            } else if (unfinished) {
+              setSelected(unfinished.id); setNewDate(unfinished.serviceDate);
+              setNotice(`请先完成 ${unfinished.serviceDate} 的未归库日報，再填写 ${initialDate} 的日報。`);
+            } else {
+              setSelected(null); setStarting(true); setNewDate(initialDate);
+            }
           }
           setData(result); setDirty(Boolean(restored)); setBusy(false);
         }
@@ -267,7 +280,7 @@ export default function DriverReport({ initialReportId, returnMonth }: { initial
       window.removeEventListener("pagehide", pageHide);
       window.removeEventListener("beforeunload", beforeUnload);
     };
-  }, [revision, initialReportId]);
+  }, [revision, initialReportId, initialDate]);
   const open = data?.reports.find(r => !r.returnedAt);
   const report = data?.reports.find(r => r.id === selected) ?? open;
   const serviceDate = newDate ?? reportTime(new Date(now).toISOString()).slice(0, 10);

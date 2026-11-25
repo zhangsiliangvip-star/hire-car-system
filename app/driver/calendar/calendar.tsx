@@ -159,16 +159,20 @@ export default function DriverCalendar() {
           </div>)}
           <div className="driver-calendar-row driver-calendar-finance-row">
           <div className="driver-calendar-vehicle driver-calendar-finance-label">
-            <strong>财务 / 日報</strong>
+            <strong>日工资 / 财务 / 日報</strong>
             {loaded.finance.manualItems.some(item => item.amount !== 0)
-              ? <span>月调整 ¥{loaded.finance.manualItems.reduce((sum, item) => sum + item.amount, 0).toLocaleString("ja-JP")}</span>
+              ? <span>月度调整 ¥{loaded.finance.manualItems.reduce((sum, item) => sum + item.amount, 0).toLocaleString("ja-JP")}</span>
               : <span>按日汇总</span>}
           </div>
           {dailyFinance.map((day, index) => <div key={dates[index].date}
             className={`driver-calendar-finance-cell${dates[index].date === today ? " is-today" : ""}`}
             aria-label={`${dates[index].date}财务与日報`}>
-            {day.wage !== null && <Link href={`/driver/finance?date=${dates[index].date}&view=wages`}>
-              工资 {`¥${day.wage.toLocaleString("ja-JP")}`}
+            {day.wage !== null ? <Link className="driver-calendar-daily-wage"
+              href={`/driver/finance?date=${dates[index].date}&view=wages`}>
+              日工资 {`¥${day.wage.toLocaleString("ja-JP")}`}
+            </Link> : <span className="driver-calendar-daily-wage">日工资 暂无</span>}
+            {day.advances > 0 && <Link href={`/driver/finance?date=${dates[index].date}`}>
+              立替 {`¥${day.advances.toLocaleString("ja-JP")}`}
             </Link>}
             {day.company > 0 && <Link href={`/driver/finance?date=${dates[index].date}`}>
               社報 {`¥${day.company.toLocaleString("ja-JP")}`}
@@ -179,11 +183,12 @@ export default function DriverCalendar() {
             {day.fuel > 0 && <Link href={`/driver/finance?date=${dates[index].date}`}>
               燃油 {`¥${day.fuel.toLocaleString("ja-JP")}`}
             </Link>}
-            {day.reports.map(report => <Link key={report.id}
-              href={`/driver/report?reportId=${report.id}&month=${month}`}>
-              日報 {report.returnedAt ? "已归库" : "进行中"}
-            </Link>)}
-            {day.wage === null && !day.company && !day.trip && !day.fuel && !day.reports.length && <span>—</span>}
+            {day.reports.length ? day.reports.map(report => <Link key={report.id}
+              className="driver-calendar-report-link"
+              href={`/driver/report?reportId=${report.id}&date=${report.serviceDate}`}>
+              日報 {report.returnedAt ? "已归库 · 查看/修改" : "进行中 · 查看"}
+            </Link>) : <Link className="driver-calendar-report-link"
+              href={`/driver/report?date=${dates[index].date}`}>填写日報</Link>}
           </div>)}
           </div>
         </div>

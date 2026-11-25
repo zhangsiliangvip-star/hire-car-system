@@ -22,6 +22,7 @@ export type DriverCalendarEntry = z.infer<typeof driverCalendarEntrySchema>;
 
 export type DriverCalendarFinanceDay = {
   wage: number | null;
+  advances: number;
   company: number;
   trip: number;
   fuel: number;
@@ -34,11 +35,15 @@ export function buildDriverCalendarFinance(
   reports: DriverCalendarReport[],
 ): DriverCalendarFinanceDay[] {
   const summaries = new Map(dates.map(date => [date, {
-    wage: null as number | null, company: 0, trip: 0, fuel: 0, reports: [] as DriverCalendarReport[],
+    wage: null as number | null, advances: 0, company: 0, trip: 0, fuel: 0,
+    reports: [] as DriverCalendarReport[],
   }]));
   for (const row of finance.wages) {
     const day = summaries.get(row.date);
-    if (day) day.wage = (day.wage ?? 0) + row.base + row.bonus + row.overtime + row.advances;
+    if (day) {
+      day.wage = (day.wage ?? 0) + row.base + row.bonus + row.overtime;
+      day.advances += row.advances;
+    }
   }
   for (const item of finance.trips) {
     const day = summaries.get(item.date);

@@ -33,3 +33,5 @@
 .driver-calendar-finance-cell a:focus-visible{text-decoration:underline}
 .driver-calendar-finance-cell.is-today{background:#f3f7fe}
 .driver-calendar-finance-cell>span{color:#87958c}
+.driver-calendar-finance-cell .driver-calendar-daily-wage{font-weight:700;color:#1f5135}
+.driver-calendar-finance-cell .driver-calendar-report-link{color:#2563eb}

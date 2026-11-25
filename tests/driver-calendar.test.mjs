@@ -38,7 +38,7 @@ test("calendar combines wage, reimbursement, fuel and reports on their service d
     { id: id.replace(/1$/, "2"), serviceDate: "2026-10-31", returnedAt: null }];
 
   assert.deepEqual(JSON.parse(JSON.stringify(buildDriverCalendarFinance(dates, finance, reports))), [
-    { wage: 15000, company: 1500, trip: 800, fuel: 0, reports: [reports[0]] },
-    { wage: null, company: 0, trip: 0, fuel: 2500, reports: [] },
+    { wage: 13500, advances: 1500, company: 1500, trip: 800, fuel: 0, reports: [reports[0]] },
+    { wage: null, advances: 0, company: 0, trip: 0, fuel: 2500, reports: [] },
   ]);
 });

@@ -60,7 +60,8 @@ function memoryStorage() {
 const walkElements = node => !React.isValidElement(node) ? [] :
   [node, ...React.Children.toArray(node.props.children).flatMap(walkElements)];
 
-function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, savedReports, details = [], initialReportId, status = 200 } = {}) {
+function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, savedReports, details = [],
+  initialReportId, initialDate, status = 200 } = {}) {
   const states = [], refs = [], effects = [], events = new Map();
   const headerInputs = [], tableInputs = [];
   let stateCursor = 0, refCursor = 0, authChange, cleanup;
@@ -110,7 +111,7 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
   }).default;
   function render() {
     stateCursor = 0; refCursor = 0; effects.length = 0;
-    const tree = Component({ initialReportId });
+    const tree = Component({ initialReportId, initialDate });
     refs[0].current = { querySelectorAll: () => tableInputs };
     refs[1].current = { querySelectorAll: () => headerInputs, reportValidity: () => true };
     return tree;
@@ -174,6 +175,23 @@ test("opening reports resumes an unfinished report even when newer history comes
   assert.match(html, /value="Synthetic depot"/);
   const reopened = draftHarness({ savedReports: [fixture, active] });
   assert.match(renderToStaticMarkup(await reopened.loadPage()), /value="Active depot"/);
+});
+
+test("calendar date opens a report for that date unless another report is still open", async () => {
+  const date = "2026-10-25";
+  const h = draftHarness({ saved: null, savedReports: [], initialDate: date });
+  let html = renderToStaticMarkup(await h.loadPage());
+  assert.equal(h.states[10], date);
+  assert.equal(h.states[8], true);
+  assert.match(html, new RegExp(`value="${date}"`));
+
+  const active = { ...fixture, id: id.replace(/1$/, "2"), serviceDate: "2026-10-26",
+    returnedAt: null, returnAddress: null, returnKm: null };
+  const blocked = draftHarness({ saved: null, savedReports: [active], initialDate: date });
+  html = renderToStaticMarkup(await blocked.loadPage());
+  assert.equal(blocked.states[1], active.id);
+  assert.equal(blocked.states[10], active.serviceDate);
+  assert.match(html, /请先完成 2026-10-26 的未归库日報，再填写 2026-10-25 的日報/);
 });
 
 test("resetting a new report on the same day retains loaded defaults", async () => {
