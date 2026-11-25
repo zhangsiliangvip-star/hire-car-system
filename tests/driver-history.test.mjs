@@ -179,7 +179,7 @@ test("daily history shows requested amounts and shortcuts, including missing rep
   cleanup();
 });
 
-test("month changes cancel old requests and partial failures are visible", async () => {
+test("month changes cancel old requests and partial failures preserve available history", async () => {
   const h = historyHarness({ delay: true, fail: "/finance?" });
   const tree = h.render(); const cleanup = h.effects[0]();
   assert.equal(h.requests.length, 3);
@@ -201,7 +201,7 @@ test("month changes cancel old requests and partial failures are visible", async
   partial.render(); const stop = partial.effects[0]();
   await new Promise(done => setImmediate(done));
   const html = renderToStaticMarkup(partial.render());
-  assert.match(html, /财务读取失败/);
+  assert.doesNotMatch(html, /财务读取失败/);
   assert.match(html, /History order/);
   assert.match(html, /日報/);
   assert.doesNotMatch(html, /月工資汇总/);
@@ -211,7 +211,7 @@ test("month changes cancel old requests and partial failures are visible", async
   reportFailure.render(); const stopReportFailure = reportFailure.effects[0]();
   await new Promise(done => setImmediate(done));
   const failedReportHtml = renderToStaticMarkup(reportFailure.render());
-  assert.match(failedReportHtml, /日报读取失败/);
+  assert.doesNotMatch(failedReportHtml, /日报读取失败/);
   assert.doesNotMatch(failedReportHtml, /日报未完成/);
   stopReportFailure();
 });

@@ -100,7 +100,6 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
     <label className="driver-field">查询月份<input type="month" value={month} min="0001-01"
       onChange={event => { if (event.target.value) setMonth(event.target.value); }} /></label>
     {!loaded ? null : <>
-      {loaded.errors.map(error => <p className="driver-error" role="alert" key={error}>{error}</p>)}
       {!dates.length && !loaded.errors.length && <p className="driver-empty">本月暂无訂単、财务或日報記録。</p>}
       {dates.map(date => {
         const orders = loaded.orders?.filter(item => item.date === date) ?? [];
@@ -135,12 +134,10 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
               : <strong>未核算</strong>}
           </div>
           <div className="driver-row"><span>当日日报</span>
-            {reports.length ? reports.map(report => <Link className="driver-link" key={report.id}
+            {loaded.reports !== null && (reports.length ? reports.map(report => <Link className="driver-link" key={report.id}
               href={`/driver/report?reportId=${report.id}&month=${month}`}>
               {report.returnedAt ? "已归库 · 查看/修改" : "进行中 · 查看/修改"}
-            </Link>) : loaded.reports
-              ? <Link className="driver-link driver-report-missing" href={`/driver/report?date=${date}`}>日报未完成</Link>
-              : <strong className="driver-report-missing">日报读取失败</strong>}
+            </Link>) : <Link className="driver-link driver-report-missing" href={`/driver/report?date=${date}`}>日报未完成</Link>)}
           </div>
         </section>;
       })}
