@@ -3,9 +3,12 @@
 import Link from "next/link";
 import DriverNavigation from "@/app/driver/navigation";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/browser";
 import { japanDate } from "@/lib/driver/orders";
-import { buildDriverCalendar, driverCalendarRange, driverCalendarSchema, type DriverCalendarEntry } from "@/lib/driver/calendar";
+import { buildDriverCalendar, buildDriverCalendarFinance, driverCalendarRange, driverCalendarSchema, type DriverCalendarEntry } from "@/lib/driver/calendar";
+import { financeDataSchema } from "@/lib/driver/finance";
+import { reportHistorySchema } from "@/lib/driver/reports";
 import { shiftDataSchema } from "@/lib/driver/shifts";
 import { getJapaneseHolidays } from "@/lib/japanese-holidays";
 import "./calendar.css";
@@ -24,7 +27,8 @@ function moveMonth(month: string, offset: number) {
 export default function DriverCalendar() {
   const today = japanDate();
   const [month, setMonth] = useState(() => today.slice(0, 7));
-  const [data, setData] = useState<{ month: string; entries: DriverCalendarEntry[]; rest: string[] } | null>(null);
+  const [data, setData] = useState<{ month: string; entries: DriverCalendarEntry[]; rest: string[];
+    finance: ReturnType<typeof financeDataSchema.parse>; reports: ReturnType<typeof reportHistorySchema.parse> } | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
@@ -35,21 +39,32 @@ export default function DriverCalendar() {
     let active = true;
     async function load() {
       try {
-        const [calendar, shifts] = await Promise.all([
+        const [calendar, shifts, finance, reports] = await Promise.all([
           fetch(`/api/driver/calendar?month=${month}`, { cache: "no-store", signal: controller.signal }),
           fetch(`/api/driver/shifts?month=${month}`, { cache: "no-store", signal: controller.signal }),
+          fetch(`/api/driver/finance?month=${month}`, { cache: "no-store", signal: controller.signal }),
+          fetch(`/api/driver/report-history?month=${month}`, { cache: "no-store", signal: controller.signal }),
         ]);
-        if (calendar.status === 401 || shifts.status === 401) { location.replace("/driver/login?next=%2Fdriver%2Fcalendar"); return; }
-        const result = await calendar.json();
+        if ([calendar, shifts, finance, reports].some(response => response.status === 401)) {
+          location.replace("/driver/login?next=%2Fdriver%2Fcalendar"); return;
+        }
+        const [result, financeResult, reportsResult] = await Promise.all([
+          calendar.json(), finance.json(), reports.json(),
+        ]);
         if (!calendar.ok) throw new Error(result.error || "无法读取日歴，請重试。");
+        if (!finance.ok) throw new Error(financeResult.error || "无法读取财务，請重试。");
+        if (!reports.ok) throw new Error(reportsResult.error || "无法读取日報，請重试。");
         const parsed = driverCalendarSchema.parse(result);
         if (parsed.month !== month) throw new Error("月份不一致，請重试。");
+        const parsedFinance = financeDataSchema.parse(financeResult);
+        const parsedReports = z.object({ reports: reportHistorySchema }).strict().parse(reportsResult).reports;
         let rest: string[] = [];
         if (shifts.ok) {
           const shift = shiftDataSchema.safeParse(await shifts.json());
           if (shift.success && shift.data.month === month) rest = shift.data.dates;
         }
-        if (active) { setData({ month, entries: parsed.entries, rest }); setError(""); }
+        if (active) { setData({ month, entries: parsed.entries, rest, finance: parsedFinance,
+          reports: parsedReports }); setError(""); }
       } catch (cause) {
         if (controller.signal.aborted || !active) return;
         console.error("Driver calendar load failed.", cause);
@@ -81,6 +96,8 @@ export default function DriverCalendar() {
       red: holiday || weekday === 0 || weekday === 6, holiday, rest: restDates.has(date) };
   });
   const vehicles = loaded ? buildDriverCalendar(loaded.entries, dates.map(day => day.date)) : [];
+  const dailyFinance = loaded ? buildDriverCalendarFinance(dates.map(day => day.date), loaded.finance,
+    loaded.reports) : [];
 
   useEffect(() => {
     const element = scroller.current;
@@ -106,7 +123,7 @@ export default function DriverCalendar() {
       <button type="button" className="driver-calendar-today" aria-pressed={month === today.slice(0, 7)}
         onClick={() => { scrolledMonth.current = ""; if (month === today.slice(0, 7)) setRevision(value => value + 1); else changeMonth(today.slice(0, 7)); }}>今天</button>
     </div>
-    <p className="driver-muted">只显示分配给你的訂単及使用車両；红色「休」为你提交的希望休。</p>
+    <p className="driver-muted">只显示分配给你的訂単及使用車両；红色「休」为你提交的希望休。工资、申報与日報按日期汇总，申報金额包含待审核项目。</p>
     {error && <p className="driver-error" role="alert">{error}</p>}
     {!loaded ? (!error && <p className="driver-empty" role="status">正在读取日歴…</p>) : <>
       <div className="driver-calendar-scroll" ref={scroller}>
@@ -140,6 +157,35 @@ export default function DriverCalendar() {
               </div>}
             </div>)}
           </div>)}
+          <div className="driver-calendar-row driver-calendar-finance-row">
+          <div className="driver-calendar-vehicle driver-calendar-finance-label">
+            <strong>财务 / 日報</strong>
+            {loaded.finance.manualItems.some(item => item.amount !== 0)
+              ? <span>月调整 ¥{loaded.finance.manualItems.reduce((sum, item) => sum + item.amount, 0).toLocaleString("ja-JP")}</span>
+              : <span>按日汇总</span>}
+          </div>
+          {dailyFinance.map((day, index) => <div key={dates[index].date}
+            className={`driver-calendar-finance-cell${dates[index].date === today ? " is-today" : ""}`}
+            aria-label={`${dates[index].date}财务与日報`}>
+            {day.wage !== null && <Link href={`/driver/finance?date=${dates[index].date}&view=wages`}>
+              工资 {`¥${day.wage.toLocaleString("ja-JP")}`}
+            </Link>}
+            {day.company > 0 && <Link href={`/driver/finance?date=${dates[index].date}`}>
+              社報 {`¥${day.company.toLocaleString("ja-JP")}`}
+            </Link>}
+            {day.trip > 0 && <Link href={`/driver/finance?date=${dates[index].date}`}>
+              旅報 {`¥${day.trip.toLocaleString("ja-JP")}`}
+            </Link>}
+            {day.fuel > 0 && <Link href={`/driver/finance?date=${dates[index].date}`}>
+              燃油 {`¥${day.fuel.toLocaleString("ja-JP")}`}
+            </Link>}
+            {day.reports.map(report => <Link key={report.id}
+              href={`/driver/report?reportId=${report.id}&month=${month}`}>
+              日報 {report.returnedAt ? "已归库" : "进行中"}
+            </Link>)}
+            {day.wage === null && !day.company && !day.trip && !day.fuel && !day.reports.length && <span>—</span>}
+          </div>)}
+          </div>
         </div>
       </div>
       {!vehicles.length && <div className="driver-card driver-empty">本月暂无分配给你的訂単。</div>}

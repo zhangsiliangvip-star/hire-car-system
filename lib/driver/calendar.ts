@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { shiftMonthSchema } from "@/lib/driver/shifts";
+import type { FinanceData } from "./finance";
+
+export type DriverCalendarReport = { id: string; serviceDate: string; returnedAt: string | null };
 
 export const driverCalendarEntrySchema = z.object({
   orderId: z.uuid(),
@@ -16,6 +19,46 @@ export const driverCalendarSchema = z.object({
   entries: z.array(driverCalendarEntrySchema).max(2000),
 }).strict().refine(value => value.entries.every(entry => entry.date.startsWith(`${value.month}-`)));
 export type DriverCalendarEntry = z.infer<typeof driverCalendarEntrySchema>;
+
+export type DriverCalendarFinanceDay = {
+  wage: number | null;
+  company: number;
+  trip: number;
+  fuel: number;
+  reports: DriverCalendarReport[];
+};
+
+export function buildDriverCalendarFinance(
+  dates: string[],
+  finance: FinanceData,
+  reports: DriverCalendarReport[],
+): DriverCalendarFinanceDay[] {
+  const summaries = new Map(dates.map(date => [date, {
+    wage: null as number | null, company: 0, trip: 0, fuel: 0, reports: [] as DriverCalendarReport[],
+  }]));
+  for (const row of finance.wages) {
+    const day = summaries.get(row.date);
+    if (day) day.wage = (day.wage ?? 0) + row.base + row.bonus + row.overtime + row.advances;
+  }
+  for (const item of finance.trips) {
+    const day = summaries.get(item.date);
+    if (!day) continue;
+    for (const claim of item.claims) {
+      for (const expense of claim.expenses) {
+        if (expense.type === "company") day.company += expense.amount;
+        if (expense.type === "trip") day.trip += expense.amount;
+      }
+    }
+  }
+  for (const claim of finance.fuelClaims) {
+    const day = summaries.get(claim.date);
+    if (day) day.fuel += claim.amount;
+  }
+  for (const report of reports) {
+    summaries.get(report.serviceDate)?.reports.push(report);
+  }
+  return dates.map(date => summaries.get(date)!);
+}
 
 export function driverCalendarRange(month: string) {
   const parsed = shiftMonthSchema.parse(month);
