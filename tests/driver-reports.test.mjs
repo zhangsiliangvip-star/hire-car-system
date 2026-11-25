@@ -588,7 +588,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.match(html, /請選択当天訂単/);
   const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
   assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-    ["日期", "关联当天訂単", "車両番号", "運転手", "客数", "出勤点呼時間"]);
+    ["日期", "关联当天訂単", "車両番号", "運転手", "客数", "出勤点呼時間", "退勤点呼時間"]);
   assert.doesNotMatch(headerMarkup, /driver-card/);
   select.onChange({ target: { value: id } });
   html = render();
@@ -1126,16 +1126,15 @@ test("mobile report renders departure, stops, rest controls and completed totals
     for (const label of ["日期", "出勤点呼時間", "退勤点呼時間", "車両番号", "運転手", "客数"]) assert.ok(html.includes(`aria-label="${label}"`));
     const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
     assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-        ["日期", "車両番号", "運転手", "客数", "出勤点呼時間"]);
+      ["日期", "車両番号", "運転手", "客数", "出勤点呼時間", "退勤点呼時間"]);
     assert.doesNotMatch(html, /出勤点呼日期|退勤点呼日期|dutyStartDate|name="dutyEndDate"/);
-    assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('aria-label="退勤点呼時間"'));
-      assert.ok(headerMarkup.indexOf('aria-label="客数"') < headerMarkup.indexOf('aria-label="出勤点呼時間"'));
-      assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('<tbody aria-label="出库記録">'));
+    assert.ok(headerMarkup.indexOf('aria-label="客数"') < headerMarkup.indexOf('aria-label="出勤点呼時間"'));
+    assert.ok(headerMarkup.indexOf('aria-label="出勤点呼時間"') < headerMarkup.indexOf('aria-label="退勤点呼時間"'));
+    assert.ok(headerMarkup.indexOf('aria-label="退勤点呼時間"') < html.indexOf('<tbody aria-label="出库記録">'));
     assert.ok(html.indexOf('<tbody aria-label="出库記録">') < html.indexOf('<tbody aria-label="归库記録">'));
-    assert.ok(html.indexOf('<tbody aria-label="归库記録">') < html.indexOf('<tbody aria-label="退勤点呼">'));
-      assert.doesNotMatch(html, /<tbody aria-label="出勤点呼">|<h2>日報<\/h2>/);
-      assert.match(html, /<section class="driver-card driver-stops driver-report-card" aria-label="日報">/);
-      assert.match(html, /<caption class="driver-report-caption">乗務記録<\/caption>/);
+    assert.doesNotMatch(html, /<tbody aria-label="出勤点呼">|<tbody aria-label="退勤点呼">|<h2>日報<\/h2>/);
+    assert.match(html, /<section class="driver-card driver-stops driver-report-card" aria-label="日報">/);
+    assert.match(html, /<caption class="driver-report-caption">乗務記録<\/caption>/);
     assert.match(html, /<details[^>]*><summary>历史日報<\/summary>/);
     const historyOptions = html.match(/<summary>历史日報<\/summary>[\s\S]*?<select[^>]*>([\s\S]*?)<\/select>/)?.[1];
     assert.ok(historyOptions);
@@ -1215,7 +1214,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.match(stopHtml, /<input(?=[^>]*name="km")(?=[^>]*type="number")(?=[^>]*value="120")[^>]*>/);
     assert.doesNotMatch(stopHtml, /name="arrivedKm"|name="departedKm"|到着 km|出発 km/);
     assert.ok(html.includes('value="00:00"'));
-    const locationRows = html.slice(html.indexOf('<tbody aria-label="出库記録">'), html.indexOf('<tbody aria-label="退勤点呼">'));
+    const locationRows = html.slice(html.indexOf('<tbody aria-label="出库記録">'), html.indexOf('</table>'));
     assert.doesNotMatch(locationRows, /type="(?:date|datetime-local)"/);
     assert.doesNotMatch(html.replace(/<[^>]*>/g, ""), /(?:\s|T)\d{2}:\d{2}:\d{2}/);
     assert.doesNotMatch(html, /時間打卡|本次記録：/);

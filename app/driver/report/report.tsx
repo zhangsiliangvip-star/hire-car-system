@@ -610,6 +610,9 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
         <DriverReportDutyRows key={`duty-start-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
           position="start" header={report?.header}
           disabled={saving} draft={draftFields} />
+        <DriverReportDutyRows key={`duty-end-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
+          position="end" header={report?.header}
+          disabled={saving} draft={draftFields} />
         </form>
         <table ref={table} className="driver-stop-table driver-sheet" onInput={e => {
           if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-header" || e.target.form?.id === "report-checkout" ||
@@ -645,9 +648,6 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           <ReturnRow key={`return-${report.id}`} report={report} depotAddress={garageAddress}
             disabled={saving} saveChanges={saveChanges} fields={draftFields} />
           </>}
-          <DriverReportDutyRows key={`duty-end-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
-            position="end" header={report?.header}
-            disabled={saving} draft={draftFields} />
         </table>
         {addStop}
       </section>
