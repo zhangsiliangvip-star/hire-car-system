@@ -99,7 +99,6 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
     <h1>日歴</h1>
     <label className="driver-field">查询月份<input type="month" value={month} min="0001-01"
       onChange={event => { if (event.target.value) setMonth(event.target.value); }} /></label>
-    <button className="driver-link" type="button" onClick={() => { setData(null); setRevision(value => value + 1); }}>刷新日歴</button>
     {!loaded ? <p className="driver-empty" role="status">正在读取日歴…</p> : <>
       {loaded.errors.map(error => <p className="driver-error" role="alert" key={error}>{error}</p>)}
       {loaded.finance && <Link className="driver-card" href={`/driver/finance?month=${encodeURIComponent(month)}&view=wages`}>
