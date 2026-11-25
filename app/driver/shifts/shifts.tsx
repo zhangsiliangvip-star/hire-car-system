@@ -122,7 +122,7 @@ export default function DriverShifts() {
           onClick={() => setSelectionMode("rest")}>希望休</button>
       </div>
       <div className="shift-calendar" aria-label="シフト希望日期">
-          {["日", "月", "火", "水", "木", "金", "土"].map(day => <span className="shift-weekday" key={day}>{day}</span>)}
+          {["月", "火", "水", "木", "金", "土", "日"].map(day => <span className="shift-weekday" key={day}>{day}</span>)}
           {Array.from({ length: calendar.offset }, (_, index) => <span key={`blank-${index}`} />)}
           {calendar.dates.map(date => {
             const restSelected = dates.includes(date);

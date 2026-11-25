@@ -2,12 +2,12 @@
 
 import DriverNavigation from "@/app/driver/navigation";
 import Link from "next/link";
-import { ReportDutyFields } from "@/components/report-duty-fields";
+import { DriverReportDutyRows } from "@/components/driver-report-duty-rows";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { createDriverRequestId } from "@/lib/driver/orders";
 import { captureReportFields, readReportDraft, writeReportDraft, type ReportDraft } from "@/lib/driver/report-draft";
-import { departureFromForm, durationLabel, formatManualClock, fromJapanInput, reportCommandSchema, reportDataSchema, reportDefaultsSchema, reportTime,
+import { defaultDutyEndDate, departureFromForm, durationLabel, formatManualClock, fromJapanInput, reportCommandSchema, reportDataSchema, reportDefaultsSchema, reportTime,
   reportHeaderSchema, reportHeaderShapeSchema, reportOnDate, reportSchema, reportTimeOrderError, reportTotals, returnFromForm, stopFromForm, toJapanInput, type DailyReport } from "@/lib/driver/reports";
 import { z } from "zod";
 import styles from "./report.module.css";
@@ -413,14 +413,15 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
       const value = String(fields.get(name) ?? "");
       return validDate(value) ? value : force ? previousValue ?? report?.serviceDate ?? headerServiceDate : value;
     };
+    const dutyStartDate = date("dutyStartDate", Boolean(dutyStartTime), previous?.dutyStartDate);
     const passengerValue = fields.get("passengerCount");
     const passengerCount = passengerValue === "" ? null : Number(passengerValue);
     const vehicleValue = String(fields.get("vehicleNumber") ?? "");
     const driverValue = String(fields.get("driverName") ?? "");
     const header = { serviceDate: headerServiceDate,
       dutyStartTime, dutyEndTime,
-      dutyStartDate: date("dutyStartDate", Boolean(dutyStartTime), previous?.dutyStartDate),
-      dutyEndDate: date("dutyEndDate", Boolean(dutyEndTime), previous?.dutyEndDate),
+      dutyStartDate,
+      dutyEndDate: dutyEndTime ? defaultDutyEndDate(dutyStartDate ?? headerServiceDate, dutyStartTime ?? "", dutyEndTime) : null,
       ...(data?.vehicleLinking ? {
         assignmentId: report ? String(fields.get("assignmentId") ?? "") || null : selectedOrder?.assignmentId ?? null,
         vehicleBaseline: report ? String(fields.get("vehicleBaseline") ?? "") : selectedOrder?.vehicleNumber ?? "",
@@ -612,20 +613,21 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
         <label>運転手<input key={report ? report.header?.driverName ?? "" : `${serviceDate}-${currentDefaults?.driverName ?? ""}`} name="driverName" aria-label="運転手"
           maxLength={100} disabled={saving || (!report && !currentDefaults)}
           defaultValue={draftFields?.["report-header/driverName"] ?? report?.header?.driverName ?? currentDefaults?.driverName ?? ""} /></label>
-        <ReportDutyFields key={`duty-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
-          header={report?.header} serviceDate={report?.serviceDate ?? serviceDate} disabled={saving}
-          manualTimeInput draft={draftFields} />
       </form>
       <section className="driver-card driver-stops" aria-label="出库经由地归库"><h2>出库 · 经由地 · 归库</h2>
         <p className="driver-muted">日報默认处于修改状态；经由地時間手動填写后统一保存，早于上一项自動顺延至次日。已归库日報也可修改和追加、削除经由地。</p>
         <table ref={table} className="driver-stop-table driver-sheet" onInput={e => {
-          if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-checkout" || e.target.form?.dataset.stopId || e.target.form?.hasAttribute("data-departure") || e.target.form?.hasAttribute("data-return"))) setDirty(true);
+          if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-header" || e.target.form?.id === "report-checkout" ||
+            e.target.form?.dataset.stopId || e.target.form?.hasAttribute("data-departure") || e.target.form?.hasAttribute("data-return"))) setDirty(true);
         }}>
           <caption>{report ? `${report.serviceDate} · ${report.returnedAt ? "已归库" : "出库中"}` : "新日報"} · 日本時間</caption>
           <colgroup><col className="driver-col-label" /><col className="driver-col-address" /><col className="driver-col-km" />
             <col className="driver-col-time" /><col className="driver-col-time" /></colgroup>
           <thead><tr><th scope="col">项目</th><th scope="col">地址</th><th scope="col">公里数</th>
             <th scope="col">到着</th><th scope="col">出発</th></tr></thead>
+          <DriverReportDutyRows key={`duty-start-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
+            position="start" header={report?.header} serviceDate={report?.serviceDate ?? serviceDate}
+            disabled={saving} draft={draftFields} />
           {!report && <LocationRows key={serviceDate} locationKey={assignment} serviceDate={serviceDate} fields={draftFields}
             disabled={saving || !currentDefaults || needsOrder} save={async p => {
             if (!currentDefaults || needsOrder) { setError("請先读取当天訂単并選択訂単。"); return false; }
@@ -648,6 +650,9 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
            allowDelete fields={draftFields} />)}
           <ReturnRow key={`return-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} fields={draftFields} />
           </>}
+          <DriverReportDutyRows key={`duty-end-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
+            position="end" header={report?.header} serviceDate={report?.serviceDate ?? serviceDate}
+            disabled={saving} draft={draftFields} />
         </table>
         {addStop}
         {!report && <p className="driver-muted">保存开始地点后，可在表格内继续添加经由地。</p>}
@@ -668,7 +673,10 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           setDirty(false); setStarting(false); setSelected(e.target.value); setError(""); setNotice("");
         }}>
           {!report && <option value="">新日報 · 待出库</option>}
-          {data.reports.map(r => <option key={r.id} value={r.id}>{r.serviceDate}</option>)}
+          {data.reports.map(r => {
+            const orderName = r.orderOptions?.find(option => option.assignmentId === r.header?.assignmentId)?.label.trim();
+            return <option key={r.id} value={r.id}>{r.serviceDate}{orderName ? ` · ${orderName}` : ""}</option>;
+          })}
         </select></label></details>}
         {data && !busy && !report && <div className={styles.floatingActions} role="group" aria-label="開始地点保存">
           <button type="submit" form="report-checkout" className="driver-button"

@@ -22,6 +22,7 @@ function load(relative, mocks = {}, globals = {}) {
     require: name => Object.hasOwn(mocks, name) ? mocks[name] :
       name === "@/app/driver/navigation" ? load("app/driver/navigation.tsx", mocks, globals) :
       name === "@/components/report-duty-fields" ? load("components/report-duty-fields.tsx", { "@/lib/driver/reports": reports }) :
+      name === "@/components/driver-report-duty-rows" ? load("components/driver-report-duty-rows.tsx", { "@/lib/driver/reports": reports }) :
       name === "@/lib/driver/report-draft" ? load("lib/driver/report-draft.ts") :
       name === "./report.module.css" ? { default: { report: "driver-report", floatingActions: "driver-report-actions" } } : require(name),
     Request, Response, Headers, URL, Date, Intl, process, queueMicrotask, console: { error() {} }, ...globals,
@@ -252,9 +253,7 @@ test("incomplete report fields survive app switches, navigation and reload witho
   h.field("report-header", "passengerCount", "");
   h.field("report-header", "dutyStartTime", "2");
   h.field("report-header", "dutyStartDate", "2026-10-27");
-  h.field("report-header", "dutyEndDate", "2026-10-28");
   h.field("report-header", "dutyEndTime", "0215");
-  h.field("report-header", "dutyEndManual", "0");
   h.field("report-edit-departure", "address", "Unsaved depot");
   h.field("report-edit-departure", "km", "");
   h.field("report-edit-return", "address", "Unsaved return");
@@ -271,7 +270,8 @@ test("incomplete report fields survive app switches, navigation and reload witho
   for (const value of ["Draft plate", "Unsaved depot", "Unsaved return", "0215"])
     assert.ok(html.includes(`value="${value}"`), value);
   assert.match(html, /name="dutyStartTime"[^>]*value="2"/);
-  assert.match(html, /name="dutyEndManual"[^>]*value="0"/);
+  assert.match(html, /name="dutyEndTime"[^>]*value="0215"/);
+  assert.doesNotMatch(html, /name="dutyEndDate"|退勤点呼日期/);
   assert.match(html, /name="passengerCount"[^>]*value=""/);
   assert.match(html, /aria-label="出库公里表"[^>]*value=""/);
   assert.match(html, /已恢复本机草稿/);
@@ -1092,7 +1092,12 @@ test("mobile report renders departure, stops, rest controls and completed totals
   const layouts = [];
   for (const closed of [true,false]) {
     let cursor = 0;
-    const r = { ...fixture, stops: [{ id: closed ? id : id.replace(/1$/, "2"), address: "Synthetic long test stop address".repeat(4),
+    const r = { ...fixture,
+      header: { assignmentId: id, dutyStartDate: fixture.serviceDate, dutyEndDate: "2026-10-28",
+        dutyStartTime: "22:00", dutyEndTime: "02:30", vehicleNumber: "Synthetic plate",
+        driverName: "Synthetic driver", passengerCount: 3 },
+      orderOptions: [{ assignmentId: id, label: "Synthetic order name", vehicleNumber: "Synthetic plate" }],
+      stops: [{ id: closed ? id : id.replace(/1$/, "2"), address: "Synthetic long test stop address".repeat(4),
       arrivedAt: "2026-10-28T00:00:00+09:00", arrivedKm: 120,
       departedAt: closed ? "2026-10-28T00:15:00+09:00" : null, departedKm: closed ? 120 : null }],
       returnedAt: closed ? fixture.returnedAt : null,
@@ -1116,13 +1121,17 @@ test("mobile report renders departure, stops, rest controls and completed totals
     for (const label of ["日期", "出勤点呼時間", "退勤点呼時間", "車両番号", "運転手", "客数"]) assert.ok(html.includes(`aria-label="${label}"`));
     const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
     assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-      ["日期", "客数", "車両番号", "運転手", "出勤点呼日期", "退勤点呼日期", "出勤点呼時間", "退勤点呼時間"]);
+      ["日期", "客数", "車両番号", "運転手"]);
+    assert.doesNotMatch(html, /退勤点呼日期|name="dutyEndDate"/);
     assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('aria-label="退勤点呼時間"'));
-    assert.ok(html.indexOf('aria-label="運転手"') < html.indexOf('aria-label="出勤点呼時間"'));
+    assert.ok(html.indexOf('<tbody aria-label="出勤点呼">') < html.indexOf('<tbody aria-label="出库記録">'));
+    assert.ok(html.indexOf('<tbody aria-label="出库記録">') < html.indexOf('<tbody aria-label="归库記録">'));
+    assert.ok(html.indexOf('<tbody aria-label="归库記録">') < html.indexOf('<tbody aria-label="退勤点呼">'));
+    assert.match(html, /<td colSpan="4"><div class="driver-duty-inline">[\s\S]*aria-label="出勤点呼日期"[\s\S]*aria-label="出勤点呼時間"/);
     assert.match(html, /<details[^>]*><summary>历史日報<\/summary>/);
     const historyOptions = html.match(/<summary>历史日報<\/summary>[\s\S]*?<select[^>]*>([\s\S]*?)<\/select>/)?.[1];
     assert.ok(historyOptions);
-    assert.match(historyOptions, new RegExp(`<option value="${fixture.id}"(?: selected="")?>${fixture.serviceDate}</option>`));
+    assert.match(historyOptions, new RegExp(`<option value="${fixture.id}"(?: selected="")?>${fixture.serviceDate} · Synthetic order name</option>`));
     assert.doesNotMatch(historyOptions, /已归库|出库中|\d{2}:\d{2}/);
     assert.ok(html.indexOf('aria-label="日報基本信息"') < html.indexOf('<table'));
     assert.ok(html.indexOf('<summary>历史日報') > html.indexOf('</table>'));
@@ -1197,7 +1206,8 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.match(stopHtml, /<input(?=[^>]*name="km")(?=[^>]*type="number")(?=[^>]*value="120")[^>]*>/);
     assert.doesNotMatch(stopHtml, /name="arrivedKm"|name="departedKm"|到着 km|出発 km/);
     assert.ok(html.includes('value="00:00"'));
-    assert.doesNotMatch(routeSection, /type="(?:date|datetime-local)"/);
+    const locationRows = html.slice(html.indexOf('<tbody aria-label="出库記録">'), html.indexOf('<tbody aria-label="退勤点呼">'));
+    assert.doesNotMatch(locationRows, /type="(?:date|datetime-local)"/);
     assert.doesNotMatch(html.replace(/<[^>]*>/g, ""), /(?:\s|T)\d{2}:\d{2}:\d{2}/);
     assert.doesNotMatch(html, /時間打卡|本次記録：/);
     assert.doesNotMatch(html, /一键到达打卡|一键出発打卡/);

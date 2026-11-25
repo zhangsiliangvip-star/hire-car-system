@@ -22,6 +22,10 @@
 .report :global(.driver-sheet-location){background:#edf3ef;height:40px}
 .report :global(.driver-sheet-location) > th,.report :global(.driver-sheet-location) > td{height:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal}
 .report :global(.driver-sheet-location) > th:global(.driver-location-label){white-space:normal;line-height:1.15;overflow:visible}
+.report :global(.driver-sheet-duty) > th,.report :global(.driver-sheet-duty) > td{height:auto;min-height:40px;white-space:normal;overflow:visible}
+.report :global(.driver-duty-inline){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:end}
+.report :global(.driver-duty-inline label){display:flex;flex-direction:column;min-width:0;font-size:11px;line-height:1.35}
+.report :global(.driver-duty-end) label{grid-column:1}
 .report :global(.driver-sheet-location) :global(.driver-check){height:34px;max-height:34px;overflow:hidden;white-space:nowrap}
 .report :global(.driver-sheet) input:not([type=checkbox]){box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;height:34px;min-height:34px;max-height:34px;margin:0;padding:2px 3px;line-height:28px;background:white;color:inherit;border:1px solid #dbe5dd;border-radius:2px;font-size:16px}
 .report :global(.driver-sheet) input[data-manual-time]{padding:2px 0;text-align:center}

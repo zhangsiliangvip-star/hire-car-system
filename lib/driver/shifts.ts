@@ -27,7 +27,7 @@ export function shiftMonthDays(month: string) {
   const start = new Date(`${parsed}-01T00:00:00Z`);
   const count = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
   return {
-    offset: start.getUTCDay(),
+    offset: (start.getUTCDay() + 6) % 7,
     dates: Array.from({ length: count }, (_, index) => `${parsed}-${String(index + 1).padStart(2, "0")}`),
   };
 }

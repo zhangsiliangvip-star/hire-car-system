@@ -88,7 +88,8 @@ test("monthly shifts validate exact month, unique in-month dates and bounded not
     assert.equal(shifts.shiftSubmissionSchema.safeParse({ ...command, ...patch }).success, false);
   assert.equal(shifts.shiftMonthDays("2028-02").dates.length, 29);
   assert.equal(shifts.shiftMonthDays("2026-02").dates.length, 28);
-  assert.equal(shifts.shiftMonthDays("2026-11").offset, 0);
+  assert.equal(shifts.shiftMonthDays("2026-11").offset, 6);
+  assert.equal(shifts.shiftMonthDays("2026-12").offset, 1);
 });
 test("driver shifts reject identities and ownership selectors before invoking database", async () => {
   for (const denied of [401, 403, 404]) {
@@ -179,6 +180,7 @@ function renderShift({ fetch: fetchMock = async () => Response.json(data), confi
 test("monthly calendar selects one preference mode before tapping dates", () => {
   const h = renderShift();
   assert.equal(h.buttons.filter(button => button["aria-label"]?.startsWith("2026-11-")).length, 30);
+  assert.match(h.html, /<span class="shift-weekday">月<\/span><span class="shift-weekday">火<\/span><span class="shift-weekday">水<\/span>/);
   assert.match(h.html, /aria-label="2026-11-01 休日 希望休" aria-pressed="true"/);
   assert.match(h.html, /aria-label="2026-11-03 祝日"/);
   assert.match(h.html, /<small>休日<\/small>/);
