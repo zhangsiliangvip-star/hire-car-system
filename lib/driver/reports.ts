@@ -41,6 +41,9 @@ export const reportSchema = z.object({
   rests: z.array(z.object({ startedAt: instant, endedAt: instant.nullable() }).strict()).max(100),
 }).strict();
 export type DailyReport = z.infer<typeof reportSchema>;
+export const reportHistorySchema = z.array(z.object({
+  id: z.uuid(), serviceDate: z.iso.date(), returnedAt: instant.nullable(),
+}).strict());
 export const reportTimeErrors: Record<string, string> = {
   PVS01: "訂単关联与運転士或服务日不一致，請重新選択关联訂単。",
   PVS02: "請填写本地域已登记且唯一的車両番号；关联日報保存后会同步訂単。",

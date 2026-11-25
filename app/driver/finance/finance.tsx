@@ -1,6 +1,7 @@
 "use client";
 
 import DriverNavigation from "@/app/driver/navigation";
+import Link from "next/link";
 import { ReceiptDialog } from "@/components/order-receipts";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
@@ -12,9 +13,11 @@ import { fuelClaimSchema, fuelSubmissionSchema } from "@/lib/driver/fuel";
 
 const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
 const labels = { pending: "待后台确认", approved: "已确认入账", rejected: "已退回，請修改后提交" };
-export default function DriverFinance() {
-  const [month, setMonth] = useState(() => japanDate().slice(0, 7));
-  const [date, setDate] = useState(() => japanDate());
+export default function DriverFinance({ initialDate, initialAssignmentId, initialView }: {
+  initialDate?: string; initialAssignmentId?: string; initialView?: "wages";
+} = {}) {
+  const [month, setMonth] = useState(() => (initialDate ?? japanDate()).slice(0, 7));
+  const [date, setDate] = useState(() => initialDate ?? japanDate());
   const [data, setData] = useState<FinanceData | null>(null);
   const [selected, setSelected] = useState("");
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -25,7 +28,7 @@ export default function DriverFinance() {
   const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
   const [receipt, setReceipt] = useState("");
-  const [view, setView] = useState<"claims" | "wages">("claims");
+  const [view, setView] = useState<"claims" | "wages">(initialView ?? "claims");
   const [fuelAmount, setFuelAmount] = useState("");
   const [fuelReceipts, setFuelReceipts] = useState<string[]>([]);
   const [fuelAssignment, setFuelAssignment] = useState("");
@@ -34,6 +37,7 @@ export default function DriverFinance() {
   const pickingReceipt = useRef(false);
   const selectedDate = useRef(date);
   const pending = useRef<{ key: string; id: string } | null>(null);
+  const initialTarget = useRef(initialAssignmentId);
   const trip = data?.trips.find(item => item.assignmentId === selected);
   const overtimeClaim = trip?.claims.find(item => item.category === "overtime");
   const fuelClaim = data?.fuelClaims.find(item => item.date === date);
@@ -65,6 +69,15 @@ export default function DriverFinance() {
         setData(parsed);
         const fuel = parsed.fuelClaims.find(item => item.date === selectedDate.current);
         setFuelAmount(fuel ? String(fuel.amount) : ""); setFuelReceipts(fuel?.receipts || []); setFuelAssignment(fuel?.assignmentId || "");
+        if (initialTarget.current) {
+          const item = parsed.trips.find(trip => trip.assignmentId === initialTarget.current && trip.date === selectedDate.current);
+          if (item) {
+            setSelected(item.assignmentId);
+            setExpenses(item.claims.flatMap(claim => claim.expenses));
+            setHours(String(item.claims.find(claim => claim.category === "overtime")?.overtimeHours ?? item.existingOvertimeHours));
+          } else setError("所选财务記録不存在或当前不可修改，請返回日歴核对。");
+          initialTarget.current = undefined;
+        }
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Driver finance load failed.", cause);
@@ -103,6 +116,7 @@ export default function DriverFinance() {
   function canLeave() { return !dirty || window.confirm("切换会放弃尚未提交的明細，是否继续？"); }
   function changeDate(next: string) {
     if (!next || next === date || !canLeave()) return;
+    initialTarget.current = undefined;
     const nextMonth = next.slice(0, 7);
     if (nextMonth !== month) {
       setLoading(true); setData(null); setMonth(nextMonth);
@@ -258,6 +272,8 @@ export default function DriverFinance() {
   }), { base: 0, bonus: 0, overtime: 0, advances: 0 });
   return <main className="driver-main driver-finance">
     <DriverNavigation active="finance" busy={busy} canLeave={canLeave} />
+    {initialDate && <Link className="driver-link" href={`/driver/history?month=${encodeURIComponent(month)}`}
+      onClick={event => { if (busy || !canLeave()) event.preventDefault(); }}>‹ 返回日歴</Link>}
     <h1>财务工資</h1>
     <div className="driver-tabs" aria-label="财务界面">
       <button type="button" aria-pressed={view === "claims"} onClick={() => { setView("claims"); setReceipt(""); }}>立替申報</button>
@@ -266,6 +282,7 @@ export default function DriverFinance() {
     <p className="driver-muted">本人有效行程可申報社報／旅報、超時和燃油費；历史訂単可补录社報／旅報及超時。提交后直接入账，仍可修改金额、明細及票据。已入账费用按新旧差额更新，超時小時数替换当天原值，保留修改記録。切后台会清除未提交草稿，請先保存。</p>
     <label className="driver-field">月份<input type="month" value={month} disabled={busy}
       onChange={event => { if (event.target.value && canLeave()) {
+        initialTarget.current = undefined;
         setLoading(true); setData(null); setSelected(""); setExpenses([]); setHours(""); setError(""); setNotice(""); setReceipt("");
         setFuelAmount(""); setFuelReceipts([]); setFuelAssignment("");
         setMonth(event.target.value); setDate(`${event.target.value}-01`);

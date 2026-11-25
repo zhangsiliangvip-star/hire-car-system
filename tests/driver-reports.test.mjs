@@ -60,7 +60,7 @@ function memoryStorage() {
 const walkElements = node => !React.isValidElement(node) ? [] :
   [node, ...React.Children.toArray(node.props.children).flatMap(walkElements)];
 
-function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, status = 200 } = {}) {
+function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, savedReports, details = [], initialReportId, status = 200 } = {}) {
   const states = [], refs = [], effects = [], events = new Map();
   const headerInputs = [], tableInputs = [];
   let stateCursor = 0, refCursor = 0, authChange, cleanup;
@@ -97,14 +97,20 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
     FormData: class {
       constructor(form) { this.get = name => form.querySelectorAll().find(input => input.name === name)?.value ?? ""; }
     },
-    fetch: async (url, options) => options?.method === "POST"
-      ? Response.json(status === 200 ? { report: { ...saved, version: saved.version + 1 } } : { error: "Save failed." }, { status })
-      : Response.json(url.startsWith("/api/driver/report-defaults") ? defaultsFixture
-        : { reports: saved ? [saved] : [], depot: null }),
+    fetch: async (url, options) => {
+      if (options?.method === "POST")
+        return Response.json(status === 200 ? { report: { ...saved, version: saved.version + 1 } } : { error: "Save failed." }, { status });
+      if (url.startsWith("/api/driver/report-history?reportId=")) {
+        const report = details.find(item => item.id === new URL(`https://driver.example${url}`).searchParams.get("reportId"));
+        return Response.json(report ? { report } : { error: "Not found" }, { status: report ? 200 : 404 });
+      }
+      return Response.json(url.startsWith("/api/driver/report-defaults") ? defaultsFixture
+        : { reports: savedReports ?? (saved ? [saved] : []), depot: null });
+    },
   }).default;
   function render() {
     stateCursor = 0; refCursor = 0; effects.length = 0;
-    const tree = Component();
+    const tree = Component({ initialReportId });
     refs[0].current = { querySelectorAll: () => tableInputs };
     refs[1].current = { querySelectorAll: () => headerInputs, reportValidity: () => true };
     return tree;
@@ -132,16 +138,96 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
     await new Promise(done => setImmediate(done));
     return render();
   }
-  return { states, refs, storage, field, edit, render, loadPage, loadDefaults,
+  function selectReport(reportId) {
+    const select = walkElements(render()).find(node => node.type === "select" &&
+      React.Children.toArray(node.props.children).some(option => option.props.value === reportId));
+    select.props.onChange({ target: { value: reportId } });
+  }
+  return { states, refs, storage, field, edit, render, loadPage, loadDefaults, selectReport,
     signOut: () => authChange("SIGNED_OUT"),
     visibility: value => { document.visibilityState = value; events.get("visibilitychange")(); },
     pageHide: () => events.get("pagehide")(),
   };
 }
 
+test("opening reports starts fresh after completed history and still permits viewing it", async () => {
+  const h = draftHarness();
+  let html = renderToStaticMarkup(await h.loadPage());
+  assert.match(html, /新日報 · 日本時間/);
+  assert.doesNotMatch(html, /value="Synthetic depot"/);
+  h.selectReport(id);
+  html = renderToStaticMarkup(h.render());
+  assert.match(html, /value="Synthetic depot"/);
+  const reopened = draftHarness({ storage: h.storage });
+  assert.match(renderToStaticMarkup(await reopened.loadPage()), /新日報 · 日本時間/);
+});
+
+test("opening reports resumes an unfinished report even when newer history comes first", async () => {
+  const active = { ...fixture, id: id.replace(/1$/, "2"), serviceDate: "2026-10-26",
+    returnedAt: null, returnAddress: null, returnKm: null, departureAddress: "Active depot" };
+  const h = draftHarness({ savedReports: [fixture, active] });
+  let html = renderToStaticMarkup(await h.loadPage());
+  assert.match(html, /value="Active depot"/);
+  assert.match(html, /请先完成当前出库中的日报/);
+  h.selectReport(id);
+  html = renderToStaticMarkup(h.render());
+  assert.match(html, /value="Synthetic depot"/);
+  const reopened = draftHarness({ savedReports: [fixture, active] });
+  assert.match(renderToStaticMarkup(await reopened.loadPage()), /value="Active depot"/);
+});
+
+test("resetting a new report on the same day retains loaded defaults", async () => {
+  const h = draftHarness({ saved: null });
+  await h.loadPage();
+  const today = h.states[10];
+  h.states[11] = { ...defaultsFixture, serviceDate: today, orders: [defaultsFixture.orders[0]] };
+  h.states[12] = id;
+  const button = walkElements(h.render()).find(node => node.type === "button" && node.props.children === "＋ 新建日报");
+  button.props.onClick();
+  assert.equal(h.states[11].serviceDate, today);
+  assert.equal(h.states[12], id);
+});
+
+test("history link opens and saves a report beyond the recent list", async () => {
+  const old = { ...fixture, id: id.replace(/1$/, "2"), departureAddress: "Older depot" };
+  const h = draftHarness({ initialReportId: old.id, saved: old, savedReports: [fixture], details: [old] });
+  let html = renderToStaticMarkup(await h.loadPage());
+  assert.match(html, /value="Older depot"/);
+  h.field("report-header", "vehicleNumber", "Updated plate");
+  const tree = await h.edit();
+  await walkElements(tree).find(node => node.type?.name === "AddStopForm").props.save("edit_stops", { stops: [], force: true });
+  html = renderToStaticMarkup(h.render());
+  assert.match(html, /value="Older depot"/);
+  assert.equal(h.states[0].reports.find(report => report.id === old.id).version, 2);
+});
+
+test("opening history preserves a draft for a different old report", async () => {
+  const target = { ...fixture, id: id.replace(/1$/, "2"), departureAddress: "Target depot" };
+  const oldDraft = { ...fixture, id: id.replace(/1$/, "3"), departureAddress: "Draft report" };
+  const storage = memoryStorage();
+  storage.setItem(`driver-report-draft:${id}`, JSON.stringify({
+    reportId: oldDraft.id, version: oldDraft.version, serviceDate: oldDraft.serviceDate, starting: false,
+    assignment: "", fields: { "report-edit-departure/address": "Unsaved depot" },
+  }));
+  const h = draftHarness({ storage, initialReportId: target.id, savedReports: [fixture], details: [target, oldDraft] });
+  const html = renderToStaticMarkup(await h.loadPage());
+  assert.match(html, /value="Unsaved depot"/);
+  assert.match(html, /已恢复另一份本机草稿/);
+  assert.equal(h.states[1], oldDraft.id);
+  assert.notEqual(storage.length, 0);
+});
+
+test("missing history report shows an error rather than another report", async () => {
+  const h = draftHarness({ initialReportId: id.replace(/1$/, "2") });
+  const html = renderToStaticMarkup(await h.loadPage());
+  assert.match(html, /日報不存在或无权查看/);
+  assert.doesNotMatch(html, /value="Synthetic depot"/);
+});
+
 test("incomplete report fields survive app switches, navigation and reload without submitting", async () => {
   const h = draftHarness();
   await h.loadPage();
+  h.selectReport(id);
   h.field("report-header", "serviceDate", fixture.serviceDate);
   h.field("report-header", "vehicleNumber", "Draft plate");
   h.field("report-header", "passengerCount", "");
@@ -175,6 +261,7 @@ test("incomplete report fields survive app switches, navigation and reload witho
 test("draft storage is account-isolated, rejects stale versions and is cleared on sign-out", async () => {
   const h = draftHarness();
   await h.loadPage();
+  h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Private draft");
   await h.edit();
   const other = draftHarness({ storage: h.storage, user: id.replace(/1$/, "2") });
@@ -212,6 +299,7 @@ for (const status of [200, 409])
 test(`report save ${status === 200 ? "clears" : "retains"} the local draft`, async () => {
   const h = draftHarness({ status });
   await h.loadPage();
+  h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Draft");
   const tree = await h.edit();
   const save = walkElements(tree).find(node => node.type?.name === "AddStopForm").props.save;
@@ -222,6 +310,7 @@ test(`report save ${status === 200 ? "clears" : "retains"} the local draft`, asy
 test("stop mutations rebase the draft without losing other unfinished fields", async () => {
   const h = draftHarness();
   await h.loadPage();
+  h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Unfinished plate");
   h.field(`report-stop-${id}`, "address", "Removed draft stop");
   const tree = await h.edit();
@@ -238,6 +327,7 @@ test("storage errors are visible and prevent navigation from discarding edits", 
   storage.setItem = () => { throw new Error("Storage blocked"); };
   const h = draftHarness({ storage });
   await h.loadPage();
+  h.selectReport(id);
   h.field("report-header", "vehicleNumber", "Keep live");
   const tree = await h.edit();
   assert.equal(walkElements(tree).find(node => node.type?.name === "DriverNavigation").props.canLeave(), false);
@@ -263,7 +353,7 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
       header: { vehicleNumber: "BASE", assignmentId: id, driverName: "Driver", passengerCount: 1 },
       orderOptions: [{ assignmentId: id, label: "Synthetic order", vehicleNumber: "BASE" }],
     }], depot: null };
-    const states = [data, null, "", "", false, mode === "saving", 0, Date.now(),
+    const states = [data, id, "", "", false, mode === "saving", 0, Date.now(),
       false, mode === "dirty", fixture.serviceDate, null, "", ""];
     let cursor = 0; const effects = []; let tick; let resolve; let signal; let cleared = false;
     const Component = load("app/driver/report/report.tsx", {
@@ -298,6 +388,30 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
   }
 });
 
+test("polling keeps the selected historical report outside the recent list", async () => {
+  const old = { ...fixture, id: id.replace(/1$/, "2"), departureAddress: "Old depot" };
+  const states = [{ reports: [fixture, old], depot: null }, old.id, "", "", false, false, 0, Date.now(),
+    false, false, fixture.serviceDate, null, "", ""];
+  const effects = [];
+  let cursor = 0, tick;
+  const Component = load("app/driver/report/report.tsx", {
+    react: { ...React, useEffect: effect => effects.push(effect), useRef: value => ({ current: value }),
+      useState: () => { const index = cursor++; return [states[index], value => { states[index] = value; }]; } },
+    "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "@/lib/supabase/browser": {}, "@/lib/driver/orders": {}, "@/lib/driver/reports": reports,
+  }, { document: { visibilityState: "visible" }, AbortController,
+    setInterval: callback => { tick = callback; return 1; }, clearInterval() {},
+    fetch: async url => Response.json(url.startsWith("/api/driver/report-history?")
+      ? { report: { ...old, version: 2 } } : { reports: [fixture], depot: null }),
+  }).default;
+  Component();
+  const cleanup = effects[1]();
+  tick();
+  await new Promise(done => setImmediate(done));
+  assert.equal(states[0].reports.find(item => item.id === old.id).version, 2);
+  cleanup();
+});
+
 test("report action buttons remain fixed above the viewport", () => {
   const css = readFileSync(new URL("../app/driver/report/report.module.css", import.meta.url), "utf8");
   assert.match(css, /\.floatingActions\{[^}]*position:fixed/);
@@ -316,6 +430,75 @@ test("new report shortcut stays visible while report data is loading", () => {
   }).default;
   const html = renderToStaticMarkup(React.createElement(Component));
   assert.match(html, /刷新日報<\/button><button class="driver-link" disabled="" title="日报加载完成后可新建" aria-label="新建日报（日报加载完成后可新建）">＋ 新建日报<\/button>/);
+});
+
+for (const { first, differentDate } of [
+  { first: "defaults", differentDate: false },
+  { first: "reports", differentDate: false },
+  { first: "reports", differentDate: true },
+])
+test(`parallel report loading preserves drafts when ${first} finishes first${differentDate ? " on a different date" : ""}`, async () => {
+  const states = [], refs = [], effects = [], requests = new Map();
+  const storage = memoryStorage();
+  const draftDate = differentDate ? "2026-10-28" : fixture.serviceDate;
+  storage.setItem(`driver-report-draft:${id}`, JSON.stringify({
+    reportId: null, version: 0, serviceDate: draftDate, starting: true,
+    assignment: defaultsFixture.orders[1].assignmentId, fields: { "report-checkout/address": "Draft depot" },
+  }));
+  let stateCursor = 0, refCursor = 0;
+  const Component = load("app/driver/report/report.tsx", {
+    react: { ...React,
+      useState: initial => {
+        const index = stateCursor++;
+        if (!(index in states)) states[index] = index === 10 ? fixture.serviceDate : typeof initial === "function" ? initial() : initial;
+        return [states[index], value => { states[index] = typeof value === "function" ? value(states[index]) : value; }];
+      },
+      useRef: initial => refs[refCursor++] ??= { current: initial },
+      useEffect: effect => effects.push(effect),
+    },
+    "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
+    "@/lib/driver/orders": {}, "@/lib/driver/reports": reports,
+    "@/lib/supabase/browser": { createClient: () => ({ auth: {
+      getUser: async () => ({ data: { user: { id } }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+    } }) },
+  }, {
+    document: { visibilityState: "visible", addEventListener() {}, removeEventListener() {} },
+    window: { addEventListener() {}, removeEventListener() {} },
+    sessionStorage: storage, AbortController, setInterval: () => 1, clearInterval() {},
+    fetch: (url, options) => new Promise(resolve => requests.set(url.includes("report-defaults") ? "defaults" : "reports",
+      { resolve, signal: options.signal })),
+  }).default;
+  function render() { stateCursor = 0; refCursor = 0; effects.length = 0; return Component(); }
+  render();
+  const stopReports = effects[0]();
+  const stopDefaults = effects[2]();
+  assert.deepEqual([...requests.keys()].sort(), ["defaults", "reports"]);
+  const results = { defaults: defaultsFixture, reports: { reports: [fixture], depot: null } };
+  requests.get(first).resolve(Response.json(results[first]));
+  await new Promise(done => setImmediate(done));
+  render();
+  const second = first === "defaults" ? "reports" : "defaults";
+  let stopNewDefaults;
+  if (differentDate) {
+    const oldRequest = requests.get("defaults");
+    stopDefaults();
+    assert.equal(oldRequest.signal.aborted, true);
+    stopNewDefaults = effects[2]();
+    oldRequest.resolve(Response.json(defaultsFixture));
+    await new Promise(done => setImmediate(done));
+    assert.equal(states[11], null);
+    results.defaults = { ...defaultsFixture, serviceDate: draftDate };
+    assert.equal(requests.get("defaults").signal.aborted, false);
+  }
+  requests.get(second).resolve(Response.json(results[second]));
+  await new Promise(done => setImmediate(done));
+  const html = renderToStaticMarkup(render());
+  assert.match(html, /value="Draft depot"/);
+  assert.match(html, /已恢复本机草稿/);
+  assert.equal(states[12], defaultsFixture.orders[1].assignmentId);
+  assert.equal(states[11].serviceDate, draftDate);
+  stopNewDefaults?.(); stopDefaults(); stopReports();
 });
 
 test("report defaults API validates date and identity and exposes only minimal no-store defaults", async () => {
@@ -412,6 +595,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.equal(checkoutProps.disabled, false);
   assert.match(html, /当天没有已派给本人的訂単/);
   states[0] = { reports: [{ ...fixture, header: { vehicleNumber: "Saved plate", driverName: "Saved name", passengerCount: null } }], depot: null };
+  states[1] = fixture.id;
   html = render();
   assert.match(html, /value="Saved plate"/);
   assert.match(html, /value="Saved name"/);
@@ -858,7 +1042,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
       departedAt: closed ? "2026-10-28T00:15:00+09:00" : null, departedKm: closed ? 120 : null }],
       returnedAt: closed ? fixture.returnedAt : null,
       returnAddress: closed ? fixture.returnAddress : null, returnKm: closed ? fixture.returnKm : null };
-    const values = [{ reports: [r], depot: null }, null, "", "", false, false, 0, Date.parse(fixture.returnedAt), false, false];
+    const values = [{ reports: [r], depot: null }, r.id, "", "", false, false, 0, Date.parse(fixture.returnedAt), false, false];
     const runtime = require("react/jsx-runtime");
     const checkKeys = create => (type, props, ...rest) => {
       const children = [props?.children].flat(Infinity).filter(React.isValidElement);

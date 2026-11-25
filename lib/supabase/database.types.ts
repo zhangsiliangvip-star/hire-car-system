@@ -271,6 +271,8 @@ export type Database = {
         Args: Record<string, never>;
         Returns: Json;
       };
+      driver_report_history: { Args: { target_month: string }; Returns: Json };
+      driver_report_detail: { Args: { target_report: string }; Returns: Json };
       driver_report_defaults: {
         Args: { target_date: string };
         Returns: Json;

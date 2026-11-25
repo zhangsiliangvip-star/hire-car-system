@@ -1,6 +1,7 @@
 "use client";
 
 import DriverNavigation from "@/app/driver/navigation";
+import Link from "next/link";
 import { ReportDutyFields } from "@/components/report-duty-fields";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
@@ -8,7 +9,7 @@ import { createDriverRequestId } from "@/lib/driver/orders";
 import { captureReportFields, readReportDraft, writeReportDraft, type ReportDraft } from "@/lib/driver/report-draft";
 import { departureFromForm, durationLabel, formatManualClock, fromJapanInput, reportCommandSchema, reportDataSchema, reportDefaultsSchema, reportTime,
   reportHeaderSchema, reportHeaderShapeSchema, reportOnDate, reportSchema, reportTimeOrderError, reportTotals, returnFromForm, stopFromForm, toJapanInput, type DailyReport } from "@/lib/driver/reports";
-import type { z } from "zod";
+import { z } from "zod";
 import styles from "./report.module.css";
 
 type Action = z.infer<typeof reportCommandSchema>["action"];
@@ -149,9 +150,9 @@ function StopRow({ stop, index, disabled, saveChanges, removeStop, allowDelete, 
     </tbody>;
 }
 
-export default function DriverReport() {
+export default function DriverReport({ initialReportId, returnMonth }: { initialReportId?: string; returnMonth?: string } = {}) {
   const [data, setData] = useState<z.infer<typeof reportDataSchema> | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialReportId ?? null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(true);
@@ -177,42 +178,63 @@ export default function DriverReport() {
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
+    async function readReport(reportId: string): Promise<DailyReport | null> {
+      const response = await fetch(`/api/driver/report-history?reportId=${encodeURIComponent(reportId)}`,
+        { cache: "no-store", signal: controller.signal });
+      if (response.status === 401) { location.replace("/driver/login"); throw new Error("請重新登录。"); }
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error("无法读取历史日報，請刷新重试。");
+      const parsed = z.object({ report: reportSchema }).strict().parse(await response.json()).report;
+      if (parsed.id !== reportId) throw new Error("历史日報与所选日報不一致。");
+      return parsed;
+    }
     async function load() {
       try {
-        const [response, identity] = await Promise.all([
+        const [response, identity, target] = await Promise.all([
           fetch("/api/driver/reports", { cache: "no-store", signal: controller.signal }),
           createClient("driver").auth.getUser(),
+          initialReportId !== undefined ? readReport(initialReportId) : Promise.resolve(null),
         ]);
         if (response.status === 401) { location.replace("/driver/login"); return; }
         if (identity.error || !identity.data.user) throw new Error("无法确认登录账号，請重新登录后重试。");
         if (!response.ok) throw new Error("无法读取日報，請重试或联系管理员。");
         const result = reportDataSchema.parse(await response.json());
+        if (initialReportId !== undefined && !target) throw new Error("日報不存在或无权查看。");
+        if (target && !result.reports.some(item => item.id === target.id)) result.reports.push(target);
         if (active && document.visibilityState === "visible") {
           draftOwner.current = identity.data.user.id;
           let restored: ReportDraft | null = null;
+          let stored: ReportDraft | null = null;
           try {
-            const stored = readReportDraft(sessionStorage, draftOwner.current);
-            const saved = result.reports.find(item => item.id === stored?.reportId);
-            if (stored && (stored.reportId ? saved?.version !== stored.version : result.reports.some(item => !item.returnedAt))) {
-              setError("服务器日報已有更新，未自动套用本机草稿。請核对最新内容后继续填写。");
-            } else restored = stored;
+            stored = readReportDraft(sessionStorage, draftOwner.current);
           } catch (cause) {
             console.error("Driver report draft restore failed.", cause);
             setError("无法读取本机草稿，請检查浏览器存储设置；现有草稿未清除。");
           }
+          let saved = result.reports.find(item => item.id === stored?.reportId);
+          if (stored?.reportId && !saved) {
+            saved = await readReport(stored.reportId) ?? undefined;
+            if (saved) result.reports.push(saved);
+          }
+          if (!active || controller.signal.aborted || document.visibilityState !== "visible") return;
+          if (stored && (stored.reportId ? saved?.version !== stored.version : result.reports.some(item => !item.returnedAt))) {
+            setError("服务器日報已有更新，未自动套用本机草稿。請核对最新内容后继续填写。");
+          } else restored = stored;
           setDraft(restored);
           defaultsDraft.current = restored?.reportId === null ? restored : null;
           if (restored) {
             setSelected(restored.reportId); setStarting(restored.starting);
             setNewDate(restored.serviceDate); setAssignment(restored.assignment);
-            setNotice("已恢复本机草稿，請继续填写并点“保存”提交。");
+            setNotice(initialReportId && restored.reportId !== initialReportId
+              ? "已恢复另一份本机草稿，請先保存或放弃修改，再選択历史日報。"
+              : "已恢复本机草稿，請继续填写并点“保存”提交。");
           }
           setData(result); setDirty(Boolean(restored)); setBusy(false);
         }
       } catch (cause) {
         if (controller.signal.aborted) return;
         console.error("Report load failed.", cause);
-        if (active) { setError("无法读取日報，請刷新重试。"); setBusy(false); }
+        if (active) { setError(cause instanceof Error ? cause.message : "无法读取日報，請刷新重试。"); setBusy(false); }
       }
     }
     function revalidate() {
@@ -245,14 +267,14 @@ export default function DriverReport() {
       window.removeEventListener("pagehide", pageHide);
       window.removeEventListener("beforeunload", beforeUnload);
     };
-  }, [revision]);
+  }, [revision, initialReportId]);
   const open = data?.reports.find(r => !r.returnedAt);
-  const report = starting && !open ? undefined : data?.reports.find(r => r.id === selected) ?? data?.reports[0];
+  const report = data?.reports.find(r => r.id === selected) ?? open;
   const serviceDate = newDate ?? reportTime(new Date(now).toISOString()).slice(0, 10);
   const currentDefaults = defaults?.serviceDate === serviceDate ? defaults : null;
   const selectedOrder = currentDefaults?.orders.find(order => order.assignmentId === assignment);
   const needsOrder = Boolean(currentDefaults?.orders.length && !selectedOrder);
-  const canLoadDefaults = Boolean(data && !report && !busy);
+  const canLoadDefaults = !report && (busy || Boolean(data));
   const draftFields = draft?.reportId === (report?.id ?? null) ? draft.fields : undefined;
   function discardDraft() {
     try {
@@ -292,8 +314,12 @@ export default function DriverReport() {
     if (open || saving) return;
     if (dirty && !window.confirm("开始新日報会放弃尚未保存的修改，是否继续？")) return;
     if (!discardDraft()) return;
-    setDirty(false); setSelected(null); setStarting(true); setNewDate(reportTime(new Date().toISOString()).slice(0, 10));
-    setDefaults(null); setAssignment(""); setDefaultsError(""); setError(""); setNotice("");
+    const today = reportTime(new Date().toISOString()).slice(0, 10);
+    setDirty(false); setSelected(null); setStarting(true); setNewDate(today);
+    if (serviceDate !== today) setDefaults(null);
+    if (serviceDate !== today || report) setDefaultsError("");
+    setAssignment(serviceDate === today && currentDefaults?.orders.length === 1 ? currentDefaults.orders[0].assignmentId : "");
+    setError(""); setNotice("");
   }
   useEffect(() => {
     if (busy || saving || dirty || starting) return;
@@ -308,6 +334,15 @@ export default function DriverReport() {
         if (response.status === 401) { location.replace("/driver/login"); return; }
         if (!response.ok) throw new Error("日報同步失败，請刷新核对最新車両番号。");
         const result = reportDataSchema.parse(await response.json());
+        if (selected && !result.reports.some(item => item.id === selected)) {
+          const detail = await fetch(`/api/driver/report-history?reportId=${encodeURIComponent(selected)}`,
+            { cache: "no-store", signal: controller.signal });
+          if (detail.status === 401) { location.replace("/driver/login"); return; }
+          if (!detail.ok) throw new Error("历史日報同步失败，請刷新核对。");
+          const saved = z.object({ report: reportSchema }).strict().parse(await detail.json()).report;
+          if (saved.id !== selected) throw new Error("历史日報与所选日報不一致。");
+          result.reports.push(saved);
+        }
         if (active && !dirtyRef.current && !lock.current && document.visibilityState === "visible") {
           setData(result); setError("");
         }
@@ -319,7 +354,7 @@ export default function DriverReport() {
     }
     const timer = setInterval(() => void refreshSavedReports(), 10_000);
     return () => { active = false; controller.abort(); clearInterval(timer); };
-  }, [busy, saving, dirty, starting]);
+  }, [busy, saving, dirty, starting, selected]);
   useEffect(() => {
     if (!canLoadDefaults) return;
     const controller = new AbortController();
@@ -333,7 +368,7 @@ export default function DriverReport() {
         const result = reportDefaultsSchema.parse(await response.json());
         if (result.serviceDate !== serviceDate) throw new Error("日報默认信息日期不匹配。");
         if (active && document.visibilityState === "visible") {
-          setDefaults(result);
+          setDefaults(result); setDefaultsError("");
           const restored = defaultsDraft.current;
           setAssignment(restored?.serviceDate === serviceDate
             ? restored.assignment : result.orders.length === 1 ? result.orders[0].assignmentId : "");
@@ -426,7 +461,7 @@ export default function DriverReport() {
       setSelected(updated.id);
       setStarting(false);
       setData(current => current ? { ...current, reports: [updated,
-        ...current.reports.filter(r => r.id !== updated.id)].sort((a, b) => b.departedAt.localeCompare(a.departedAt)).slice(0, 31) } : current);
+        ...current.reports.filter(r => r.id !== updated.id)].sort((a, b) => b.departedAt.localeCompare(a.departedAt)) } : current);
       if (action !== "add_stop" && action !== "remove_stop") setDirty(false);
       const forced = action === "edit_stops" && typeof payload === "object" && payload !== null &&
         "force" in payload && payload.force === true;
@@ -490,6 +525,8 @@ export default function DriverReport() {
   return <main className={`driver-main ${styles.report}`} onInput={queueDraft} onChange={queueDraft} onBlur={queueDraft}>
     <DriverNavigation active="report" busy={saving}
       canLeave={persistDraft} />
+    {returnMonth && <Link className="driver-link" href={`/driver/history?month=${encodeURIComponent(returnMonth)}`}
+      onClick={event => { if (saving || !persistDraft()) event.preventDefault(); }}>‹ 返回日歴</Link>}
     <div className="driver-toolbar">
       <button className="driver-link" disabled={saving} onClick={() => {
         if (dirty && !window.confirm("刷新会放弃尚未保存的修改，是否继续？")) return;
@@ -512,7 +549,7 @@ export default function DriverReport() {
         {currentDefaults && (currentDefaults.orders.length ? <label className="driver-field">关联当天訂単
           <select aria-label="关联当天訂単" value={assignment} disabled={saving} onChange={e => {
             if (dirty && !window.confirm("更换訂単会重新带入車両番号及車库地址，是否继续？")) return;
-            setDraft(null); setAssignment(e.target.value); setDirty(true);
+            setDraft(null); defaultsDraft.current = null; setAssignment(e.target.value); setDirty(true);
           }}>
             <option value="">請選択当天訂単</option>
             {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
@@ -548,7 +585,7 @@ export default function DriverReport() {
         </label>}
         <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
           disabled={saving} defaultValue={draftFields?.["report-header/serviceDate"] ?? report?.serviceDate ?? serviceDate} onChange={e => {
-            if (!report) { setDraft(null); setNewDate(e.target.value); setDefaults(null); setAssignment(""); setDefaultsError(""); }
+            if (!report) { setDraft(null); defaultsDraft.current = null; setNewDate(e.target.value); setDefaults(null); setAssignment(""); setDefaultsError(""); }
             else {
               const link = headerForm.current?.elements.namedItem("assignmentId");
               if (link instanceof HTMLSelectElement) link.value = "";
@@ -611,7 +648,7 @@ export default function DriverReport() {
           <div className="driver-row"><span>拘束時間{!report.returnedAt && "（进行中）"}</span><strong>{durationLabel(totals!.elapsedMs)}</strong></div>
         </section>
       </>}
-      {data.reports.length > 0 && <details className="driver-card"><summary>历史日報</summary><label className="driver-field">最近31份日報
+      {data.reports.length > 0 && <details className="driver-card"><summary>历史日報</summary><label className="driver-field">最近及所选日報
         <select value={report?.id ?? ""} disabled={saving} onChange={e => {
           if (dirty && !window.confirm("切换日報会放弃尚未保存的修改，是否继续？")) return;
           if (!discardDraft()) return;

@@ -270,6 +270,46 @@ function renderFinance({ status = null, withEffects = false, fetch: fetchMock, v
   const html = render();
   return { html, states, effects, events, buttons, inputs, document, uploads, render };
 }
+
+test("history finance link loads the selected date and existing claim for editing", async () => {
+  for (const available of [true, false]) {
+    const states = [], refs = [], effects = [];
+    let cursor = 0, refCursor = 0, requested;
+    const historical = { ...data, trips: available ? [{ ...data.trips[0], historical: true, claims: [claim] }] : [],
+      fuelClaims: [fuelClaim] };
+    const Component = load("app/driver/finance/finance.tsx", {
+      react: { ...React, useEffect: effect => effects.push(effect),
+        useRef: value => refs[refCursor++] ??= { current: value },
+        useState: initial => {
+          const index = cursor++;
+          if (!(index in states)) states[index] = typeof initial === "function" ? initial() : initial;
+          return [states[index], value => { states[index] = typeof value === "function" ? value(states[index]) : value; }];
+        } },
+      "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
+      "@/lib/driver/orders": { createDriverRequestId: () => id, japanDate: () => "2026-11-25" },
+      "@/lib/driver/finance": finance, "@/lib/driver/fuel": fuel,
+      "@/lib/supabase/browser": { createClient: () => ({ auth: {
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+      } }) },
+    }, { AbortController, document: { addEventListener() {}, removeEventListener() {} },
+      location: { replace() {} }, fetch: async url => { requested = url; return Response.json(historical); } }).default;
+    function render() { cursor = 0; refCursor = 0; effects.length = 0;
+      return Component({ initialDate: "2026-10-27", initialAssignmentId: id }); }
+    render(); const cleanup = effects[0]();
+    await new Promise(done => setImmediate(done));
+    const html = renderToStaticMarkup(render());
+    assert.equal(requested, "/api/driver/finance?month=2026-10");
+    assert.equal(states[1], "2026-10-27");
+    assert.equal(states[13], "6000");
+    if (available) {
+      assert.equal(states[3], id);
+      assert.match(html, /value="Parking"/);
+      assert.match(html, /保存社報立替并提交/);
+    } else assert.match(html, /所选财务記録不存在或当前不可修改/);
+    cleanup();
+  }
+});
+
 test("driver receipt URL opens a popup without adding a bottom card or discarding unsaved drafts", () => {
   const h = renderFinance();
   h.states[11] = "https://receipts.example/private-signed.jpg";
