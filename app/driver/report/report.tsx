@@ -566,7 +566,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           }}>
             <option value="">請選択当天訂単</option>
             {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
-              {order.time} · {order.pickup} → {order.destination} · {order.vehicleNumber || "未填車両番号"}
+              {order.orderName?.trim() || "未命名订单"}
             </option>)}
           </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和車库地址請手動填写。</p>)}
         {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，請手動填写。</p>}
@@ -588,7 +588,7 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
             {report.header?.assignmentId && !report.orderOptions?.some(item => item.assignmentId === report.header?.assignmentId) &&
               <option value={report.header.assignmentId}>原关联訂単（歴史派单）</option>}
             {report.orderOptions?.map(item => <option key={item.assignmentId} value={item.assignmentId}>
-              {item.label} · {item.vehicleNumber || "未填写"}
+              {item.label}
             </option>)}
           </select>
           <span className="driver-muted">{report.header?.assignmentId

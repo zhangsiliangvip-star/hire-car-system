@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     try { body = JSON.parse(text); } catch { return jsonResponse({ error: "JSON无效。" }, { status: 400 }); }
     const parsed = shiftStatusQuerySchema.safeParse(body);
     if (!parsed.success) return jsonResponse({ error: "行程日期无效。" }, { status: 400 });
-    const { data, error } = await supabase.rpc("staff_driver_rest_days", { service_dates: parsed.data.dates });
+    const { data, error } = await supabase.rpc("staff_driver_shift_requests", { service_dates: parsed.data.dates });
     if (error) throw error;
     return jsonResponse(shiftStatusSchema.parse({ enabled: true, days: data }));
   } catch (error) {

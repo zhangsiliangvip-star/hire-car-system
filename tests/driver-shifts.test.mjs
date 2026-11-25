@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import vm from "node:vm";
 import ts from "typescript";
+import { PGlite } from "@electric-sql/pglite";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -35,8 +36,9 @@ const { isDriverActionOrigin } = load("lib/driver/assignment-action.ts", {
   "@/lib/driver/orders": {}, "@/lib/driver/test-runtime": {},
 });
 const id = "c6000000-0000-4000-8000-000000000001";
-const data = { month: "2026-11", version: 1, dates: ["2026-11-01", "2026-11-15"], note: "Monthly note" };
-const command = { month: data.month, dates: data.dates, note: data.note, expectedVersion: 0, requestId: id };
+const data = { month: "2026-11", version: 1, dates: ["2026-11-01", "2026-11-15"], attendanceDates: [], note: "Monthly note" };
+const command = { month: data.month, dates: data.dates, attendanceDates: data.attendanceDates,
+  note: data.note, expectedVersion: 0, requestId: id };
 function api({ staff = false, denied = 0, enabled = true, profile = true, result = data, error = null } = {}) {
   const calls = [];
   const supabase = { async rpc(name, args) { calls.push({ name, args }); return { data: result, error }; } };
@@ -81,7 +83,8 @@ test("monthly shifts validate exact month, unique in-month dates and bounded not
   assert.ok(shifts.shiftSubmissionSchema.safeParse(command).success);
   assert.ok(shifts.shiftSubmissionSchema.safeParse({ ...command, dates: [] }).success);
   for (const patch of [{ month: "2026-13" }, { dates: ["2026-12-01"] }, { dates: ["2026-11-31"] },
-    { dates: [data.dates[0], data.dates[0]] }, { driverId: id }, { note: "x".repeat(1001) }, { expectedVersion: -1 }])
+    { dates: [data.dates[0], data.dates[0]] }, { attendanceDates: [data.dates[0]] },
+    { attendanceDates: ["2026-12-01"] }, { driverId: id }, { note: "x".repeat(1001) }, { expectedVersion: -1 }])
     assert.equal(shifts.shiftSubmissionSchema.safeParse({ ...command, ...patch }).success, false);
   assert.equal(shifts.shiftMonthDays("2028-02").dates.length, 29);
   assert.equal(shifts.shiftMonthDays("2026-02").dates.length, 28);
@@ -103,7 +106,7 @@ test("monthly reads return minimal uncached data and surface malformed/database 
   const response = await h.GET(new Request("https://driver.example/api/driver/shifts?month=2026-11"));
   assert.equal(response.status, 200); assert.match(response.headers.get("Cache-Control"), /no-store/);
   assert.deepEqual(await response.json(), data);
-  assert.deepEqual(plain(h.calls), [{ name: "driver_monthly_shift", args: { target_month: "2026-11" } }]);
+  assert.deepEqual(plain(h.calls), [{ name: "driver_monthly_shift_v2", args: { target_month: "2026-11" } }]);
   for (const settings of [{ result: { ...data, driverId: id } }, { result: null }, { error: { code: "XX000" } }])
     assert.equal((await api(settings).GET(new Request("https://driver.example/api/driver/shifts?month=2026-11"))).status, 503);
 });
@@ -116,8 +119,9 @@ test("shift writes enforce origin JSON size and strict payload", async () => {
 test("shift submission forwards version/idempotency and reports failures explicitly", async () => {
   const h = api(); const response = await h.POST(request(command));
   assert.equal(response.status, 200); assert.deepEqual(await response.json(), data);
-  assert.deepEqual(plain(h.calls), [{ name: "submit_driver_monthly_shift", args: {
-    target_month: "2026-11", expected_version: 0, target_request: id, rest_dates: data.dates, note: data.note,
+  assert.deepEqual(plain(h.calls), [{ name: "submit_driver_monthly_shift_v2", args: {
+    target_month: "2026-11", expected_version: 0, target_request: id, rest_dates: data.dates,
+    attendance_dates: data.attendanceDates, note: data.note,
   } }]);
   for (const [code, status] of [["40001", 409], ["42501", 403], ["22023", 422], ["XX000", 503]])
     assert.equal((await api({ error: { code } }).POST(request(command))).status, status);
@@ -127,11 +131,15 @@ test("staff rest hints are test-gated, staff-only and exclude driver notes", asy
   assert.deepEqual(await (await disabled.POST(request({ dates: data.dates }))).json(), { enabled: false, days: [] });
   assert.equal(disabled.calls.length, 0);
   assert.equal((await api({ staff: true, profile: false }).POST(request({ dates: data.dates }))).status, 403);
-  const h = api({ staff: true, result: [{ driverId: id, date: data.dates[0] }] });
+  const h = api({ staff: true, result: [{ driverId: id, date: data.dates[0], type: "rest" },
+    { driverId: id, date: data.dates[1], type: "attendance" }] });
   const response = await h.POST(request({ dates: data.dates }));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { enabled: true, days: [{ driverId: id, date: data.dates[0] }] });
-  assert.deepEqual(plain(h.calls), [{ name: "staff_driver_rest_days", args: { service_dates: data.dates } }]);
+  assert.deepEqual(await response.json(), { enabled: true, days: [
+    { driverId: id, date: data.dates[0], type: "rest" },
+    { driverId: id, date: data.dates[1], type: "attendance" },
+  ] });
+  assert.deepEqual(plain(h.calls), [{ name: "staff_driver_shift_requests", args: { service_dates: data.dates } }]);
   assert.equal((await api({ staff: true, result: [{ driverId: id, date: data.dates[0], note: "Private" }] })
     .POST(request({ dates: data.dates }))).status, 503);
   for (const req of [request({ dates: [] }), request({ dates: ["2026-02-30"] }), request({ dates: data.dates, regionId: id })])
@@ -139,7 +147,7 @@ test("staff rest hints are test-gated, staff-only and exclude driver notes", asy
 });
 
 function renderShift({ fetch: fetchMock = async () => Response.json(data), confirm = () => true } = {}) {
-  const states = ["2026-11", data, [...data.dates], data.note, false, false, "", "", 0];
+  const states = ["2026-11", data, [...data.dates], data.note, false, false, "", "", 0, [...data.attendanceDates]];
   const effects = [], refs = [], events = {}, buttons = [], inputs = [];
   const document = { visibilityState: "visible", addEventListener(name, fn) { events[name] = fn; }, removeEventListener() {} };
   let cursor = 0, refCursor = 0;
@@ -156,7 +164,8 @@ function renderShift({ fetch: fetchMock = async () => Response.json(data), confi
         return [states[i], value => { states[i] = typeof value === "function" ? value(states[i]) : value; }]; } },
     "react/jsx-runtime": { ...runtime, jsx: capture(runtime.jsx), jsxs: capture(runtime.jsxs) },
     "next/link": { default: ({ children, ...props }) => React.createElement("a", props, children) },
-    "@/lib/driver/shifts": shifts, "@/lib/driver/orders": { japanDate: () => "2026-11-01", createDriverRequestId: () => id },
+    "@/lib/driver/shifts": shifts, "@/lib/japanese-holidays": load("lib/japanese-holidays.ts"),
+    "@/lib/driver/orders": { japanDate: () => "2026-11-01", createDriverRequestId: () => id },
     "@/lib/supabase/browser": { createClient: () => ({ auth: { onAuthStateChange(fn) {
       events.auth = fn; return { data: { subscription: { unsubscribe() {} } } };
     } } }) },
@@ -167,14 +176,22 @@ function renderShift({ fetch: fetchMock = async () => Response.json(data), confi
   }
   return { html: render(), render, states, effects, events, document, buttons, inputs };
 }
-test("monthly calendar allows independent multiple rest dates with notes beneath", () => {
+test("monthly calendar selects one preference mode before tapping dates", () => {
   const h = renderShift();
   assert.equal(h.buttons.filter(button => button["aria-label"]?.startsWith("2026-11-")).length, 30);
-  assert.match(h.html, /aria-label="2026-11-01" aria-pressed="true"/);
+  assert.match(h.html, /aria-label="2026-11-01 休日 希望休" aria-pressed="true"/);
+  assert.match(h.html, /aria-label="2026-11-03 祝日"/);
+  assert.match(h.html, /<small>休日<\/small>/);
+  assert.match(h.html, /<small>祝日<\/small>/);
+  assert.doesNotMatch(h.html, /按月選択希望休息的日期/);
   h.buttons.find(button => button["aria-label"] === "2026-11-02").onClick();
-  assert.ok(h.states[2].includes("2026-11-02")); assert.equal(h.states[2].length, 3);
-  h.render(); h.buttons.find(button => button["aria-label"] === "2026-11-01").onClick();
+  assert.ok(h.states[9].includes("2026-11-02")); assert.equal(h.states[2].length, 2);
+  h.buttons.find(button => button.children === "希望休").onClick();
+  h.render(); h.buttons.find(button => button["aria-label"] === "2026-11-01 休日 希望休").onClick();
   assert.equal(h.states[2].includes("2026-11-01"), false);
+  h.buttons.find(button => button["aria-label"] === "2026-11-02 希望出勤").onClick();
+  assert.equal(h.states[2].includes("2026-11-02"), true);
+  assert.equal(h.states[9].includes("2026-11-02"), false);
   h.inputs.find(input => input.rows === 3).onChange({ target: { value: "New note" } });
   assert.equal(h.states[3], "New note");
   assert.ok(h.html.indexOf("备注<textarea") > h.html.indexOf('aria-label="2026-11-30"'));
@@ -184,6 +201,67 @@ test("monthly calendar allows independent multiple rest dates with notes beneath
     writeFileSync(process.env.DRIVER_SHIFT_LAYOUT_FILE,
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${css}</style><div class="driver-app">${h.html}</div>`);
   }
+});
+test("staff calendar shows requested attendance names below dates in blue", () => {
+  const source = readFileSync(fileURLToPath(new URL("../app/page.tsx", import.meta.url)), "utf8");
+  assert.match(source, /attendanceDriverNamesByDate\.get\(d\.date\)/);
+  assert.match(source, /calendar-attendance-drivers[^"]*text-blue-600/);
+  assert.match(source, /title=\{`出勤希望：/);
+});
+test("shift migration stores mutually exclusive attendance and rest requests and exposes typed staff indicators", async t => {
+  const db = new PGlite();
+  t.after(() => db.close());
+  await db.exec(`
+    create role anon;
+    create role authenticated;
+    create schema auth;
+    create table public.drivers (id uuid primary key, region_id uuid not null);
+    create table public.profiles (id uuid primary key, region_id uuid);
+    create table public.driver_auth_links (driver_id uuid primary key);
+    create table public.driver_monthly_shifts (
+      driver_id uuid not null, region_id uuid not null, month text not null,
+      rest_dates date[] not null default '{}', note text not null default '',
+      version bigint not null default 1, request_id uuid not null, submitted_at timestamptz not null default now(),
+      primary key (driver_id, month)
+    );
+    insert into public.drivers values ('${id}', 'c6000000-0000-4000-8000-000000000010');
+    insert into public.profiles values ('c6000000-0000-4000-8000-000000000011', 'c6000000-0000-4000-8000-000000000010');
+    insert into public.driver_auth_links values ('${id}');
+    create function auth.uid() returns uuid language sql stable as $$
+      select 'c6000000-0000-4000-8000-000000000011'::uuid
+    $$;
+    create function public.driver_identity() returns table(driver_id uuid, region_id uuid)
+      language sql stable as $$ select '${id}'::uuid, 'c6000000-0000-4000-8000-000000000010'::uuid $$;
+    create function public.is_staff() returns boolean language sql stable as $$ select true $$;
+    create function public.is_admin() returns boolean language sql stable as $$ select true $$;
+  `);
+  await db.exec(readFileSync(new URL("../supabase/migrations/20261214000000_driver_shift_attendance_requests.sql", import.meta.url), "utf8"));
+  const submitted = (await db.query(
+    "select public.submit_driver_monthly_shift_v2($1, 0, $2, $3::date[], $4::date[], $5) as value",
+    ["2026-11", id, ["2026-11-02"], ["2026-11-03"], "note"],
+  )).rows[0].value;
+  assert.deepEqual(submitted.dates, ["2026-11-02"]);
+  assert.deepEqual(submitted.attendanceDates, ["2026-11-03"]);
+  const days = (await db.query(
+    "select public.staff_driver_shift_requests(array['2026-11-02'::date, '2026-11-03'::date]) as value",
+  )).rows[0].value;
+  assert.deepEqual(days, [
+    { driverId: id, date: "2026-11-02", type: "rest" },
+    { driverId: id, date: "2026-11-03", type: "attendance" },
+  ]);
+  const staffSaved = (await db.query(
+    "select public.staff_submit_driver_monthly_shift_v2($1, '2026-11', 1, $2, '{}'::date[], array['2026-11-04'::date], '') as value",
+    [id, "c6000000-0000-4000-8000-000000000012"],
+  )).rows[0].value;
+  assert.deepEqual(staffSaved.attendanceDates, ["2026-11-04"]);
+  const driverRead = (await db.query("select public.driver_monthly_shift_v2('2026-11') as value")).rows[0].value;
+  assert.deepEqual(driverRead.attendanceDates, ["2026-11-04"]);
+  const staffRead = (await db.query("select public.staff_driver_monthly_shift_v2($1, '2026-11') as value", [id])).rows[0].value;
+  assert.deepEqual(staffRead.attendanceDates, ["2026-11-04"]);
+  await assert.rejects(() => db.query(
+    "select public.submit_driver_monthly_shift_v2('2026-11', 2, $1, array['2026-11-05'::date], array['2026-11-05'::date], '')",
+    ["c6000000-0000-4000-8000-000000000013"],
+  ));
 });
 test("shifts submit exact selected month dates and notes, preserving independent months", async () => {
   const calls = [];
@@ -246,12 +324,13 @@ function renderDialog({ days = [], fetch: fetchMock, serviceDates = data.dates,
   return { html: render(), render, states, effects, buttons, selected: () => selected };
 }
 test("driver cards show red rest in bottom-right by driver ID but remain selectable", () => {
-  const h = renderDialog({ days: [{ driverId: id, date: data.dates[0] }] });
+  const h = renderDialog({ days: [{ driverId: id, date: data.dates[0], type: "rest" }] });
   assert.match(h.html, /absolute bottom-2 right-2[^"]*text-red-600/);
   assert.match(h.html, /希望休：2026-11-01/);
   h.buttons.find(button => button.children[0]?.props?.children === "Test Driver").onClick();
   assert.equal(h.selected(), "Test Driver");
-  assert.equal(renderDialog({ days: [{ driverId: "c6000000-0000-4000-8000-000000000002", date: data.dates[0] }] })
+  assert.equal(renderDialog({ days: [{ driverId: "c6000000-0000-4000-8000-000000000002",
+    date: data.dates[0], type: "rest" }] })
     .html.includes(">休</span>"), false);
 });
 test("driver selection dialog prioritizes attendance then recorded romanized reading", () => {

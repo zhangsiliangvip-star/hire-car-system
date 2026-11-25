@@ -74,7 +74,8 @@ export const reportDefaultsSchema = z.object({
   serviceDate: z.iso.date(),
   driverName: z.string().max(100),
   orders: z.array(z.object({
-    assignmentId: z.uuid(), time: z.string(), pickup: z.string(), destination: z.string(),
+    assignmentId: z.uuid(), orderName: z.string().optional(), time: z.string(),
+    pickup: z.string(), destination: z.string(),
     vehicleNumber: z.string().max(100),
     depot: z.object({ name: z.string(), address }).strict().nullable(),
   }).strict()).max(200),

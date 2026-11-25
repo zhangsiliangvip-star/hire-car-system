@@ -65,6 +65,7 @@ async function fixture(t) {
   `);
   await db.exec(definition(pwa, "record_driver_finance_event"));
   await db.exec(definition(pwa, "record_driver_daily_fuel_event"));
+  await db.exec(definition(pwa, "driver_finance_data").replace("a.status='completed'", "a.status<>'revoked'"));
   await db.exec(`create trigger driver_finance_event after insert or update on public.driver_finance_claims
     for each row execute function public.record_driver_finance_event();
     create trigger driver_daily_fuel_event after insert or update on public.driver_daily_fuel
@@ -72,6 +73,7 @@ async function fixture(t) {
   await db.exec(definition(pwa, "submit_driver_finance").replace("a.status<>'completed'", "a.status='revoked'")
     .replace("on conflict(assignment_id,category) do update", "on conflict(assignment_id,category) where assignment_id is not null do update"));
   await db.exec(definition(historical, "submit_driver_historical_finance").replace(/\n/g, "\r\n"));
+  await db.exec(definition(historical, "driver_historical_finance_data"));
   await db.exec(definition(pwa, "submit_driver_daily_fuel").replace("a.status<>'completed'", "a.status='revoked'"));
   await db.exec(definition(historical, "can_access_driver_receipt"));
   await db.exec(definition(pwa, "has_driver_fuel_day").replace("a.status='completed'", "a.status<>'revoked'"));
@@ -85,6 +87,8 @@ async function fixture(t) {
   await db.exec(read("20261202000000_staff_advance_category_switch"));
   await db.exec(read("20261203000000_staff_advance_item_switch"));
   await db.exec(read("20261204000000_staff_advance_item_delete"));
+  await db.exec(read("20261211000000_future_driver_advance_prefill"));
+  await db.exec(read("20261212000000_driver_finance_order_names"));
   let sequence = 100;
   const request = () => `00000000-0000-4000-8000-${String(sequence++).padStart(12, "0")}`;
   const scalar = async (sql, args = []) => (await db.query(sql, args)).rows[0].value;
@@ -100,6 +104,54 @@ async function fixture(t) {
   }
   return { db, scalar, day, advance, fuel, request };
 }
+
+test("live and historical finance projections include order names", async t => {
+  const { scalar } = await fixture(t);
+  const live = await scalar("select pg_get_functiondef('public.driver_finance_data_v2(text)'::regprocedure) as value");
+  const historical = await scalar("select pg_get_functiondef('public.driver_historical_finance_data_v2(text)'::regprocedure) as value");
+  assert.match(live, /'orderName',o\.customer/);
+  assert.match(historical, /'orderName',h\.order_name/);
+  assert.doesNotMatch(await scalar("select pg_get_functiondef('public.driver_finance_data(text)'::regprocedure) as value"),
+    /'orderName',o\.customer/);
+});
+
+test("future orders allow advance prefill without posting until the service date and reject future overtime or fuel", async t => {
+  const { db, scalar, advance, request } = await fixture(t);
+  const futureDate = await scalar("select (current_date+30)::text as value");
+  const serviceDate = await scalar("select current_date::text as value");
+  const finance = await scalar("select finance_by_date->$2 as value from public.orders where id=$1", [order, date]);
+  await db.query("update public.orders set date=$2::date,end_date=$2::date,finance_by_date=jsonb_build_object(($2::date)::text,$3::jsonb) where id=$1",
+    [order, futureDate, JSON.stringify(finance)]);
+  await db.query("update public.driver_assignments set service_date=$2 where id=$1", [assignment, futureDate]);
+
+  const projection = await scalar("select pg_get_functiondef('public.driver_finance_data(text)'::regprocedure) as value");
+  assert.doesNotMatch(projection, /a\.service_date\s*<=\s*\(now\(\) at time zone/);
+  const futureReceipt = `${driver}/${assignment}/company/${ids[17]}.jpg`;
+  await db.query("insert into storage.objects values('driver-finance-receipts',$1)", [futureReceipt]);
+  assert.equal(await scalar("select public.can_access_driver_receipt($1,true) as value", [futureReceipt]), true);
+  const company = await advance({ category: "company", amount: 1500 });
+  const trip = await advance({ category: "trip", amount: 2500 });
+  assert.equal(company.status, "pending");
+  assert.equal(trip.status, "pending");
+  const futureFinance = await scalar("select finance_by_date->$2 as value from public.orders where id=$1", [order, futureDate]);
+  assert.equal(futureFinance.driverAdvanceCompanyReport, 100);
+  assert.equal(futureFinance.driverAdvanceTripReport, 200);
+  await assert.rejects(advance({ category: "overtime", hours: 1 }), /Completed own trip required/);
+  await assert.rejects(scalar("select public.submit_driver_daily_fuel($1,$2,0,$3,1000,'[]'::jsonb) as value",
+    [futureDate, assignment, request()]), /Completed own day required/);
+
+  await db.query("update public.orders set date=$2::date,end_date=$2::date,finance_by_date=jsonb_build_object(($2::date)::text,$3::jsonb) where id=$1",
+    [order, serviceDate, JSON.stringify(futureFinance)]);
+  await db.query("update public.driver_assignments set service_date=$2,status='completed' where id=$1",
+    [assignment, serviceDate]);
+  const postedCompany = await advance({ category: "company", amount: 1500, version: company.version });
+  const postedTrip = await advance({ category: "trip", amount: 2500, version: trip.version });
+  assert.equal(postedCompany.status, "approved");
+  assert.equal(postedTrip.status, "approved");
+  const postedFinance = await scalar("select finance_by_date->$2 as value from public.orders where id=$1", [order, serviceDate]);
+  assert.equal(postedFinance.driverAdvanceCompanyReport, 1600);
+  assert.equal(postedFinance.driverAdvanceTripReport, 2700);
+});
 
 test("staff deletes one expense, reverses only its amount and preserves photos in audit, other details and driver editability", async t => {
   const { db, scalar, day, advance } = await fixture(t);

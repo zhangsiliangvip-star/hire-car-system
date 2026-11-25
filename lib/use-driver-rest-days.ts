@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
-import { shiftStatusSchema } from "@/lib/driver/shifts";
-
-type RestDay = { driverId: string; date: string };
+import { shiftStatusSchema, type ShiftStatusDay } from "@/lib/driver/shifts";
 
 export function useDriverRestDays(enabled: boolean, dates: string[]) {
-  const [state, setState] = useState<{ key: string; days: RestDay[] } | null>(null);
+  const [state, setState] = useState<{ key: string; days: ShiftStatusDay[] } | null>(null);
   const datesKey = JSON.stringify([...new Set(dates)].sort());
   useEffect(() => {
     const requested: string[] = JSON.parse(datesKey);

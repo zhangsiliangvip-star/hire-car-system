@@ -30,8 +30,9 @@ const shifts = load("lib\\driver\\shifts.ts");
 const { jsonResponse } = load("lib\\api-response.ts");
 const driverId = "c6000000-0000-4000-8000-000000000001";
 const requestId = "c6000000-0000-4000-8000-000000000002";
-const data = { month: "2026-11", version: 3, dates: ["2026-11-02"], note: "Shared note" };
-const command = { driverId, shift: { month: data.month, dates: data.dates, note: data.note, expectedVersion: 3, requestId } };
+const data = { month: "2026-11", version: 3, dates: ["2026-11-02"], attendanceDates: [], note: "Shared note" };
+const command = { driverId, shift: { month: data.month, dates: data.dates, attendanceDates: data.attendanceDates,
+  note: data.note, expectedVersion: 3, requestId } };
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const postal = load("lib\\postal-address.ts");
@@ -389,7 +390,7 @@ test("driver save guards unsaved rests and invalid bank details without issuing 
   };
   vm.createContext(context);
   vm.runInContext(ts.transpileModule(block, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
-  context.saveDriver(); assert.match(alerts.at(-1), /保存本月休息日/);
+  context.saveDriver(); assert.match(alerts.at(-1), /保存本月シフト希望/);
   context.driverRestState.dirty = false;
   context.saveDriver(); assert.match(alerts.at(-1), /半角数字/);
   context.driverRestState.busy = true;
@@ -430,9 +431,10 @@ test("staff reads and writes forward driver, monthly version, note and idempoten
   assert.deepEqual(await response.json(), data);
   assert.equal((await h.POST(post())).status, 200);
   assert.deepEqual(plain(h.calls), [
-    { name: "staff_driver_monthly_shift", args: { target_driver: driverId, target_month: data.month } },
-    { name: "staff_submit_driver_monthly_shift", args: { target_driver: driverId, target_month: data.month,
-      expected_version: 3, target_request: requestId, rest_dates: data.dates, note: data.note } },
+    { name: "staff_driver_monthly_shift_v2", args: { target_driver: driverId, target_month: data.month } },
+    { name: "staff_submit_driver_monthly_shift_v2", args: { target_driver: driverId, target_month: data.month,
+      expected_version: 3, target_request: requestId, rest_dates: data.dates,
+      attendance_dates: data.attendanceDates, note: data.note } },
   ]);
 });
 test("staff writes reject foreign origins, oversized/non-JSON and invalid dates without writes", async () => {
@@ -454,7 +456,8 @@ test("staff conflicts, permissions, missing migrations and malformed responses r
 });
 
 function editor({ saved = data, fetch: fetchMock = async () => Response.json(data), confirm = () => true } = {}) {
-  const states = [data.month, saved, saved?.dates ?? [], saved?.note ?? "", !saved, false, "", "", 0];
+  const states = [data.month, saved, saved?.dates ?? [], saved?.note ?? "", !saved, false, "", "", 0,
+    saved?.attendanceDates ?? []];
   const refs = [], effects = [], buttons = [], inputs = [], reported = [];
   let cursor = 0, refCursor = 0;
   const runtime = require("react/jsx-runtime");
@@ -483,14 +486,18 @@ test("staff calendar multi-selects dates, loads the saved month and reports unsa
   const h = editor({ saved: null, fetch: async url => { calls.push(url); return Response.json(data); } });
   h.effects[1](); await tick(); h.render();
   assert.match(calls[0], new RegExp(`driverId=${driverId}&month=2026-11`));
-  assert.match(h.render(), /aria-label="2026-11-02" aria-pressed="true"/);
+  assert.match(h.render(), /aria-label="2026-11-02 希望休" aria-pressed="true"/);
   assert.equal(h.buttons.filter(button => button["aria-label"]?.startsWith("2026-11-")).length, 30);
   h.buttons.find(button => button["aria-label"] === "2026-11-03").onClick();
   h.render(); h.effects[0]();
   assert.deepEqual(h.reported.at(-1), { busy: false, dirty: true });
-  assert.deepEqual(plain(h.states[2]), ["2026-11-02", "2026-11-03"]);
-  h.buttons.find(button => button["aria-label"] === "2026-11-02").onClick();
-  assert.deepEqual(plain(h.states[2]), ["2026-11-03"]);
+  assert.deepEqual(plain(h.states[2]), ["2026-11-02"]);
+  assert.deepEqual(plain(h.states[9]), ["2026-11-03"]);
+  h.buttons.find(button => button.children === "希望休").onClick();
+  h.render();
+  h.buttons.find(button => button["aria-label"] === "2026-11-02 希望休").onClick();
+  assert.deepEqual(plain(h.states[2]), []);
+  assert.deepEqual(plain(h.states[9]), ["2026-11-03"]);
 });
 test("staff saves retain failed drafts, block duplicates and reuse retry request IDs", async () => {
   const calls = []; let resolve;
@@ -498,13 +505,13 @@ test("staff saves retain failed drafts, block duplicates and reuse retry request
   const h = editor({ fetch: async (_url, init) => { calls.push(JSON.parse(init.body));
     return calls.length === 1 ? pending : Response.json({ ...data, version: 4, dates: [] }); } });
   h.states[2] = []; h.render();
-  const save = () => h.buttons.find(button => Array.isArray(button.children) ? false : button.children === "保存本月休息日").onClick();
+  const save = () => h.buttons.find(button => Array.isArray(button.children) ? false : button.children === "保存本月シフト希望").onClick();
   save(); save(); assert.equal(calls.length, 1);
   resolve(Response.json({ error: "Conflict: refresh first" }, { status: 409 })); await tick();
   assert.equal(h.states[6], "Conflict: refresh first"); assert.equal(h.states[1].version, 3);
   assert.equal(h.states[2].length, 0); assert.equal(h.states[5], false);
   h.render(); save(); await tick();
-  assert.deepEqual(calls[0], { driverId, shift: { ...command.shift, dates: [] } });
+  assert.deepEqual(calls[0], { driverId, shift: { ...command.shift, dates: [], attendanceDates: [] } });
   assert.equal(calls[0].shift.requestId, calls[1].shift.requestId);
   assert.equal(h.states[1].version, 4); assert.match(h.states[7], /同步/);
 });
@@ -519,7 +526,7 @@ test("staff month switching guards drafts and a rejected read never enables savi
   const failed = editor({ saved: null, fetch: async () => Response.json({ error: "Read failed" }, { status: 503 }) });
   failed.effects[1](); await tick();
   assert.equal(failed.states[1], null); assert.equal(failed.states[6], "Read failed");
-  assert.doesNotMatch(failed.render(), /保存本月休息日/);
+  assert.doesNotMatch(failed.render(), /保存本月シフト希望/);
 });
 test("wide driver dialog renders all bank inputs and synchronized rest editor", () => {
   const source = readFileSync(path.join(root, "app\\page.tsx"), "utf8");
@@ -551,7 +558,7 @@ test("wide driver dialog renders all bank inputs and synchronized rest editor", 
   assert.ok(markup.indexOf("郵便番号") < markup.indexOf("住所先"));
   assert.match(source, /<div className="driver-editor-full grid gap-3">\s*<DriverPostalCode[\s\S]*?<label className="driver-editor-field">\s*住所先/);
   assert.doesNotMatch(markup, /列表状态/);
-  for (const text of ["基本资料", "常勤/非常勤", "常勤", "非常勤", "郵便番号", "住所先", "所属会社", "銀行名", "支店名", "口座種別", "口座番号", "口座名義", "保存本月休息日", "保存運転士资料"])
+  for (const text of ["基本资料", "常勤/非常勤", "常勤", "非常勤", "郵便番号", "住所先", "所属会社", "銀行名", "支店名", "口座種別", "口座番号", "口座名義", "保存本月シフト希望", "保存運転士资料"])
     assert.ok(markup.includes(text), text);
   assert.match(source, /<option value="常勤">常勤<\/option><option value="非常勤">非常勤<\/option>/);
   assert.match(source, /aria-label="司机类别筛选"/);

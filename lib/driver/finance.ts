@@ -32,7 +32,8 @@ export const financeClaimSchema = z.object({
   reviewNote: z.string(), submittedAt: z.string(),
 }).strict();
 export const financeTripSchema = z.object({
-  assignmentId: z.uuid(), date: z.iso.date(), pickup: z.string(), destination: z.string(),
+  assignmentId: z.uuid(), date: z.iso.date(), orderName: z.string().optional(),
+  pickup: z.string(), destination: z.string(),
   historical: z.boolean().optional(),
   existingOvertimeHours: z.number().nonnegative(),
   claims: z.array(financeClaimSchema).max(3),

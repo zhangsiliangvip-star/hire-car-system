@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const date = z.iso.date().safeParse(params.get("date"));
     if (!date.success || [...params.keys()].some(key => key !== "date") || params.getAll("date").length !== 1)
       return jsonResponse({ error: "請選択有效的日報日期。" }, { status: 400 });
-    const { data, error } = await identity.supabase.rpc("driver_report_defaults", { target_date: date.data });
+    const { data, error } = await identity.supabase.rpc("driver_report_defaults_v2", { target_date: date.data });
     if (error) {
       console.error("Driver report defaults rejected.", { code: error.code });
       return jsonResponse({ error: "无法读取当天訂単和車库，請重试。" }, { status: 503 });

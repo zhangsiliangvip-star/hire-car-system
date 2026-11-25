@@ -8,6 +8,7 @@ import ts from "typescript";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { writeFileSync } from "node:fs";
+import { PGlite } from "@electric-sql/pglite";
 
 const require = createRequire(import.meta.url);
 function load(relative, mocks = {}, globals = {}) {
@@ -42,9 +43,9 @@ const fixture = {
 const checkout = { reportId: null, expectedVersion: 0, requestId: id, action: "checkout",
   payload: { useDefault: false, address: "Synthetic depot", km: 100, departedAt: fixture.departedAt } };
 const defaultsFixture = { serviceDate: fixture.serviceDate, driverName: "Linked driver",
-  orders: [{ assignmentId: id, time: "09:00", pickup: "Airport", destination: "Hotel",
+  orders: [{ assignmentId: id, orderName: "Linked order name", time: "09:00", pickup: "Airport", destination: "Hotel",
     vehicleNumber: "Linked plate", depot: { name: "Vehicle owner", address: "Owner garage" } },
-  { assignmentId: id.replace(/1$/, "2"), time: "14:00", pickup: "Hotel", destination: "Airport",
+  { assignmentId: id.replace(/1$/, "2"), orderName: "Second order name", time: "14:00", pickup: "Hotel", destination: "Airport",
     vehicleNumber: "Second plate", depot: null }] };
 
 function memoryStorage() {
@@ -402,6 +403,9 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
     cleanup(); assert.equal(signal.aborted, true); assert.equal(cleared, true);
     const html = renderToStaticMarkup(tree);
     assert.match(html, /日報关联訂単/);
+    const options = html.match(/<select name="assignmentId"[\s\S]*?<\/select>/)?.[0] || "";
+    assert.match(options, /Synthetic order<\/option>/);
+    assert.doesNotMatch(options, /BASE|Synthetic plate/);
     assert.match(html, /修改并保存也会更新訂単/);
   }
 });
@@ -544,7 +548,7 @@ test("report defaults API validates date and identity and exposes only minimal n
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Cache-Control"), /no-store/);
   assert.deepEqual(await response.json(), defaultsFixture);
-  assert.deepEqual(JSON.parse(JSON.stringify(h.calls)), [{ name: "driver_report_defaults", args: { target_date: fixture.serviceDate } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls)), [{ name: "driver_report_defaults_v2", args: { target_date: fixture.serviceDate } }]);
   for (const options of [{ result: null }, { result: { ...defaultsFixture, password: "no" } },
     { result: { ...defaultsFixture, orders: [{ ...defaultsFixture.orders[0], price: 999 }] } }])
     assert.equal((await defaultsHandler(options).GET(new Request("https://driver.example?date=2026-10-27"))).status, 500);
@@ -585,6 +589,9 @@ test("new report requires order selection, permits manual defaults and clears wr
   select.onChange({ target: { value: id } });
   html = render();
   assert.equal(checkoutProps.disabled, false);
+  const orderOptions = html.match(/<select aria-label="关联当天訂単"[\s\S]*?<\/select>/)?.[0] || "";
+  assert.match(orderOptions, /Linked order name/);
+  assert.doesNotMatch(orderOptions, /09:00|Airport|Hotel|Linked plate/);
   assert.match(html, /value="Linked plate"/);
   assert.match(html, /value="Linked driver"/);
   assert.doesNotMatch(html, /value="Owner garage"/);
@@ -618,6 +625,36 @@ test("new report requires order selection, permits manual defaults and clears wr
   assert.match(html, /value="Saved plate"/);
   assert.match(html, /value="Saved name"/);
   assert.doesNotMatch(html, /aria-label="关联当天訂単"/);
+});
+
+test("report order selectors display only names after database projections are migrated", async t => {
+  const db = new PGlite();
+  t.after(() => db.close());
+  await db.exec(`
+    create role anon;
+    create role authenticated;
+    create type public.driver_daily_reports as (driver_id uuid, region_id uuid, service_date date, header jsonb);
+    create function public.driver_report_defaults(target_date date) returns jsonb language sql as $$
+      with o as (select 'Order Name'::text as customer),
+      a as (select '${id}'::uuid as assignment_id, '09:00'::text as departure_time,
+        'Airport'::text as pickup, 'Hotel'::text as destination)
+      select jsonb_build_object('orders',jsonb_build_array(jsonb_build_object(
+        'assignmentId',a.assignment_id,'time',a.departure_time,'pickup',a.pickup,'destination',a.destination)))
+      from a cross join o
+    $$;
+    create function public.report_order_options(r public.driver_daily_reports) returns jsonb language sql as $$
+      select coalesce(jsonb_agg(jsonb_build_object('assignmentId',x.id,
+        'label',concat_ws(' · ',x.time,x.customer,x.pickup||' → '||x.destination),
+        'vehicleNumber',x.plate)),'[]'::jsonb)
+      from (select '${id}'::uuid as id,'09:00'::text as time,'Order Name'::text as customer,
+        'Airport'::text as pickup,'Hotel'::text as destination,'Plate'::text as plate) x
+    $$;
+  `);
+  await db.exec(readFileSync(new URL("../supabase/migrations/20261213000000_driver_report_order_names_only.sql", import.meta.url), "utf8"));
+  const defaults = (await db.query("select public.driver_report_defaults_v2('2026-10-27') as value")).rows[0].value;
+  const options = (await db.query("select public.report_order_options(null::public.driver_daily_reports) as value")).rows[0].value;
+  assert.equal(defaults.orders[0].orderName, "Order Name");
+  assert.deepEqual(options, [{ assignmentId: id, label: "Order Name", vehicleNumber: "Plate" }]);
 });
 
 test("defaults loader ignores late dates, auto-selects a single order and surfaces failures", async () => {

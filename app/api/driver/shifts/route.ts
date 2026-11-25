@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const query = z.object({ month: shiftMonthSchema }).strict()
       .safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!query.success) return jsonResponse({ error: "請選択有效月份。" }, { status: 400 });
-    const { data, error } = await identity.supabase.rpc("driver_monthly_shift", { target_month: query.data.month });
+    const { data, error } = await identity.supabase.rpc("driver_monthly_shift_v2", { target_month: query.data.month });
     if (error) throw error;
     return jsonResponse(shiftDataSchema.parse(data));
   } catch (error) {
@@ -35,9 +35,9 @@ export async function POST(request: Request) {
     const parsed = shiftSubmissionSchema.safeParse(body);
     if (!parsed.success) return jsonResponse({ error: "請检查本月休息日期及备注（最多1000字）。" }, { status: 400 });
     const item = parsed.data;
-    const { data, error } = await identity.supabase.rpc("submit_driver_monthly_shift", {
+    const { data, error } = await identity.supabase.rpc("submit_driver_monthly_shift_v2", {
       target_month: item.month, expected_version: item.expectedVersion, target_request: item.requestId,
-      rest_dates: item.dates, note: item.note,
+      rest_dates: item.dates, attendance_dates: item.attendanceDates, note: item.note,
     });
     if (error) {
       console.error("Driver shift submission rejected.", { code: error.code });

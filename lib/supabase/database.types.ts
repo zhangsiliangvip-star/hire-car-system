@@ -179,13 +179,18 @@ export type Database = {
       driver_own_profile: { Args: Record<string, never>; Returns: Json };
       update_driver_own_profile: { Args: { expected_version: number; action: string; contacts: Json }; Returns: Json };
       driver_monthly_shift: { Args: { target_month: string }; Returns: Json };
-      submit_driver_monthly_shift: { Args: { target_month: string; expected_version: number; target_request: string; rest_dates: string[]; note: string }; Returns: Json };
+      driver_monthly_shift_v2: { Args: { target_month: string }; Returns: Json };
+      submit_driver_monthly_shift_v2: { Args: { target_month: string; expected_version: number; target_request: string; rest_dates: string[]; attendance_dates: string[]; note: string }; Returns: Json };
       staff_driver_rest_days: { Args: { service_dates: string[] }; Returns: Json };
+      staff_driver_shift_requests: { Args: { service_dates: string[] }; Returns: Json };
       staff_driver_monthly_shift: { Args: { target_driver: string; target_month: string }; Returns: Json };
-      staff_submit_driver_monthly_shift: { Args: { target_driver: string; target_month: string; expected_version: number; target_request: string; rest_dates: string[]; note: string }; Returns: Json };
+      staff_driver_monthly_shift_v2: { Args: { target_driver: string; target_month: string }; Returns: Json };
+      staff_submit_driver_monthly_shift_v2: { Args: { target_driver: string; target_month: string; expected_version: number; target_request: string; rest_dates: string[]; attendance_dates: string[]; note: string }; Returns: Json };
       driver_finance_data: { Args: { target_month: string }; Returns: Json };
+      driver_finance_data_v2: { Args: { target_month: string }; Returns: Json };
       ensure_driver_historical_finance_links: { Args: { target_month: string }; Returns: undefined };
       driver_historical_finance_data: { Args: { target_month: string }; Returns: Json };
+      driver_historical_finance_data_v2: { Args: { target_month: string }; Returns: Json };
       submit_driver_finance: { Args: { target_assignment: string; target_category: string; expected_version: number; target_request: string; items: Json; hours: number }; Returns: Json };
       submit_driver_historical_finance: { Args: { target_link: string; target_category: string; expected_version: number; target_request: string; items: Json; hours: number }; Returns: Json };
       admin_driver_finance: { Args: { target_month: string }; Returns: Json };
@@ -274,6 +279,10 @@ export type Database = {
       driver_report_history: { Args: { target_month: string }; Returns: Json };
       driver_report_detail: { Args: { target_report: string }; Returns: Json };
       driver_report_defaults: {
+        Args: { target_date: string };
+        Returns: Json;
+      };
+      driver_report_defaults_v2: {
         Args: { target_date: string };
         Returns: Json;
       };

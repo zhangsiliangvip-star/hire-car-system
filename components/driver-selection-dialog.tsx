@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { shiftStatusSchema } from "@/lib/driver/shifts";
+import { shiftStatusSchema, type ShiftStatusDay } from "@/lib/driver/shifts";
 import { sortDriversByMonthlyAttendance } from "@/lib/driver-selection";
 import { getJapanDate } from "@/lib/vehicle-compliance";
 import { isDriverLicenseExpired } from "@/lib/driver-license";
@@ -36,7 +36,7 @@ export function DriverSelectionDialog({
   const [search, setSearch] = useState("");
   const [manualName, setManualName] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
-  const [restDays, setRestDays] = useState<{ key: string; days: { driverId: string; date: string }[] } | null>(null);
+  const [restDays, setRestDays] = useState<{ key: string; days: ShiftStatusDay[] } | null>(null);
   const [restError, setRestError] = useState("");
   const [restRevision, setRestRevision] = useState(0);
   const [selectionError, setSelectionError] = useState("");
@@ -133,7 +133,8 @@ export function DriverSelectionDialog({
           <p role="status" className="mb-3 text-sm text-gray-500">正在读取休息提示…</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {matches.map((driver) => {
-            const resting = restDays?.key === datesKey ? restDays.days.filter(day => day.driverId === driver.id) : [];
+            const resting = restDays?.key === datesKey
+              ? restDays.days.filter(day => day.driverId === driver.id && day.type === "rest") : [];
             const expired = isDriverLicenseExpired({ licenseExpiry: driver.licenseExpiry || "" }, today);
             return (
             <button key={driver.id} type="button" aria-pressed={selected === driver.name}

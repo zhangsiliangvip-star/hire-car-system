@@ -1488,12 +1488,17 @@ export default function Home() {
     setActiveView(view);
   }
   const driverExecution = useDriverExecutionStatus(Boolean(currentProfile) && (activeView === "calendar" || activeView === "orders"));
-  const driverRestDays = useDriverRestDays(Boolean(currentProfile) && activeView === "calendar", dates.map(day => day.date));
+  const driverShiftRequests = useDriverRestDays(Boolean(currentProfile) && activeView === "calendar", dates.map(day => day.date));
   const restingDriverNamesByDate = new Map<string, string[]>();
-  for (const day of driverRestDays) {
+  const attendanceDriverNamesByDate = new Map<string, string[]>();
+  for (const day of driverShiftRequests) {
     const driver = driverRecords.find(record => record.id === day.driverId);
-    const name = driver?.employmentType === "非常勤" ? undefined : driver?.name;
-    if (name) restingDriverNamesByDate.set(day.date, [...(restingDriverNamesByDate.get(day.date) ?? []), name]);
+    if (!driver?.name) continue;
+    if (day.type === "attendance") {
+      attendanceDriverNamesByDate.set(day.date, [...(attendanceDriverNamesByDate.get(day.date) ?? []), driver.name]);
+    } else if (driver.employmentType !== "非常勤") {
+      restingDriverNamesByDate.set(day.date, [...(restingDriverNamesByDate.get(day.date) ?? []), driver.name]);
+    }
   }
   const driverExecutionByOrder = new Map(driverExecution.data?.rows.map(row => [row.orderId, row]));
   useLayoutEffect(() => {
@@ -3683,7 +3688,7 @@ export default function Home() {
     if (dialogSavingRef.current) return;
     if (driverRestState.busy) return;
     if (driverRestState.dirty) {
-      alert("請先点击“保存本月休息日”，再保存運転士资料。");
+      alert("請先点击“保存本月シフト希望”，再保存運転士资料。");
       return;
     }
     if (editingDriverId === null && !requireSpecificRegionForNewData()) return;
@@ -7475,6 +7480,14 @@ export default function Home() {
                   {d.day}
                 </div>
                 {d.isHoliday && <div className="text-xs text-red-600">休日</div>}
+                {(attendanceDriverNamesByDate.get(d.date)?.length ?? 0) > 0 && (
+                  <div
+                    className="calendar-attendance-drivers mt-1 break-words text-xs font-semibold leading-tight text-blue-600"
+                    title={`出勤希望：${attendanceDriverNamesByDate.get(d.date)!.join("、")}`}
+                  >
+                    {attendanceDriverNamesByDate.get(d.date)!.join("、")}
+                  </div>
+                )}
                 {(restingDriverNamesByDate.get(d.date)?.length ?? 0) > 0 && (
                   <div
                     className="calendar-rest-drivers mt-1 break-words text-xs font-semibold leading-tight text-red-600"
@@ -9966,13 +9979,13 @@ export default function Home() {
                 <h2 id="driver-form-title" className="text-xl font-bold text-slate-900">
                   {editingDriverName ? "编辑運転士" : "新增運転士"}
                 </h2>
-                <p className="mt-1 text-xs text-slate-500">基本资料 · 银行口座 · 每月休息日</p>
+                <p className="mt-1 text-xs text-slate-500">基本资料 · 银行口座 · 每月シフト希望</p>
               </div>
               <button
                 type="button"
                 disabled={dialogSaving || driverRestState.busy}
                 onClick={() => {
-                  if (driverRestState.dirty && !window.confirm("休息日尚未保存，确定关闭并放弃休息日修改？")) return;
+                  if (driverRestState.dirty && !window.confirm("シフト希望尚未保存，确定关闭并放弃修改？")) return;
                   setShowDriverForm(false);
                 }}
                 aria-label="关闭"
@@ -10137,14 +10150,14 @@ export default function Home() {
               </section>
               </div>
               <section className="driver-editor-card driver-editor-rest">
-                <h3 className="driver-editor-section-title">每月休息日 <span>シフト</span></h3>
+                <h3 className="driver-editor-section-title">每月シフト希望</h3>
                 {editingDriverId ? <DriverRestEditor key={editingDriverId} driverId={editingDriverId} onStateChange={setDriverRestState} />
-                  : <p className="rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">请先保存運転士资料，再点击编辑，即可录入休息日。无需先创建司机手机账号。</p>}
+                  : <p className="rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-800">请先保存運転士资料，再点击编辑，即可录入シフト希望。无需先创建司机手机账号。</p>}
               </section>
             </div>
 
             <div className="driver-editor-footer sticky bottom-0 -mx-6 -mb-6 mt-6 flex flex-wrap items-center justify-between gap-3 border-t bg-white px-6 py-4">
-              <p className="text-xs text-slate-500">资料及银行口座在此保存；休息日请在右侧单独保存。</p>
+              <p className="text-xs text-slate-500">资料及银行口座在此保存；シフト希望请在右侧单独保存。</p>
               <button
                 type="button"
                 onClick={saveDriver}

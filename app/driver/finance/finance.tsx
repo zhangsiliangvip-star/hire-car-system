@@ -13,6 +13,9 @@ import { fuelClaimSchema, fuelSubmissionSchema } from "@/lib/driver/fuel";
 
 const yen = (value: number) => `¥${value.toLocaleString("ja-JP")}`;
 const labels = { pending: "待后台确认", approved: "已确认入账", rejected: "已退回，請修改后提交" };
+function tripLabel(item: FinanceData["trips"][number]) {
+  return item.orderName?.trim() || "未命名订单";
+}
 export default function DriverFinance({ initialDate, initialAssignmentId, initialView }: {
   initialDate?: string; initialAssignmentId?: string; initialView?: "wages";
 } = {}) {
@@ -32,6 +35,8 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
   const [fuelAmount, setFuelAmount] = useState("");
   const [fuelReceipts, setFuelReceipts] = useState<string[]>([]);
   const [fuelAssignment, setFuelAssignment] = useState("");
+  const today = japanDate();
+  const futureDate = date > today;
   const lock = useRef(false);
   const generation = useRef(0);
   const pickingReceipt = useRef(false);
@@ -199,11 +204,12 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
     } catch (cause) {
       if (current !== generation.current) return;
       console.error("Driver wages refresh after finance save failed.", cause);
-      throw new Error("费用已保存，但月工資汇总刷新失败；請点击“刷新财务”核对，不要重复录入同笔费用。");
+      throw new Error("费用已保存，但月工資汇总刷新失败；請稍后重新打开财务页核对，不要重复录入同笔费用。");
     }
   }
   async function submitFuel() {
     if (lock.current) return;
+    if (date > japanDate()) { setError("未到用車日期，暂不能申報燃油費。"); return; }
     const content = { date, assignmentId: fuelAssignment, amount: Number(fuelAmount), receipts: fuelReceipts,
       expectedVersion: fuelClaim?.version || 0 };
     const key = JSON.stringify(content);
@@ -232,6 +238,9 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
   }
   async function submit(targetCategory: FinanceCategory) {
     if (lock.current || !trip) return;
+    if (trip.date > japanDate() && targetCategory === "overtime") {
+      setError("未到用車日期，暂不能申報超時。"); return;
+    }
     const content = { assignmentId: trip.assignmentId, historical: trip.historical, category: targetCategory,
       expectedVersion: trip.claims.find(item => item.category === targetCategory)?.version || 0,
       expenses: targetCategory === "overtime" ? [] : expenses.filter(item => item.type === targetCategory),
@@ -248,7 +257,7 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
       });
       const result = await response.json();
       if (current !== generation.current) return;
-      if (!response.ok) throw new Error(result.error || "提交未获确认，請刷新核对。");
+      if (!response.ok) throw new Error(result.error || "提交未获确认，請重新打开财务页核对。");
       const claim = financeClaimSchema.parse(result.claim);
       setData(current => current ? { ...current, trips: current.trips.map(item =>
         item.assignmentId === claim.assignmentId ? { ...item, claims: [
@@ -256,6 +265,8 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
         ] } : item) } : null);
       pending.current = null; setNotice(claim.status === "approved"
         ? `${financeCategoryLabels[claim.category]}已保存并更新訂単当天财务；其他分类可继续填写。`
+        : claim.category !== "overtime" && trip.date > japanDate()
+          ? `${financeCategoryLabels[claim.category]}已预先填写，待行程完成后由后台确认；暂未计入訂単财务。`
         : `${financeCategoryLabels[claim.category]}已提交，待后台确认；其他分类可继续填写。`);
       if (claim.status === "approved") await refreshWages(current);
     } catch (cause) {
@@ -264,7 +275,7 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
     } finally { if (current === generation.current) { lock.current = false; setBusy(false); } }
   }
   const dayTrips = data?.trips.filter(item => item.date === date) || [];
-  const fuelTrips = dayTrips.filter(item => !item.historical);
+  const fuelTrips = dayTrips.filter(item => !item.historical && item.date <= today);
   const dayTotals = expenseTotals(dayTrips.flatMap(item => item.assignmentId === selected ? expenses : item.claims.flatMap(claim => claim.expenses)));
   const wages = data?.wages.reduce((total, row) => ({
     base: total.base + row.base, bonus: total.bonus + row.bonus,
@@ -279,26 +290,10 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
       <button type="button" aria-pressed={view === "claims"} onClick={() => { setView("claims"); setReceipt(""); }}>立替申報</button>
       <button type="button" aria-pressed={view === "wages"} onClick={() => { setView("wages"); setReceipt(""); }}>月工資</button>
     </div>
-    <p className="driver-muted">本人有效行程可申報社報／旅報、超時和燃油費；历史訂単可补录社報／旅報及超時。提交后直接入账，仍可修改金额、明細及票据。已入账费用按新旧差额更新，超時小時数替换当天原值，保留修改記録。切后台会清除未提交草稿，請先保存。</p>
-    <label className="driver-field">月份<input type="month" value={month} disabled={busy}
-      onChange={event => { if (event.target.value && canLeave()) {
-        initialTarget.current = undefined;
-        setLoading(true); setData(null); setSelected(""); setExpenses([]); setHours(""); setError(""); setNotice(""); setReceipt("");
-        setFuelAmount(""); setFuelReceipts([]); setFuelAssignment("");
-        setMonth(event.target.value); setDate(`${event.target.value}-01`);
-        selectedDate.current = `${event.target.value}-01`;
-      } }} /></label>
-    <button className="driver-link" disabled={busy || loading} onClick={() => {
-      if (!canLeave()) return;
-      setLoading(true); setData(null); setSelected(""); setExpenses([]); setHours(""); setError(""); setReceipt("");
-      setFuelAmount(""); setFuelReceipts([]); setFuelAssignment("");
-      setRevision(value => value + 1);
-    }}>刷新财务</button>
     {error && <p className="driver-error" role="alert">{error}</p>}
     {notice && <p className="driver-notice" role="status">{notice}</p>}
     {loading ? <p className="driver-empty">正在读取财务…</p> : data && <>
       {view === "wages" ? <section className="driver-card"><h2>本月工資</h2>
-        <p className="driver-muted">只读，应発金額包含基本、奖励、超時工資、手動加减及后台已记運転士立替。待审申報不计入，不代表已支付；尚未核算的数据可能继续调整。</p>
         <div className="driver-row"><span>基本工資</span><strong>{yen(wages!.base)}</strong></div>
         <div className="driver-row"><span>奖励工資</span><strong>{yen(wages!.bonus)}</strong></div>
         <div className="driver-row"><span>超時工資</span><strong>{yen(wages!.overtime)}</strong></div>
@@ -309,13 +304,12 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
         <div className="driver-row"><span>应発金額</span><strong>{yen(wages!.base + wages!.bonus + wages!.overtime + wages!.advances +
           data.manualItems.reduce((sum, item) => sum + item.amount, 0))}</strong></div>
       </section> : <>
-      <div className="finance-date-row"><label className="driver-field">用車日期<input type="date" value={date} min={`${month}-01`}
-        max={`${month}-${new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()}`} disabled={busy}
+      <div className="finance-date-row"><label className="driver-field">用車日期<input type="date" value={date} disabled={busy}
         onChange={event => changeDate(event.target.value)} /></label>
         <button className="driver-link" type="button" disabled={busy} onClick={() => changeDate(japanDate())}>当日</button></div>
       <label className="driver-field">選択当天訂単<select value={selected} disabled={busy} onChange={event => choose(event.target.value)}>
         <option value="">請選択当天訂単</option>{dayTrips.map(item =>
-          <option key={item.assignmentId} value={item.assignmentId}>{item.historical ? "历史訂単 · " : ""}{item.pickup} → {item.destination}</option>)}
+          <option key={item.assignmentId} value={item.assignmentId}>{tripLabel(item)}</option>)}
       </select></label>
       {!dayTrips.length && <p className="driver-empty">当天暂无本人可申報的行程。</p>}
       {trip && advanceSections.map(({ category, claim }) =>
@@ -356,19 +350,20 @@ export default function DriverFinance({ initialDate, initialAssignmentId, initia
         <h2>超時申報{trip.historical ? " · 历史訂単" : ""}</h2>
         {overtimeClaim && <p className="driver-muted">{labels[overtimeClaim.status]} {overtimeClaim.reviewNote}</p>}
           <label className="driver-field">超時小時数<input type="number" min="0" max="999" step="0.01" inputMode="decimal"
-            disabled={busy}
+            disabled={busy || futureDate}
             onWheel={event => event.currentTarget.blur()}
             placeholder="例：1.5" value={hours} onChange={event => setHours(event.target.value)} /></label>
-        <button className="driver-button" disabled={busy} onClick={() => void submit("overtime")}>保存超時并提交</button>
+        <button className="driver-button" disabled={busy || futureDate} onClick={() => void submit("overtime")}>保存超時并提交</button>
       </section>}
       <section className="driver-card"><h2>当日燃油費</h2>
+        {futureDate && <p className="driver-muted">未到用車日期，暂不能申報燃油費。</p>}
         {fuelClaim && <p className="driver-muted">{labels[fuelClaim.status]} {fuelClaim.reviewNote}</p>}
-        <fieldset className="finance-fields" disabled={busy || !fuelTrips.length}>
+        <fieldset className="finance-fields" disabled={busy || futureDate || !fuelTrips.length}>
           <label className="driver-field">燃油費关联訂単<select value={fuelAssignment} onChange={event => setFuelAssignment(event.target.value)}>
             <option value="">請選択当天一张訂単</option>
             {fuelClaim && !dayTrips.some(item => item.assignmentId === fuelClaim.assignmentId) &&
               <option value={fuelClaim.assignmentId}>原关联訂単（当前不可选）</option>}
-            {fuelTrips.map(item => <option value={item.assignmentId} key={item.assignmentId}>{item.pickup} → {item.destination}</option>)}
+            {fuelTrips.map(item => <option value={item.assignmentId} key={item.assignmentId}>{tripLabel(item)}</option>)}
           </select></label>
           <label className="driver-field">燃油費（JPY）<input type="number" min={fuelClaim ? "0" : "1"} max="99999999999999" step="1" inputMode="numeric"
             value={fuelAmount} onChange={event => setFuelAmount(event.target.value)} onWheel={event => event.currentTarget.blur()} /></label>

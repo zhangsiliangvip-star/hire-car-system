@@ -39,7 +39,8 @@ const id = "c6000000-0000-4000-8000-000000000001";
 const expense = { id, type: "company", detail: "Parking", amount: 1500, receipts: [] };
 const claim = { assignmentId: id, category: "company", version: 1, status: "pending", expenses: [expense],
   overtimeHours: 0, reviewNote: "", submittedAt: "2026-10-27T00:00:00Z" };
-const data = { fuelClaims: [], trips: [{ assignmentId: id, date: "2026-10-27", pickup: "Synthetic pickup",
+const data = { fuelClaims: [], trips: [{ assignmentId: id, date: "2026-10-27", orderName: "Synthetic order",
+  pickup: "Synthetic pickup",
   destination: "Synthetic destination", existingOvertimeHours: 0, claims: [] }],
   wages: [{ date: "2026-10-27", base: 10000, bonus: 500, overtime: 3000, advances: 1500 }],
   manualItems: [{ name: "Synthetic adjustment", amount: -500 }] };
@@ -63,8 +64,8 @@ function handler({ admin = false, dailyFuel = false, denied = 0, testMode = true
   const calls = [];
   const supabase = { rpc: async (name, args) => {
     calls.push({ name, args }); return { data: ["driver_daily_fuel_data", "admin_driver_daily_fuel"].includes(name) ? [] :
-      name === "driver_historical_finance_data" ? historical :
-      name === "driver_finance_data" && result ? Object.fromEntries(Object.entries(result).filter(([key]) => key !== "fuelClaims")) : result, error };
+      name === "driver_historical_finance_data_v2" ? historical :
+      name === "driver_finance_data_v2" && result ? Object.fromEntries(Object.entries(result).filter(([key]) => key !== "fuelClaims")) : result, error };
   } };
   const exports = load(admin ? "app/api/driver-finance-review/route.ts" :
     dailyFuel ? "app/api/driver/fuel/route.ts" : "app/api/driver/finance/route.ts", {
@@ -164,7 +165,7 @@ test("finance read is a minimal no-store projection including manual payroll adj
   assert.match(response.headers.get("Cache-Control"), /no-store/);
   assert.deepEqual(await response.json(), data);
   assert.deepEqual(h.calls.map(call => call.name), ["ensure_driver_historical_finance_links",
-    "driver_finance_data", "driver_daily_fuel_data", "driver_historical_finance_data"]);
+    "driver_finance_data_v2", "driver_daily_fuel_data", "driver_historical_finance_data_v2"]);
   assert.equal(h.calls[1].args.target_month, "2026-10");
   for (const result of [{ ...data, profit: 100 }, { ...data, wages: [{ ...data.wages[0], customerCharge: 100 }] }, null])
     assert.equal((await handler({ result }).GET(new Request("https://driver.example/api/driver/finance?month=2026-10"))).status, 500);
@@ -338,15 +339,23 @@ test("receipt uploads show a single Japanese picker label while keeping native m
 
 test("mobile finance renders both categories, all-order daily totals and complete monthly wages", () => {
   const { html } = renderFinance();
-  for (const text of ["社報", "旅報", "¥1,500", "¥2,000", "最多5张", 'multiple=""', "刷新财务"])
+  assert.doesNotMatch(html, /本人有效行程可申報/);
+  for (const text of ["社報", "旅報", "¥1,500", "¥2,000", "最多5张", 'multiple=""'])
     assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /刷新财务/);
+  assert.equal((html.match(/type="month"/g) ?? []).length, 0);
+  assert.doesNotMatch(html, /<input type="date"[^>]* min=|<input type="date"[^>]* max=/);
   const companyCard = html.split('aria-label="社報立替"')[1].split("</section>")[0];
   const tripCard = html.split('aria-label="旅報立替"')[1].split("</section>")[0];
   assert.match(companyCard, /<\/h2><p class="driver-muted">此费用无需向发单方请求<\/p>/);
   assert.match(tripCard, /<\/h2><p class="driver-muted">此费用需要向发单方额外请求<\/p>/);
   assert.doesNotMatch(companyCard, /此费用需要向发单方额外请求/);
   assert.doesNotMatch(tripCard, /此费用无需向发单方请求/);
-  const wages = renderFinance({ view: "wages" }).html;
+  const wagesHarness = renderFinance({ view: "wages" });
+  const wages = wagesHarness.html;
+  assert.equal(wagesHarness.inputs.some(input => input.type === "month"), false);
+  assert.doesNotMatch(wages, /刷新财务/);
+  assert.doesNotMatch(wages, /只读，应発金額包含/);
   for (const text of ["¥14,500", "Synthetic adjustment", "本月工資"]) assert.ok(wages.includes(text), text);
   if (process.env.DRIVER_FINANCE_LAYOUT_FILE) {
     const css = ["app/driver/driver.css", "app/driver/finance/finance.css"].map(path =>
@@ -354,6 +363,36 @@ test("mobile finance renders both categories, all-order daily totals and complet
     writeFileSync(process.env.DRIVER_FINANCE_LAYOUT_FILE,
       `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${css}</style><div class="driver-app">${html}</div>`);
   }
+});
+
+test("order selectors show order names and use a readable fallback when all labels are blank", () => {
+  const h = renderFinance();
+  const options = h.html.match(/<option[^>]*>[^<]*<\/option>/g)?.join("") || "";
+  assert.match(options, /Synthetic order/);
+  assert.doesNotMatch(options, /Synthetic pickup|Synthetic destination|→|历史訂単/);
+  h.states[2].trips[0].orderName = "";
+  h.states[2].trips[0].pickup = "";
+  h.states[2].trips[0].destination = "";
+  assert.match(h.render().match(/<option[^>]*>[^<]*<\/option>/g)?.join("") || "", /未命名订单/);
+});
+
+test("future orders allow advance prefill but block overtime and fuel submissions", () => {
+  const calls = [];
+  const h = renderFinance({ fetch: async (_url, init) => {
+    calls.push(JSON.parse(init.body));
+    return Response.json({ claim });
+  } });
+  h.states[1] = "2026-10-28";
+  for (const trip of h.states[2].trips) trip.date = "2026-10-28";
+  const html = h.render();
+  assert.doesNotMatch(html, /本人有效行程可申報/);
+  assert.match(html, /未到用車日期，暂不能申報燃油費/);
+  assert.equal(h.buttons.find(button => button.children === "保存社報立替并提交").disabled, false);
+  assert.equal(h.buttons.find(button => button.children === "保存超時并提交").disabled, true);
+  assert.equal(h.buttons.find(button => button.children === "保存燃油費并提交").disabled, true);
+  h.buttons.find(button => button.children === "保存超時并提交").onClick();
+  h.buttons.find(button => button.children === "保存燃油費并提交").onClick();
+  assert.deepEqual(calls, []);
 });
 
 test("driver fuel and advance submissions immediately expose approved posting", async () => {
@@ -374,7 +413,7 @@ test("driver fuel and advance submissions immediately expose approved posting", 
   submit.onClick({ currentTarget: { value: "company" } });
   await new Promise(resolve => setImmediate(resolve));
   assert.match(h.render(), /已保存并更新訂単当天财务/);
-  assert.match(h.html, /提交后直接入账，仍可修改金额、明細及票据/);
+  assert.doesNotMatch(h.html, /本人有效行程可申報/);
 });
 
 test("daily fuel card omits explanation and overtime submission remains editable after direct posting", async () => {

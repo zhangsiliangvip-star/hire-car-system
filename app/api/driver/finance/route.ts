@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       console.error("Driver historical finance links rejected.", { code: links.error.code });
       return jsonResponse({ error: "歴史訂単财务入口读取失败，請重试。" }, { status: 503 });
     }
-    const { data, error } = await identity.supabase.rpc("driver_finance_data", { target_month: parsed.data.month });
+    const { data, error } = await identity.supabase.rpc("driver_finance_data_v2", { target_month: parsed.data.month });
     if (error) {
       console.error("Driver finance read rejected.", { code: error.code });
       return jsonResponse({ error: "财务读取失败，請重试或联系管理员。" }, { status: 503 });
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       console.error("Driver daily fuel read rejected.", { code: fuel.error.code });
       return jsonResponse({ error: "燃油費申報读取失败，請重试。" }, { status: 503 });
     }
-    const historical = await identity.supabase.rpc("driver_historical_finance_data", {
+    const historical = await identity.supabase.rpc("driver_historical_finance_data_v2", {
       target_month: parsed.data.month,
     });
     if (historical.error) {
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     });
     if (error) {
       console.error("Driver finance submission rejected.", { code: error.code });
-      return jsonResponse({ error: error.code === "40001" ? "申報或已入账金額已变化，請刷新核对；若后台已调整金額，請联系管理员后再修改。" :
+      return jsonResponse({ error: error.code === "40001" ? "申報或已入账金額已变化，請重新打开财务页核对；若后台已调整金額，請联系管理员后再修改。" :
         "申報未获确认，請检查行程权限和票据后重试。" }, { status: error.code === "40001" ? 409 :
         error.code === "42501" ? 403 : ["22023", "22P02", "23514"].includes(error.code) ? 422 : 503 });
     }

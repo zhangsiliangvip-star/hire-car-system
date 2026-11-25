@@ -11,7 +11,7 @@ function databaseError(error: { code?: string }) {
   const conflict = error.code === "40001";
   const migration = error.code === "PGRST202" || error.code === "42883";
   return jsonResponse({ error: conflict ? "休息日期已被更新，請刷新核对后重新保存。"
-    : migration ? "后台休息日功能尚未完成数据库迁移（20261124000000），請联系管理员。"
+    : migration ? "シフト希望功能尚未完成数据库迁移（20261214000000），請联系管理员。"
     : "休息日期操作失败，請核对权限后重试。" },
   { status: conflict ? 409 : error.code === "42501" ? 403 : error.code === "22023" ? 422 : 503 });
 }
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     if (!profile) return jsonResponse({ error: "需要后台账号。" }, { status: 403 });
     const query = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!query.success) return jsonResponse({ error: "請选择有效運転士及月份。" }, { status: 400 });
-    const { data, error } = await supabase.rpc("staff_driver_monthly_shift", {
+    const { data, error } = await supabase.rpc("staff_driver_monthly_shift_v2", {
       target_driver: query.data.driverId, target_month: query.data.month,
     });
     if (error) {
@@ -51,9 +51,9 @@ export async function POST(request: Request) {
     const parsed = submissionSchema.safeParse(body);
     if (!parsed.success) return jsonResponse({ error: "請检查運転士、月份、休息日期及备注。" }, { status: 400 });
     const { driverId, shift } = parsed.data;
-    const { data, error } = await supabase.rpc("staff_submit_driver_monthly_shift", {
+    const { data, error } = await supabase.rpc("staff_submit_driver_monthly_shift_v2", {
       target_driver: driverId, target_month: shift.month, expected_version: shift.expectedVersion,
-      target_request: shift.requestId, rest_dates: shift.dates, note: shift.note,
+      target_request: shift.requestId, rest_dates: shift.dates, attendance_dates: shift.attendanceDates, note: shift.note,
     });
     if (error) {
       console.error("Staff shift submission rejected.", { code: error.code });
