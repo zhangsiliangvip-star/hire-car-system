@@ -173,7 +173,10 @@ test("daily history shows requested amounts and shortcuts, including missing rep
   assert.match(html, /class="driver-link driver-report-missing" href="\/driver\/report\?date=2026-10-26"/);
   assert.ok(html.includes(`/driver/finance?date=2026-10-27&amp;assignmentId=${id}`));
   assert.ok(html.includes("/driver/finance?date=2026-10-27"));
-  assert.ok(html.includes("/driver/finance?date=2026-10-27&amp;view=wages"));
+  assert.match(html, /class="driver-header-button" href="\/driver\/finance\?date=2026-10-27&amp;assignmentId=[^"]+">修改<\/a>/);
+  assert.match(html, /class="driver-header-button" href="\/driver\/finance\?date=2026-10-27">修改<\/a>/);
+  assert.match(html, /当日工资<\/span><strong>¥1,000<\/strong>/);
+  assert.doesNotMatch(html, /当日工资<\/span><a/);
   assert.ok(html.includes(`/driver/report?reportId=${id}&amp;month=2026-10`));
   assert.match(html, /aria-current="page"[^>]*>履歴/);
   cleanup();
