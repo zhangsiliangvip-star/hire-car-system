@@ -99,7 +99,7 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
     <h1>履歴</h1>
     <label className="driver-field">查询月份<input type="month" value={month} min="0001-01"
       onChange={event => { if (event.target.value) setMonth(event.target.value); }} /></label>
-    {!loaded ? <p className="driver-empty" role="status">正在读取履歴…</p> : <>
+    {!loaded ? null : <>
       {loaded.errors.map(error => <p className="driver-error" role="alert" key={error}>{error}</p>)}
       {!dates.length && !loaded.errors.length && <p className="driver-empty">本月暂无訂単、财务或日報記録。</p>}
       {dates.map(date => {

@@ -161,7 +161,9 @@ function historyHarness({ fail = "", delay = false } = {}) {
 
 test("daily history shows requested amounts and shortcuts, including missing reports", async () => {
   const h = historyHarness();
-  h.render(); const cleanup = h.effects[0]();
+  const initialHtml = renderToStaticMarkup(h.render());
+  assert.doesNotMatch(initialHtml, /正在读取履歴/);
+  const cleanup = h.effects[0]();
   await new Promise(done => setImmediate(done));
   const html = renderToStaticMarkup(h.render());
   for (const text of ["订单名称", "History order", "立替", "¥1,500", "燃油费", "¥500",
