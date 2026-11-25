@@ -7,7 +7,7 @@ const sections = [
   { id: "report", label: "日報", href: "/driver/report" },
   { id: "finance", label: "财务", href: "/driver/finance" },
   { id: "shifts", label: "シフト", href: "/driver/shifts" },
-  { id: "history", label: "日歴", href: "/driver/history" },
+  { id: "history", label: "履歴", href: "/driver/history" },
 ] as const;
 
 export default function DriverNavigation({ active, busy = false, canLeave }: {
