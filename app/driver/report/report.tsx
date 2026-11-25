@@ -408,20 +408,14 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
     };
     const dutyStartTime = clock("dutyStartTime", previous?.dutyStartTime);
     const dutyEndTime = clock("dutyEndTime", previous?.dutyEndTime);
-    const date = (name: string, enabled: boolean, previousValue?: string | null) => {
-      if (!enabled) return null;
-      const value = String(fields.get(name) ?? "");
-      return validDate(value) ? value : force ? previousValue ?? report?.serviceDate ?? headerServiceDate : value;
-    };
-    const dutyStartDate = date("dutyStartDate", Boolean(dutyStartTime), previous?.dutyStartDate);
     const passengerValue = fields.get("passengerCount");
     const passengerCount = passengerValue === "" ? null : Number(passengerValue);
     const vehicleValue = String(fields.get("vehicleNumber") ?? "");
     const driverValue = String(fields.get("driverName") ?? "");
     const header = { serviceDate: headerServiceDate,
       dutyStartTime, dutyEndTime,
-      dutyStartDate,
-      dutyEndDate: dutyEndTime ? defaultDutyEndDate(dutyStartDate ?? headerServiceDate, dutyStartTime ?? "", dutyEndTime) : null,
+      dutyStartDate: dutyStartTime ? headerServiceDate : null,
+      dutyEndDate: dutyEndTime ? defaultDutyEndDate(headerServiceDate, dutyStartTime ?? "", dutyEndTime) : null,
       ...(data?.vehicleLinking ? {
         assignmentId: report ? String(fields.get("assignmentId") ?? "") || null : selectedOrder?.assignmentId ?? null,
         vehicleBaseline: report ? String(fields.get("vehicleBaseline") ?? "") : selectedOrder?.vehicleNumber ?? "",
@@ -557,24 +551,19 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
     {error && <p className="driver-error" role="alert">{error}</p>}
     {dirty && <p className="driver-muted">输入内容作为本机草稿保留，切换回来可继续填写；請点“保存”正式提交。</p>}
     {busy ? <p className="driver-empty">正在读取日報…</p> : data && <>
-      {!report && <div className="driver-card">
-        {!currentDefaults && !defaultsError && <p role="status">正在读取当天訂単和車库…</p>}
-        {defaultsError && <p className="driver-error" role="alert">{defaultsError}</p>}
-        {currentDefaults && (currentDefaults.orders.length ? <label className="driver-field">关联当天訂単
-          <select aria-label="关联当天訂単" value={assignment} disabled={saving} onChange={e => {
-            if (dirty && !window.confirm("更换訂単会重新带入車両番号及車库地址，是否继续？")) return;
-            setDraft(null); defaultsDraft.current = null; setAssignment(e.target.value); setDirty(true);
-          }}>
-            <option value="">請選択当天訂単</option>
-            {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
-              {order.orderName?.trim() || "未命名订单"}
-            </option>)}
-          </select></label> : <p className="driver-muted">当天没有已派给本人的訂単，車両番号和車库地址請手動填写。</p>)}
-        {selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，請手動填写。</p>}
-      </div>}
       <form id="report-header" ref={headerForm} key={`header-${report?.id ?? "new"}-${report?.version ?? 0}-${report?.header?.vehicleNumber ?? ""}-${report?.header?.assignmentId ?? ""}`} className="driver-report-header"
         aria-label="日報基本信息" onInput={() => setDirty(true)} onSubmit={e => { e.preventDefault(); if (report) void saveChanges(); }}>
-        {report && data.vehicleLinking && <label className="driver-report-order-link">关联当天訂単
+        {!report && !currentDefaults && !defaultsError && <p role="status">正在读取当天訂単和車库…</p>}
+        {!report && defaultsError && <p className="driver-error" role="alert">{defaultsError}</p>}
+        <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
+          disabled={saving} defaultValue={draftFields?.["report-header/serviceDate"] ?? report?.serviceDate ?? serviceDate} onChange={e => {
+            if (!report) { setDraft(null); defaultsDraft.current = null; setNewDate(e.target.value); setDefaults(null); setAssignment(""); setDefaultsError(""); }
+            else {
+              const link = headerForm.current?.elements.namedItem("assignmentId");
+              if (link instanceof HTMLSelectElement) link.value = "";
+            }
+          }} /></label>
+        {report && data.vehicleLinking && <label className="driver-report-order-link">关联当天订单
           <select name="assignmentId" aria-label="日報关联訂単" disabled={saving}
             defaultValue={draftFields?.["report-header/assignmentId"] ?? report.header?.assignmentId ?? ""} onChange={event => {
               const option = report.orderOptions?.find(item => item.assignmentId === event.target.value);
@@ -592,41 +581,41 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
               {item.label}
             </option>)}
           </select>
-          <span className="driver-muted">{report.header?.assignmentId
-            ? "車両番号与关联訂単按服务日同步；修改并保存也会更新訂単。"
-            : "尚未确认訂単关联，保留原車牌；請人工選択后保存以开启同步。"}</span>
           <input name="vehicleBaseline" type="hidden" defaultValue={draftFields?.["report-header/vehicleBaseline"] ?? report.header?.vehicleNumber ?? ""} />
         </label>}
-        <label>日期<input key={report?.serviceDate ?? "new-date"} name="serviceDate" aria-label="日期" type="date" required
-          disabled={saving} defaultValue={draftFields?.["report-header/serviceDate"] ?? report?.serviceDate ?? serviceDate} onChange={e => {
-            if (!report) { setDraft(null); defaultsDraft.current = null; setNewDate(e.target.value); setDefaults(null); setAssignment(""); setDefaultsError(""); }
-            else {
-              const link = headerForm.current?.elements.namedItem("assignmentId");
-              if (link instanceof HTMLSelectElement) link.value = "";
-            }
-          }} /></label>
-        <label>客数<input key={report?.header?.passengerCount ?? ""} name="passengerCount" aria-label="客数" type="number"
-          inputMode="numeric" min="0" max="999" step="1" disabled={saving} defaultValue={draftFields?.["report-header/passengerCount"] ?? report?.header?.passengerCount ?? ""} /></label>
+        {!report && currentDefaults && <label className="driver-report-order-link">关联当天订单
+          <select aria-label="关联当天訂単" value={assignment} disabled={saving || !currentDefaults.orders.length} onChange={e => {
+            if (dirty && !window.confirm("更换訂単会重新带入車両番号及車库地址，是否继续？")) return;
+            setDraft(null); defaultsDraft.current = null; setAssignment(e.target.value); setDirty(true);
+          }}>
+            <option value="">{currentDefaults.orders.length ? "請選択当天訂単" : "暂无可关联订单"}</option>
+            {currentDefaults.orders.map(order => <option key={order.assignmentId} value={order.assignmentId}>
+              {order.orderName?.trim() || "未命名订单"}
+            </option>)}
+          </select>
+        </label>}
+        {!report && selectedOrder && !selectedOrder.depot && <p className="driver-muted">未找到唯一車両所属会社的車库地址，請手動填写。</p>}
         <label>車両番号<input key={report ? report.header?.vehicleNumber ?? "" : `${serviceDate}-${assignment}`} name="vehicleNumber" aria-label="車両番号"
           maxLength={100} disabled={saving || (!report && (!currentDefaults || needsOrder))}
           defaultValue={draftFields?.["report-header/vehicleNumber"] ?? report?.header?.vehicleNumber ?? selectedOrder?.vehicleNumber ?? ""} /></label>
         <label>運転手<input key={report ? report.header?.driverName ?? "" : `${serviceDate}-${currentDefaults?.driverName ?? ""}`} name="driverName" aria-label="運転手"
           maxLength={100} disabled={saving || (!report && !currentDefaults)}
           defaultValue={draftFields?.["report-header/driverName"] ?? report?.header?.driverName ?? currentDefaults?.driverName ?? ""} /></label>
+        <label>客数<input key={report?.header?.passengerCount ?? ""} name="passengerCount" aria-label="客数" type="number"
+          inputMode="numeric" min="0" max="999" step="1" disabled={saving} defaultValue={draftFields?.["report-header/passengerCount"] ?? report?.header?.passengerCount ?? ""} /></label>
       </form>
-      <section className="driver-card driver-stops" aria-label="出库经由地归库"><h2>出库 · 经由地 · 归库</h2>
-        <p className="driver-muted">日報默认处于修改状态；经由地時間手動填写后统一保存，早于上一项自動顺延至次日。已归库日報也可修改和追加、削除经由地。</p>
+      <section className="driver-card driver-stops" aria-label="日報"><h2>日報</h2>
         <table ref={table} className="driver-stop-table driver-sheet" onInput={e => {
           if (e.target instanceof HTMLInputElement && (e.target.form?.id === "report-header" || e.target.form?.id === "report-checkout" ||
             e.target.form?.dataset.stopId || e.target.form?.hasAttribute("data-departure") || e.target.form?.hasAttribute("data-return"))) setDirty(true);
         }}>
-          <caption>{report ? `${report.serviceDate} · ${report.returnedAt ? "已归库" : "出库中"}` : "新日報"} · 日本時間</caption>
+          <caption>{report ? `${report.serviceDate} · ${report.returnedAt ? "已归库" : "出库中"}` : "新日報"}</caption>
           <colgroup><col className="driver-col-label" /><col className="driver-col-address" /><col className="driver-col-km" />
             <col className="driver-col-time" /><col className="driver-col-time" /></colgroup>
           <thead><tr><th scope="col">项目</th><th scope="col">地址</th><th scope="col">公里数</th>
             <th scope="col">到着</th><th scope="col">出発</th></tr></thead>
           <DriverReportDutyRows key={`duty-start-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
-            position="start" header={report?.header} serviceDate={report?.serviceDate ?? serviceDate}
+            position="start" header={report?.header}
             disabled={saving} draft={draftFields} />
           {!report && <LocationRows key={serviceDate} locationKey={assignment} serviceDate={serviceDate} fields={draftFields}
             disabled={saving || !currentDefaults || needsOrder} save={async p => {
@@ -651,11 +640,10 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           <ReturnRow key={`return-${report.id}`} report={report} disabled={saving} saveChanges={saveChanges} fields={draftFields} />
           </>}
           <DriverReportDutyRows key={`duty-end-${report?.id ?? serviceDate}-${report?.version ?? 0}`}
-            position="end" header={report?.header} serviceDate={report?.serviceDate ?? serviceDate}
+            position="end" header={report?.header}
             disabled={saving} draft={draftFields} />
         </table>
         {addStop}
-        {!report && <p className="driver-muted">保存开始地点后，可在表格内继续添加经由地。</p>}
       </section>
       {notice && <p className="driver-muted" role="status">{notice}</p>}
       {report && <>
@@ -693,6 +681,5 @@ export default function DriverReport({ initialReportId, initialDate, returnMonth
           </button>
         </div>}
     </>}
-    <p className="driver-muted">請在安全停車后操作。新日報按所选当天訂単带入車両番号和本人姓名；開始地点、公里数和出発時間均手動填写。已保存日報不自動覆盖，不采集定位。</p>
   </main>;
 }

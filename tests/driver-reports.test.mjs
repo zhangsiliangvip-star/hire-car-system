@@ -156,13 +156,14 @@ function draftHarness({ storage = memoryStorage(), user = id, saved = fixture, s
 test("opening reports starts fresh after completed history and still permits viewing it", async () => {
   const h = draftHarness();
   let html = renderToStaticMarkup(await h.loadPage());
-  assert.match(html, /新日報 · 日本時間/);
+  assert.match(html, /新日報/);
+  assert.doesNotMatch(html, /日本時間/);
   assert.doesNotMatch(html, /value="Synthetic depot"/);
   h.selectReport(id);
   html = renderToStaticMarkup(h.render());
   assert.match(html, /value="Synthetic depot"/);
   const reopened = draftHarness({ storage: h.storage });
-  assert.match(renderToStaticMarkup(await reopened.loadPage()), /新日報 · 日本時間/);
+  assert.match(renderToStaticMarkup(await reopened.loadPage()), /新日報/);
 });
 
 test("opening reports resumes an unfinished report even when newer history comes first", async () => {
@@ -252,7 +253,6 @@ test("incomplete report fields survive app switches, navigation and reload witho
   h.field("report-header", "vehicleNumber", "Draft plate");
   h.field("report-header", "passengerCount", "");
   h.field("report-header", "dutyStartTime", "2");
-  h.field("report-header", "dutyStartDate", "2026-10-27");
   h.field("report-header", "dutyEndTime", "0215");
   h.field("report-edit-departure", "address", "Unsaved depot");
   h.field("report-edit-departure", "km", "");
@@ -271,7 +271,7 @@ test("incomplete report fields survive app switches, navigation and reload witho
     assert.ok(html.includes(`value="${value}"`), value);
   assert.match(html, /name="dutyStartTime"[^>]*value="2"/);
   assert.match(html, /name="dutyEndTime"[^>]*value="0215"/);
-  assert.doesNotMatch(html, /name="dutyEndDate"|退勤点呼日期/);
+  assert.doesNotMatch(html, /dutyStartDate|dutyEndDate|出勤点呼日期|退勤点呼日期/);
   assert.match(html, /name="passengerCount"[^>]*value=""/);
   assert.match(html, /aria-label="出库公里表"[^>]*value=""/);
   assert.match(html, /已恢复本机草稿/);
@@ -406,7 +406,7 @@ test("saved reports poll latest plates but never overwrite dirty or saving forms
     const options = html.match(/<select name="assignmentId"[\s\S]*?<\/select>/)?.[0] || "";
     assert.match(options, /Synthetic order<\/option>/);
     assert.doesNotMatch(options, /BASE|Synthetic plate/);
-    assert.match(html, /修改并保存也会更新訂単/);
+    assert.doesNotMatch(html, /修改并保存也会更新訂単/);
   }
 });
 
@@ -586,6 +586,10 @@ test("new report requires order selection, permits manual defaults and clears wr
   let html = render();
   assert.equal(checkoutProps.disabled, true);
   assert.match(html, /請選択当天訂単/);
+  const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
+  assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
+    ["日期", "关联当天訂単", "車両番号", "運転手", "客数"]);
+  assert.doesNotMatch(headerMarkup, /driver-card/);
   select.onChange({ target: { value: id } });
   html = render();
   assert.equal(checkoutProps.disabled, false);
@@ -618,7 +622,7 @@ test("new report requires order selection, permits manual defaults and clears wr
   states[11] = { serviceDate: "2026-10-28", driverName: "Linked driver", orders: [] };
   html = render();
   assert.equal(checkoutProps.disabled, false);
-  assert.match(html, /当天没有已派给本人的訂単/);
+  assert.match(html, /暂无可关联订单/);
   states[0] = { reports: [{ ...fixture, header: { vehicleNumber: "Saved plate", driverName: "Saved name", passengerCount: null } }], depot: null };
   states[1] = fixture.id;
   html = render();
@@ -1117,17 +1121,18 @@ test("mobile report renders departure, stops, rest controls and completed totals
       "@/lib/supabase/browser": {}, "@/lib/driver/orders": {}, "@/lib/driver/reports": reports,
     }).default;
     const html = renderToStaticMarkup(React.createElement(Component));
-    assert.doesNotMatch(html, /<h1>|class="driver-notice"|日本時間 · 跨午夜归出库当天/);
+    assert.doesNotMatch(html, /<h1>|class="driver-notice"|日本時間/);
     for (const label of ["日期", "出勤点呼時間", "退勤点呼時間", "車両番号", "運転手", "客数"]) assert.ok(html.includes(`aria-label="${label}"`));
     const headerMarkup = html.match(/<form[^>]*aria-label="日報基本信息"[^>]*>([\s\S]*?)<\/form>/)[1];
     assert.deepEqual([...headerMarkup.matchAll(/aria-label="([^"]+)"/g)].map(match => match[1]),
-      ["日期", "客数", "車両番号", "運転手"]);
-    assert.doesNotMatch(html, /退勤点呼日期|name="dutyEndDate"/);
+      ["日期", "車両番号", "運転手", "客数"]);
+    assert.doesNotMatch(html, /出勤点呼日期|退勤点呼日期|dutyStartDate|name="dutyEndDate"/);
     assert.ok(html.indexOf('aria-label="出勤点呼時間"') < html.indexOf('aria-label="退勤点呼時間"'));
     assert.ok(html.indexOf('<tbody aria-label="出勤点呼">') < html.indexOf('<tbody aria-label="出库記録">'));
     assert.ok(html.indexOf('<tbody aria-label="出库記録">') < html.indexOf('<tbody aria-label="归库記録">'));
     assert.ok(html.indexOf('<tbody aria-label="归库記録">') < html.indexOf('<tbody aria-label="退勤点呼">'));
-    assert.match(html, /<td colSpan="4"><div class="driver-duty-inline">[\s\S]*aria-label="出勤点呼日期"[\s\S]*aria-label="出勤点呼時間"/);
+    assert.match(html, /<tbody aria-label="出勤点呼">[\s\S]*aria-label="出勤点呼時間"/);
+    assert.match(html, /aria-label="日報"><h2>日報<\/h2>/);
     assert.match(html, /<details[^>]*><summary>历史日報<\/summary>/);
     const historyOptions = html.match(/<summary>历史日報<\/summary>[\s\S]*?<select[^>]*>([\s\S]*?)<\/select>/)?.[1];
     assert.ok(historyOptions);
@@ -1150,11 +1155,11 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.doesNotMatch(html, /休息自動按各经由地到着至出発的時长累计/);
     assert.doesNotMatch(html, /归库打卡/);
     assert.equal(html.includes("42.5 km"), closed);
-    assert.ok(html.includes("不采集定位"));
+    assert.doesNotMatch(html, /保存开始地点后，可在表格内继续添加经由地|不采集定位/);
     assert.ok(html.includes('class="driver-stop-table driver-sheet"'));
     assert.equal((html.match(/<table\b/g) ?? []).length, 1);
     assert.equal((html.match(/<thead>/g) ?? []).length, 1);
-    const routeSection = html.match(/<section[^>]*aria-label="出库经由地归库"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+    const routeSection = html.match(/<section[^>]*aria-label="日報"[^>]*>([\s\S]*?)<\/section>/)?.[1];
     assert.ok(routeSection);
     assert.doesNotMatch(routeSection, /保存修改/);
     assert.doesNotMatch(routeSection, /开始新一次出库/);
@@ -1168,7 +1173,7 @@ test("mobile report renders departure, stops, rest controls and completed totals
     assert.match(routeSection, /aria-label="追加空白经由地">/);
     assert.match(routeSection, /aria-label="削除经由地 1"[^>]*>×<\/button>/);
     assert.doesNotMatch(routeSection, /disabled=""/);
-    assert.match(html, /日報默认处于修改状态/);
+    assert.doesNotMatch(routeSection, /日報默认处于修改状态|早于上一项自動顺延/);
     assert.ok(routeSection.includes('aria-label="出库記録"'));
     assert.ok(routeSection.includes("Synthetic depot"));
     assert.ok(routeSection.includes('aria-label="经由地 1"'));
@@ -1366,7 +1371,7 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
     "@/lib/supabase/browser": {}, "@/lib/driver/orders": {}, "@/lib/driver/reports": reports,
   }).default;
   const html = renderToStaticMarkup(React.createElement(Component));
-  assert.match(html, /aria-label="出库经由地归库"[\s\S]*<table[\s\S]*id="report-checkout"/);
+  assert.match(html, /aria-label="日報"[\s\S]*<table[\s\S]*id="report-checkout"/);
   assert.equal((html.match(/<table\b/g) ?? []).length, 1);
   assert.match(html, /form="report-checkout"[^>]*name="km"|name="km"[^>]*form="report-checkout"/);
   assert.doesNotMatch(html, /Vehicle owner|Owner garage/);
@@ -1378,7 +1383,7 @@ test("first and subsequent checkout use a fresh spreadsheet without mixing histo
   const checkoutHtml = html.match(/<tbody aria-label="開始地点">[\s\S]*?<\/tbody>/)?.[0];
   assert.ok(checkoutHtml);
   assert.doesNotMatch(checkoutHtml, /<button/);
-  assert.ok(html.includes("保存开始地点后，可在表格内继续添加经由地。"));
+  assert.doesNotMatch(html, /保存开始地点后，可在表格内继续添加经由地。|日本時間/);
   assert.match(html, /aria-label="開始地点"[\s\S]*aria-label="開始地点地址"[\s\S]*aria-label="開始地点公里数"[\s\S]*aria-label="開始地点出発時間"/);
   assert.match(html, /<input(?=[^>]*name="departedAt")(?=[^>]*data-manual-time)(?=[^>]*required="")[^>]*>/);
   assert.doesNotMatch(html, /出库打卡|打卡|出库記録|新经由地地址/);
