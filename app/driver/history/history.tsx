@@ -43,7 +43,7 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
         }),
         read(`/api/driver/finance?month=${encodeURIComponent(month)}`, "财务").then(value => {
           const parsed = financeDataSchema.parse(value);
-          if ([...parsed.trips, ...parsed.fuelClaims, ...parsed.wages].some(item => !item.date.startsWith(`${month}-`)))
+          if ([...parsed.trips, ...parsed.wages].some(item => !item.date.startsWith(`${month}-`)))
             throw new Error("财务月份不一致，請重新打开页面重试。");
           return parsed;
         }),
@@ -79,7 +79,6 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
   const dates = loaded ? [...new Set([
     ...(loaded.orders ?? []).map(item => item.date),
     ...(loaded.finance?.trips ?? []).filter(item => item.claims.length || item.existingOvertimeHours > 0).map(item => item.date),
-    ...(loaded.finance?.fuelClaims ?? []).map(item => item.date),
     ...(loaded.finance?.wages ?? []).map(item => item.date),
   ])].sort((a, b) => b.localeCompare(a)) : [];
   return <main className="driver-main">
@@ -93,12 +92,10 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
         const orders = loaded.orders?.filter(item => item.date === date) ?? [];
         const trips = loaded.finance?.trips.filter(item => item.date === date &&
           (item.claims.length || item.existingOvertimeHours > 0)) ?? [];
-        const fuel = loaded.finance?.fuelClaims.filter(item => item.date === date) ?? [];
         const wages = loaded.finance?.wages.filter(item => item.date === date) ?? [];
         const claims = trips.flatMap(trip => trip.claims
           .filter(claim => claim.category === "company" || claim.category === "trip")
           .map(claim => ({ trip, claim })));
-        const fuelTotal = fuel.reduce((sum, claim) => sum + claim.amount, 0);
         const dailyWage = wages.reduce((sum, wage) => sum + wage.base + wage.bonus + wage.overtime, 0);
         return <section className="driver-card driver-history-card" key={date} aria-label={`${date}履歴`}>
           <h2>{date}</h2>
@@ -110,9 +107,6 @@ export default function DriverHistory({ initialMonth }: { initialMonth?: string 
             <strong>{trip.pickup} → {trip.destination} · {yen(claim.expenses.reduce((sum, item) => sum + item.amount, 0))}
               {" · "}{statusLabels[claim.status]}</strong>
           </div>) : <div className="driver-row driver-history-row"><span>立替</span><strong>{yen(0)}</strong></div>}
-          <div className="driver-row driver-history-row"><span>燃油费</span>
-            <strong>{yen(fuelTotal)}</strong>
-          </div>
           <div className="driver-row driver-history-row"><span>当日工资</span>
             <strong>{wages.length ? yen(dailyWage) : "未核算"}</strong>
           </div>

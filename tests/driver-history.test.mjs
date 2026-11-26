@@ -43,7 +43,9 @@ const claim = { assignmentId: id, version: 1, category: "company", status: "appr
 const finance = { trips: [{ assignmentId: id, date: report.serviceDate, pickup: "Airport", destination: "Hotel",
   existingOvertimeHours: 0, claims: [claim] }],
   fuelClaims: [{ id: other, date: report.serviceDate, assignmentId: id, version: 1, status: "approved",
-    amount: 500, receipts: [], reviewNote: "" }],
+    amount: 500, receipts: [], reviewNote: "" },
+  { id: other, date: "2026-10-25", assignmentId: other, version: 1, status: "approved",
+    amount: 800, receipts: [], reviewNote: "" }],
   wages: [{ date: report.serviceDate, base: 1000, bonus: 0, overtime: 0, advances: 1500 }], manualItems: [] };
 const { jsonResponse } = load("lib/api-response.ts");
 const reports = load("lib/driver/reports.ts");
@@ -166,9 +168,10 @@ test("daily history is read-only and shows orders and finance without report row
   const cleanup = h.effects[0]();
   await new Promise(done => setImmediate(done));
   const html = renderToStaticMarkup(h.render());
-  for (const text of ["订单名称", "History order", "Order without report", "立替", "¥1,500", "燃油费", "¥500",
+  for (const text of ["订单名称", "History order", "Order without report", "立替", "¥1,500",
     "当日工资", "¥1,000"])
     assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /燃油费|¥500|2026-10-25/);
   assert.doesNotMatch(html, /月工資汇总/);
   assert.doesNotMatch(html, /当日日报|日报未完成|>修改</);
   assert.doesNotMatch(html, /href="\/driver\/(?:finance|report)\?/);
